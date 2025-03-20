@@ -29,7 +29,7 @@ function App() {
     { id: '12', title: 'Troubleshooting Docker Mount Error in Container', messages: [], selectedModels: [] },
   ]);
   
-  const MAX_MODELS = 4;
+  const MAX_MODELS = 16;
   
   const handleModelToggle = (modelId: string) => {
     setModels(prevModels => 
