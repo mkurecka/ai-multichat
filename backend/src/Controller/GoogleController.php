@@ -3,16 +3,23 @@
 namespace App\Controller;
 
 use KnpU\OAuth2ClientBundle\Client\ClientRegistry;
-use League\OAuth2\Client\Provider\Exception\IdentityProviderException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
+use App\Service\JWTTokenService;
+use Psr\Log\LoggerInterface;
 
 class GoogleController extends AbstractController
 {
-
+    private LoggerInterface $logger;
+    
+    public function __construct(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+    
     #[Route('/connect/google', name: 'connect_google')]
-    public function connectAction(ClientRegistry $clientRegistry)
+    public function connectAction(ClientRegistry $clientRegistry): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         return $clientRegistry
             ->getClient('google') // key used in config/packages/knpu_oauth2_client.yaml
@@ -22,28 +29,30 @@ class GoogleController extends AbstractController
     }
 
     #[Route('/connect/google/check', name: 'connect_google_check')]
-    public function connectCheckAction(Request $request, ClientRegistry $clientRegistry)
+    public function connectCheckAction(Request $request, ClientRegistry $clientRegistry, JWTTokenService $jwtService)
     {
-        // ** if you want to *authenticate* the user, then
-        // leave this method blank and create a Guard authenticator
-        // (read below)
+        // The GoogleAuthenticator will handle authentication
+        // This method will only be called if authentication was successful
 
-        /** @var \KnpU\OAuth2ClientBundle\Client\Provider\GoogleClient $client */
-        $client = $clientRegistry->getClient('google');
-
+        // Get the authenticated user
+        $user = $this->getUser();
+        
+        if (!$user) {
+            return $this->redirectToRoute('app_login');
+        }
+        
         try {
-            // the exact class depends on which provider you're using
-            /** @var \League\OAuth2\Client\Provider\GoogleUser $user */
-            $user = $client->fetchUser();
-
-            // do something with all this new power!
-            // e.g. $name = $user->getFirstName();
-            var_dump($user); die;
-            // ...
-        } catch (IdentityProviderException $e) {
-            // something went wrong!
-            // probably you should return the reason to the user
-            var_dump($e->getMessage()); die;
+            // Create JWT token
+            $token = $jwtService->createToken($user);
+            
+            // Redirect to frontend with token
+            return $this->redirect('http://localhost:5173/callback?token=' . $token);
+        } catch (\Exception $e) {
+            // Log the error
+            $this->logger->error('JWT token creation failed: ' . $e->getMessage());
+            
+            // Redirect to login with error
+            return $this->redirectToRoute('app_login', ['error' => 'authentication_failed']);
         }
     }
 }

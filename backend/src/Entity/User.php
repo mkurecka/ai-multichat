@@ -18,8 +18,14 @@ class User implements UserInterface
     #[ORM\Column(length: 255, unique: true)]
     private string $googleId;
 
+    #[ORM\Column]
+    private array $roles = [];
+
+    #[ORM\Column(length: 255)]
+    private ?string $email = null;
+
     #[ORM\ManyToOne(targetEntity: Organization::class)]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\JoinColumn(nullable: true)]
     private ?Organization $organization = null;
 
     #[ORM\OneToMany(targetEntity: ChatHistory::class, mappedBy: "user")]
@@ -123,5 +129,20 @@ class User implements UserInterface
     public function getUsername(): string
     {
         return $this->getUserIdentifier();
+    }
+
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(?string $email): void
+    {
+        $this->email = $email;
+    }
+
+    public function setRoles(array $roles): void
+    {
+        $this->roles = $roles;
     }
 }

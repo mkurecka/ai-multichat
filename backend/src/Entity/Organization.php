@@ -2,8 +2,7 @@
 
 namespace App\Entity;
 
-use App\Entity\ChatHistory;
-use App\Entity\Organization;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -18,11 +17,22 @@ class Organization
     #[ORM\Column(length: 255)]
     private string $googleId;
     
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $domain = null;
+    
+    #[ORM\Column(type: "integer")]
+    private int $usageCount = 0;
+    
     #[ORM\ManyToOne(targetEntity: User::class)]
     private ?User $user = null;
 
     #[ORM\OneToMany(targetEntity: ChatHistory::class, mappedBy: "user")]
     private Collection $chatHistories;
+    
+    public function __construct()
+    {
+        $this->chatHistories = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -37,6 +47,30 @@ class Organization
     public function setGoogleId(string $googleId): self
     {
         $this->googleId = $googleId;
+
+        return $this;
+    }
+    
+    public function getDomain(): ?string
+    {
+        return $this->domain;
+    }
+
+    public function setDomain(?string $domain): self
+    {
+        $this->domain = $domain;
+
+        return $this;
+    }
+    
+    public function getUsageCount(): int
+    {
+        return $this->usageCount;
+    }
+
+    public function setUsageCount(int $usageCount): self
+    {
+        $this->usageCount = $usageCount;
 
         return $this;
     }
@@ -68,8 +102,8 @@ class Organization
         return $this;
     }
 
-     public function removeChatHistory(ChatHistory $chatHistory): self
-     {
+    public function removeChatHistory(ChatHistory $chatHistory): self
+    {
         if ($this->chatHistories->contains($chatHistory)) {
             $this->chatHistories->removeElement($chatHistory);
         }
