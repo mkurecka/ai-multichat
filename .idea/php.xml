@@ -151,6 +151,12 @@
       <path value="$PROJECT_DIR$/backend/vendor/guzzlehttp/promises" />
       <path value="$PROJECT_DIR$/backend/vendor/guzzlehttp/guzzle" />
       <path value="$PROJECT_DIR$/backend/vendor/guzzlehttp/psr7" />
+      <path value="$PROJECT_DIR$/backend/vendor/league/oauth2-client" />
+      <path value="$PROJECT_DIR$/backend/vendor/league/oauth2-google" />
+      <path value="$PROJECT_DIR$/backend/vendor/knpuniversity/oauth2-client-bundle" />
+      <path value="$PROJECT_DIR$/backend/vendor/lexik/jwt-authentication-bundle" />
+      <path value="$PROJECT_DIR$/backend/vendor/lcobucci/clock" />
+      <path value="$PROJECT_DIR$/backend/vendor/lcobucci/jwt" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.2" />
