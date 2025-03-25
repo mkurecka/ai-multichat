@@ -5,6 +5,8 @@
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
     frontend_url: '%env(FRONTEND_URL)%'
+    openrouter_api_key: '%env(OPENROUTER_API_KEY)%'
+    openrouter_cache_ttl: '%env(int:OPENROUTER_CACHE_TTL)%'
 
 services:
     # default configuration for services in *this* file
@@ -23,3 +25,19 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+    
+    App\Service\OpenRouterService:
+        arguments:
+            $apiKey: '%openrouter_api_key%'
+            
+    # Cache adapter for models
+    models.cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            $namespace: 'models'
+            $defaultLifetime: '%openrouter_cache_ttl%'
+            
+    App\Service\ModelService:
+        arguments:
+            $cache: '@models.cache'
+            $cacheTtl: '%openrouter_cache_ttl%'

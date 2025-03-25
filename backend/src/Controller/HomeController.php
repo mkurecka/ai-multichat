@@ -11,6 +11,7 @@ class HomeController extends AbstractController
     #[Route('/', name: 'app_home')]
     public function index(): Response
     {
-        return $this->render('home/index.html.twig');
+        // Redirect to frontend instead of rendering a template
+        return $this->redirect($this->getParameter('frontend_url'));
     }
 }

@@ -8,10 +8,17 @@ const api: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Remove withCredentials as we're using JWT tokens, not cookies
 });
 
 // Add an interceptor to include the authentication token in every request
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
+  // Check if token needs refresh before making the request
+  // Skip token refresh check for the token refresh endpoint to avoid infinite loops
+  if (!config.url?.includes('/token/refresh')) {
+    await checkTokenRefresh();
+  }
+  
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -22,23 +29,163 @@ api.interceptors.request.use((config) => {
 // Handle errors globally
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Clear token and redirect to login
+  async (error) => {
+    // Don't retry if the error is from the token refresh endpoint itself
+    if (error.config.url?.includes('/token/refresh')) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (!window.location.pathname.includes('/login') && 
+          !window.location.pathname.includes('/callback')) {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
     }
+    
+    // For 401 errors, try to refresh the token and retry the request
+    if (error.response?.status === 401) {
+      console.log('Attempting to refresh token due to 401 error');
+      
+      try {
+        // Try to refresh the token
+        const refreshed = await refreshToken();
+        
+        if (refreshed) {
+          // If token refresh was successful, retry the original request
+          const token = localStorage.getItem('token');
+          error.config.headers.Authorization = `Bearer ${token}`;
+          return axios(error.config);
+        } else {
+          // If token refresh failed, redirect to login
+          if (!window.location.pathname.includes('/login') && 
+              !window.location.pathname.includes('/callback')) {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+          }
+        }
+      } catch (refreshError) {
+        console.error('Error during token refresh:', refreshError);
+        // If there was an error refreshing the token, redirect to login
+        if (!window.location.pathname.includes('/login') && 
+            !window.location.pathname.includes('/callback')) {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
+
+// Function to decode JWT token without verification
+const decodeToken = (token: string): any => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
+
+// Add a function to check if token exists and is valid
+export const isAuthenticated = (): boolean => {
+  const token = localStorage.getItem('token');
+  if (!token) return false;
+  
+  // Decode the token and check if it's expired
+  const decodedToken = decodeToken(token);
+  if (!decodedToken) return false;
+  
+  // Check if token has exp claim and is not expired
+  if (decodedToken.exp && decodedToken.exp < Date.now() / 1000) {
+    // Token is expired
+    localStorage.removeItem('token');
+    return false;
+  }
+  
+  return true;
+};
+
+// Function to refresh the token
+export const refreshToken = async (): Promise<boolean> => {
+  try {
+    // Get the current token (even if expired) to send with the refresh request
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken) {
+      return false;
+    }
+    
+    // Create a new axios instance to avoid interceptors that might cause infinite loops
+    const refreshApi = axios.create({
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentToken}`
+      }
+    });
+    
+    const response = await refreshApi.post('/token/refresh');
+    const { token } = response.data;
+    
+    if (token) {
+      localStorage.setItem('token', token);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return false;
+  }
+};
+
+// Function to check if token needs refresh (e.g., if it expires in less than 1 hour)
+export const checkTokenRefresh = async (): Promise<void> => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  
+  const decodedToken = decodeToken(token);
+  if (!decodedToken || !decodedToken.exp) return;
+  
+  // If token expires in less than 1 hour (3600 seconds), refresh it
+  const expiresIn = decodedToken.exp - (Date.now() / 1000);
+  if (expiresIn < 3600) {
+    await refreshToken();
+  }
+};
 
 // Fetch available models
 export const getModels = async (): Promise<Model[]> => {
   try {
     const response = await api.get('/models');
-    return response.data;
+    // Return the data directly if it's already an array of models
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    // Otherwise, return an empty array
+    return [];
   } catch (error) {
     console.error('Error fetching models:', error);
+    throw error;
+  }
+};
+
+// Refresh models cache
+export const refreshModels = async (): Promise<Model[]> => {
+  try {
+    const response = await api.get('/models/refresh');
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error refreshing models:', error);
     throw error;
   }
 };

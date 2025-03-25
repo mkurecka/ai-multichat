@@ -1,0 +1,65 @@
+FROM php:8.2-fpm AS php_base
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    libzip-dev \
+    libicu-dev \
+    libonig-dev \
+    libxml2-dev \
+    && docker-php-ext-install \
+    pdo_mysql \
+    zip \
+    intl \
+    opcache \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    xml
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Configure PHP for production
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    && echo "opcache.memory_consumption=256" >> "$PHP_INI_DIR/php.ini" \
+    && echo "opcache.max_accelerated_files=20000" >> "$PHP_INI_DIR/php.ini" \
+    && echo "opcache.validate_timestamps=0" >> "$PHP_INI_DIR/php.ini" \
+    && echo "realpath_cache_size=4096K" >> "$PHP_INI_DIR/php.ini" \
+    && echo "realpath_cache_ttl=600" >> "$PHP_INI_DIR/php.ini"
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Build stage for dependencies and application
+FROM php_base AS build
+
+# Copy composer files
+COPY composer.json composer.lock ./
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader --no-scripts
+
+# Copy application files
+COPY . .
+
+# Run Symfony cache clear and warmup
+RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \
+    && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
+
+# Final stage
+FROM php_base
+
+# Copy application from build stage
+COPY --from=build /var/www/html /var/www/html
+
+# Create var directory and set permissions
+RUN mkdir -p /var/www/html/var && \
+    chown -R www-data:www-data /var/www/html/var
+
+# Expose port 9000 for PHP-FPM
+EXPOSE 9000
+
+CMD ["php-fpm"]

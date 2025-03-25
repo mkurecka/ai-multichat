@@ -37,17 +37,57 @@ class JWTAuthenticator extends AbstractAuthenticator
         
         $token = str_replace('Bearer ', '', $authHeader);
 
-        $payload = $this->jwtService->validateToken($token);
-
-        if (!$payload) {
-            throw new AuthenticationException('Invalid JWT token');
+        try {
+            $payload = $this->jwtService->validateToken($token);
+    
+            if (!$payload) {
+                // Check if token is expired by trying to decode it without verification
+                try {
+                    // This is a simple check to see if the token structure is valid
+                    $tokenParts = explode('.', $token);
+                    if (count($tokenParts) === 3) {
+                        $payloadBase64 = $tokenParts[1];
+                        $payloadJson = base64_decode(str_replace(['-', '_'], ['+', '/'], $payloadBase64));
+                        $payloadData = json_decode($payloadJson, true);
+                        
+                        if (isset($payloadData['exp']) && $payloadData['exp'] < time()) {
+                            throw new AuthenticationException('JWT token has expired');
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Ignore any errors in this basic check
+                }
+                
+                // If we couldn't determine a specific reason, use a generic message
+                throw new AuthenticationException('Invalid JWT token');
+            }
+    
+            if (!isset($payload['sub'])) {
+                throw new AuthenticationException('JWT token missing subject claim');
+            }
+            
+            return new SelfValidatingPassport(
+                new UserBadge($payload['sub'], function ($userIdentifier) use ($payload) {
+                    // Try to find by ID first (for existing tokens)
+                    $user = $this->userRepository->find($userIdentifier);
+                    
+                    // If not found and we have a googleId in the payload, try that
+                    if (!$user && isset($payload['googleId'])) {
+                        $user = $this->userRepository->findOneBy(['googleId' => $payload['googleId']]);
+                    }
+                    
+                    if (!$user) {
+                        throw new AuthenticationException('User not found for token');
+                    }
+                    
+                    return $user;
+                })
+            );
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            error_log('JWT Authentication failed: ' . $e->getMessage());
+            throw new AuthenticationException('Authentication failed: ' . $e->getMessage());
         }
-
-        return new SelfValidatingPassport(
-            new UserBadge($payload['sub'], function ($userIdentifier) {
-                return $this->userRepository->find($userIdentifier);
-            })
-        );
     }
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response

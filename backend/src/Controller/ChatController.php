@@ -7,6 +7,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use App\Service\OpenRouterService;
+use App\Service\ModelService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\ChatHistory;
 
@@ -14,9 +15,15 @@ use App\Entity\ChatHistory;
 class ChatController extends AbstractController
 {
     #[Route('/models', methods: ['GET'])]
-    public function getModels(OpenRouterService $openRouter): JsonResponse
+    public function getModels(ModelService $modelService): JsonResponse
     {
-        return $this->json($openRouter->getModels());
+        return $this->json($modelService->getModels());
+    }
+    
+    #[Route('/models/refresh', methods: ['GET'])]
+    public function refreshModels(ModelService $modelService): JsonResponse
+    {
+        return $this->json($modelService->refreshModels());
     }
     
     #[Route('/chat', methods: ['POST'])]
@@ -50,7 +57,7 @@ class ChatController extends AbstractController
         ]);
     }
     
-    #[Route('/history', methods: ['GET'])]
+    #[Route('/chat/history', methods: ['GET'])]
     public function history(): JsonResponse
     {
         $user = $this->getUser();

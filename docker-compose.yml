@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Backend services
+  php:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/var:/var/www/html/var
+    depends_on:
+      - database
+    environment:
+      - APP_ENV=dev
+      - DATABASE_URL=mysql://app:!ChangeMe!@database:3306/app?serverVersion=8.0.32&charset=utf8mb4
+      - CORS_ALLOW_ORIGIN=^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$
+      - FRONTEND_URL=http://localhost:3000
+
+  nginx_backend:
+    image: nginx:alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/backend.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
+  database:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-!ChangeMe!}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-!ChangeMe!}
+    ports:
+      - "3306:3306"
+    volumes:
+      - database_data:/var/lib/mysql:rw
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-!ChangeMe!}"]
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # Frontend services
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - nginx_backend
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+
+volumes:
+  database_data:

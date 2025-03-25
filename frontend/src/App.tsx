@@ -1,27 +1,65 @@
 import { useState, useEffect } from 'react';
 import { Message, Model, ChatSession } from './types';
-import { getModels, getChatHistory, sendMessageToModels } from './services/api';
+import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh } from './services/api';
+import { useNavigate } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
 import ChatHistory from './components/ChatHistory';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 function App() {
+  const navigate = useNavigate();
   const [models, setModels] = useState<Model[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showModelSelector, setShowModelSelector] = useState(true);
   const [showChatHistory, setShowChatHistory] = useState(true);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const MAX_MODELS = 16;
   const hasMessages = messages.length > 0;
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsLoading(true);
+      
+      // Check if user is authenticated
+      if (!isAuthenticated()) {
+        // Redirect to login if not authenticated
+        navigate('/login');
+        return;
+      }
+      
+      // Check if token needs to be refreshed
+      try {
+        await checkTokenRefresh();
+      } catch (error) {
+        console.error('Error checking token:', error);
+        // If token refresh fails, redirect to login
+        navigate('/login');
+        return;
+      }
+      
+      setIsLoading(false);
+    };
+    
+    checkAuth();
+  }, [navigate]);
 
   // Fetch models on mount
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const fetchedModels = await getModels();
+        // Try to get models from cache first
+        let fetchedModels = await getModels();
+        
+        // If no models returned, refresh the cache
+        if (!fetchedModels || fetchedModels.length === 0) {
+          fetchedModels = await refreshModels();
+        }
+        
         setModels(fetchedModels.map(model => ({ ...model, selected: false })));
       } catch (error) {
         console.error('Failed to fetch models:', error);
@@ -40,9 +78,9 @@ function App() {
           id: entry.id.toString(),
           title: entry.prompt,
           messages: [
-            { role: 'user', content: entry.prompt },
+            { role: 'user' as const, content: entry.prompt },
             ...Object.entries(entry.responses).map(([modelId, content]) => ({
-              role: 'assistant',
+              role: 'assistant' as const,
               content: content as string,
               modelId,
             })),

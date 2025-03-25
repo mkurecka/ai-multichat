@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Model } from '../types';
-import { Check, Info, Search, X } from 'lucide-react';
-import { getModels } from '../api';
+import { Check, Info, RefreshCw, Search, X } from 'lucide-react';
+import { refreshModels } from '../services/api';
 
 interface ModelSelectorProps {
     models: Model[];
@@ -12,6 +12,7 @@ interface ModelSelectorProps {
 const ModelSelector: React.FC<ModelSelectorProps> = ({ models, onModelToggle, maxModels }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const selectedCount = models.filter(model => model.selected).length;
     const hasActiveChat = models.some(model => model.selected);
 
@@ -25,8 +26,29 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, onModelToggle, ma
         <div className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Select Models</h2>
-                <div className="text-sm text-gray-600">
-                    {selectedCount}/{maxModels} selected
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={async () => {
+                            setRefreshing(true);
+                            try {
+                                const refreshedModels = await refreshModels();
+                                // Force a page reload to update the models
+                                window.location.reload();
+                            } catch (error) {
+                                console.error('Failed to refresh models:', error);
+                            } finally {
+                                setRefreshing(false);
+                            }
+                        }}
+                        disabled={refreshing}
+                        className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
+                        title="Refresh models"
+                    >
+                        <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+                    </button>
+                    <div className="text-sm text-gray-600">
+                        {selectedCount}/{maxModels} selected
+                    </div>
                 </div>
             </div>
 
