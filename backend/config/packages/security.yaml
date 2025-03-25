@@ -1,5 +1,6 @@
 security:
-
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
     providers:
         app_user_provider:
             entity:
@@ -10,6 +11,11 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+        api:
+            pattern: ^/api
+            stateless: true
+            custom_authenticators:
+                - App\Security\JWTAuthenticator
         main:
             lazy: true
             provider: app_user_provider
@@ -18,11 +24,12 @@ security:
             logout:
                 path: app_logout
                 target: app_home
-            # Remove stateless: true as Google auth typically requires sessions
     
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google, roles: PUBLIC_ACCESS }
+        - { path: ^/api/public, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: ROLE_USER }
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/profile, roles: ROLE_USER }
 

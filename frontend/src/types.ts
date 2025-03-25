@@ -7,14 +7,20 @@ export interface Message {
 export interface Model {
   id: string;
   name: string;
-  description?: string; // Made optional to match OpenRouter's response
-  provider?: string; // Made optional
+  description?: string;
+  provider?: string;
   selected: boolean;
 }
 
 export interface ChatSession {
   id: string;
-  title: string; // We'll use the prompt as the title
+  title: string;
   messages: Message[];
   selectedModels: string[];
+}
+
+export interface UsageData {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
 }

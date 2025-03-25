@@ -2,9 +2,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import App from './App.tsx';
-import Login from './components/Login.tsx';
-import Callback from './components/Callback.tsx';
+import App from './App';
+import Login from './components/Login';
+import Callback from './components/Callback';
 import './index.css';
 
 // Protected Route Component
