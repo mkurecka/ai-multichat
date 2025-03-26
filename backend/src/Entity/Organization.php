@@ -5,6 +5,7 @@ namespace App\Entity;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 class Organization
@@ -12,27 +13,24 @@ class Organization
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['organization:read'])]
     private ?int $id = null;
     
     #[ORM\Column(length: 255)]
+    #[Groups(['organization:read'])]
     private string $googleId;
     
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['organization:read'])]
     private ?string $domain = null;
     
     #[ORM\Column(type: "integer")]
+    #[Groups(['organization:read'])]
     private int $usageCount = 0;
     
     #[ORM\ManyToOne(targetEntity: User::class)]
+    #[Groups(['organization:read'])]
     private ?User $user = null;
-
-    #[ORM\OneToMany(targetEntity: ChatHistory::class, mappedBy: "user")]
-    private Collection $chatHistories;
-    
-    public function __construct()
-    {
-        $this->chatHistories = new ArrayCollection();
-    }
 
     public function getId(): ?int
     {
@@ -83,30 +81,6 @@ class Organization
     public function setUser(?User $user): self
     {
         $this->user = $user;
-
-        return $this;
-    }
-
-    public function getChatHistories(): Collection
-    {
-        return $this->chatHistories;
-    }
-
-    public function addChatHistory(ChatHistory $chatHistory): self
-    {
-        if (!$this->chatHistories->contains($chatHistory)) {
-            $this->chatHistories[] = $chatHistory;
-            $chatHistory->setUser($this);
-        }
-
-        return $this;
-    }
-
-    public function removeChatHistory(ChatHistory $chatHistory): self
-    {
-        if ($this->chatHistories->contains($chatHistory)) {
-            $this->chatHistories->removeElement($chatHistory);
-        }
 
         return $this;
     }

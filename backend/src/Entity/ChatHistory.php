@@ -7,6 +7,7 @@ use DateTime;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 class ChatHistory
@@ -14,28 +15,36 @@ class ChatHistory
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['chat_history:read'])]
     private ?int $id = null;
     
     #[ORM\ManyToOne(targetEntity: User::class)]
+    #[Groups(['chat_history:read'])]
     private User $user;
     
     #[ORM\Column(type: "text")]
+    #[Groups(['chat_history:read'])]
     private string $prompt;
     
     #[ORM\Column(type: "json")]
+    #[Groups(['chat_history:read'])]
     private array $responses;
     
     #[ORM\Column(type: "datetime")]
+    #[Groups(['chat_history:read'])]
     private DateTime $createdAt;
 
     #[ORM\Column(type: "string", nullable: true)]
+    #[Groups(['chat_history:read'])]
     private ?string $threadId = null;
 
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: "children")]
     #[ORM\JoinColumn(name: "parent_id", referencedColumnName: "id", nullable: true)]
+    #[Groups(['chat_history:read'])]
     private ?self $parent = null;
 
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: "parent")]
+    #[Groups(['chat_history:read'])]
     private Collection $children;
 
     public function __construct()

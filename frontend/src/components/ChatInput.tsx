@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { Send } from 'lucide-react';
-import { sendMessageToModels } from '../services/api';
 import { Message } from '../types';
 
 interface ChatInputProps {
-    onSendMessage: (messages: Message[], prompt: string) => void; // Updated to pass responses and prompt
+    onSendMessage: (messages: Message[], prompt: string) => void;
     disabled: boolean;
-    selectedModels: string[]; // Add selected models as a prop
+    selectedModels: string[];
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, selectedModels }) => {
@@ -18,8 +17,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, selected
         if (message.trim() && !disabled && !loading) {
             setLoading(true);
             try {
-                const { responses } = await sendMessageToModels(message, selectedModels);
-                onSendMessage(responses, message); // Pass the responses and the prompt to the parent
+                // Create a temporary user message
+                const userMessage: Message = { role: 'user', content: message };
+                // Call parent handler with empty responses array (will be filled by parent)
+                onSendMessage([], message);
                 setMessage('');
             } catch (error) {
                 console.error('Failed to send message:', error);
@@ -32,21 +33,21 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, selected
     return (
         <form onSubmit={handleSubmit} className="flex items-end gap-2">
             <div className="flex-1">
-        <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder={disabled ? "Select at least one model to start chatting" : "Type your message here..."}
-            disabled={disabled || loading}
-            className={`w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-            ${disabled || loading ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
-            rows={3}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                }
-            }}
-        />
+                <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder={disabled ? "Select at least one model to start chatting" : "Type your message here..."}
+                    disabled={disabled || loading}
+                    className={`w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                    ${disabled || loading ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}
+                    rows={3}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSubmit(e);
+                        }
+                    }}
+                />
             </div>
             <button
                 type="submit"

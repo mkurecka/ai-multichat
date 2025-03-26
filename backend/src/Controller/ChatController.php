@@ -10,6 +10,7 @@ use App\Service\OpenRouterService;
 use App\Service\ModelService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\ChatHistory;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api')]
 class ChatController extends AbstractController
@@ -75,10 +76,11 @@ class ChatController extends AbstractController
     }
     
     #[Route('/chat/history', methods: ['GET'])]
-    public function history(): JsonResponse
+    public function history(SerializerInterface $serializer): JsonResponse
     {
         $user = $this->getUser();
-        return $this->json($user->getChatHistories());
+        $data = $serializer->normalize($user->getChatHistories(), null, ['groups' => ['chat_history:read']]);
+        return $this->json($data);
     }
 
     #[Route('/chat/thread/{threadId}', methods: ['GET'])]
