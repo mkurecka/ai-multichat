@@ -191,15 +191,109 @@ export const refreshModels = async (): Promise<Model[]> => {
 };
 
 // Send a message to the selected models and get responses
-export const sendMessageToModels = async (prompt: string, models: string[], threadId?: string, parentId?: string): Promise<any> => {
+export const sendMessageToModels = async (
+  prompt: string,
+  modelIds: string[],
+  threadId?: string,
+  parentId?: string,
+  onStream?: (modelId: string, content: string) => void
+): Promise<any> => {
   try {
-    const response = await api.post('/chat', {
-      prompt,
-      models,
-      threadId,
-      parentId
-    });
-    return response.data;
+    if (onStream) {
+      // For streaming, we'll handle one model at a time
+      const modelId = modelIds[0];
+      const response = await fetch(`${api.defaults.baseURL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          prompt,
+          models: [modelId],
+          threadId,
+          parentId,
+          stream: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      const decoder = new TextDecoder();
+      let content = '';
+      let openRouterId = null;
+      let currentThreadId = threadId;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              break;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.done) {
+                return {
+                  responses: {
+                    [modelId]: {
+                      content,
+                      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+                      id: openRouterId
+                    }
+                  },
+                  threadId: parsed.threadId || currentThreadId
+                };
+              }
+              if (parsed.id) {
+                openRouterId = parsed.id;
+              }
+              if (parsed.content) {
+                content += parsed.content;
+                onStream(modelId, content);
+              }
+            } catch (e) {
+              console.error('Error parsing streaming response:', e);
+            }
+          }
+        }
+      }
+
+      // If we get here without a done message, return what we have
+      return {
+        responses: {
+          [modelId]: {
+            content,
+            usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            id: openRouterId
+          }
+        },
+        threadId: currentThreadId
+      };
+    } else {
+      // Non-streaming response
+      const response = await api.post('/chat', {
+        prompt,
+        models: modelIds,
+        threadId,
+        parentId,
+        stream: false
+      });
+      return response.data;
+    }
   } catch (error) {
     console.error('Error sending message:', error);
     throw error;

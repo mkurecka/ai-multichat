@@ -35,7 +35,7 @@ class OpenRouterService
         }
     }
     
-    public function generateResponse(string $prompt, array $models): array
+    public function generateResponse(string $prompt, array $models, bool $stream = false): array
     {
         $responses = [];
         foreach ($models as $model) {
@@ -54,7 +54,7 @@ class OpenRouterService
                                 'content' => $prompt
                             ]
                         ],
-                        'stream' => false
+                        'stream' => $stream
                     ]
                 ]);
                 
@@ -66,18 +66,85 @@ class OpenRouterService
                     );
                 }
                 
-                $data = $response->toArray();
-                if (!isset($data['choices'][0]['message']['content'])) {
-                    throw new HttpException(500, 'Invalid response format from OpenRouter');
+                if ($stream) {
+                    $responses[$model] = [
+                        'stream' => $response->toStream(),
+                        'id' => null,
+                        'usage' => [
+                            'prompt_tokens' => 0,
+                            'completion_tokens' => 0,
+                            'total_tokens' => 0
+                        ]
+                    ];
+                } else {
+                    $data = $response->toArray();
+                    if (!isset($data['choices'][0]['message']['content'])) {
+                        throw new HttpException(500, 'Invalid response format from OpenRouter');
+                    }
+                    
+                    $responses[$model] = [
+                        'content' => $data['choices'][0]['message']['content'],
+                        'id' => $data['id'] ?? null,
+                        'usage' => [
+                            'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
+                            'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
+                            'total_tokens' => $data['usage']['total_tokens'] ?? 0
+                        ]
+                    ];
+                }
+            } catch (\Exception $e) {
+                $responses[$model] = [
+                    'content' => 'Error: ' . $e->getMessage(),
+                    'id' => null,
+                    'usage' => [
+                        'prompt_tokens' => 0,
+                        'completion_tokens' => 0,
+                        'total_tokens' => 0
+                    ]
+                ];
+            }
+        }
+        return $responses;
+    }
+
+    public function streamResponse(string $prompt, array $models): array
+    {
+        $responses = [];
+        foreach ($models as $model) {
+            try {
+                $response = $this->client->request('POST', self::API_URL . '/chat/completions', [
+                    'headers' => [
+                        'Authorization' => "Bearer {$this->apiKey}",
+                        'X-Title' => 'AI MultiChat',
+                        'Content-Type' => 'application/json'
+                    ],
+                    'json' => [
+                        'model' => $model,
+                        'messages' => [
+                            [
+                                'role' => 'user',
+                                'content' => $prompt
+                            ]
+                        ],
+                        'stream' => true
+                    ]
+                ]);
+                
+                if ($response->getStatusCode() !== 200) {
+                    $errorData = $response->toArray();
+                    throw new HttpException(
+                        $response->getStatusCode(),
+                        $errorData['error']['message'] ?? 'Failed to generate response from OpenRouter'
+                    );
                 }
                 
                 $responses[$model] = [
-                    'content' => $data['choices'][0]['message']['content'],
-                    'id' => $data['id'] ?? null,
+                    'stream' => $response->toStream(),
+                    'id' => null,
                     'usage' => [
-                        'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
-                        'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
-                        'total_tokens' => $data['usage']['total_tokens'] ?? 0
+                        'prompt_tokens' => 0,
+                        'completion_tokens' => 0,
+                        'total_tokens' => 0
                     ]
                 ];
             } catch (\Exception $e) {

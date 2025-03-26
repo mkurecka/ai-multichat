@@ -76,15 +76,12 @@ function App() {
         const history = await getChatHistory();
         const sessions: ChatSession[] = history.map((entry: any) => ({
           id: entry.id.toString(),
-          title: entry.prompt,
-          messages: [
-            { role: 'user' as const, content: entry.prompt },
-            ...Object.entries(entry.responses).map(([modelId, content]) => ({
-              role: 'assistant' as const,
-              content: content as string,
-              modelId,
-            })),
-          ],
+          title: entry.title,
+          threadId: entry.threadId,
+          messages: entry.messages.map((msg: any) => [
+            { role: 'user' as const, content: msg.prompt },
+            { role: 'assistant' as const, content: Object.values(msg.responses)[0] as string, modelId: msg.modelId }
+          ]).flat(),
           selectedModels: [],
         }));
         setChatHistory(sessions);
@@ -108,17 +105,41 @@ function App() {
     // Add user message
     const userMessage: Message = { role: 'user', content: prompt };
     
-    // Update messages with user message and model responses
-    setMessages(prevMessages => [...prevMessages, userMessage, ...responses]);
+    // Update messages with user message and empty responses
+    const emptyResponses = models
+      .filter(m => m.selected)
+      .map(m => ({ role: 'assistant' as const, content: '', modelId: m.id }));
+    
+    setMessages(prevMessages => [...prevMessages, userMessage, ...emptyResponses]);
 
     // Get current thread ID or create new one
     const currentThreadId = currentSessionId || undefined;
     const lastMessage = messages[messages.length - 1];
     const parentId = lastMessage?.id;
 
-    // Send message to API
+    // Send message to API with streaming
     try {
-      const result = await sendMessageToModels(prompt, models.filter(m => m.selected).map(m => m.id), currentThreadId, parentId);
+      const result = await sendMessageToModels(
+        prompt,
+        models.filter(m => m.selected).map(m => m.id),
+        currentThreadId,
+        parentId,
+        (modelId, content) => {
+          setMessages(prevMessages => {
+            const newMessages = [...prevMessages];
+            const responseIndex = newMessages.findIndex(
+              m => m.role === 'assistant' && m.modelId === modelId
+            );
+            if (responseIndex !== -1) {
+              newMessages[responseIndex] = {
+                ...newMessages[responseIndex],
+                content
+              };
+            }
+            return newMessages;
+          });
+        }
+      );
       
       // Update thread ID if this is a new thread
       if (!currentThreadId && result.threadId) {
@@ -129,17 +150,12 @@ function App() {
       const history = await getChatHistory();
       const sessions: ChatSession[] = history.map((entry: any) => ({
         id: entry.id.toString(),
-        title: entry.prompt,
+        title: entry.title,
         threadId: entry.threadId,
-        parentId: entry.parentId,
-        messages: [
-          { role: 'user' as const, content: entry.prompt },
-          ...Object.entries(entry.responses).map(([modelId, content]) => ({
-            role: 'assistant' as const,
-            content: content as string,
-            modelId,
-          })),
-        ],
+        messages: entry.messages.map((msg: any) => [
+          { role: 'user' as const, content: msg.prompt },
+          { role: 'assistant' as const, content: Object.values(msg.responses)[0] as string, modelId: msg.modelId }
+        ]).flat(),
         selectedModels: [],
       }));
       setChatHistory(sessions);
@@ -155,31 +171,16 @@ function App() {
       setMessages(session.messages);
       
       // Update model selection based on the chat
-      const modelIds = session.selectedModels;
+      const modelIds = [...new Set(session.messages
+        .filter((m: Message) => m.role === 'assistant')
+        .map((m: Message) => m.modelId))];
+        
       setModels(prevModels => 
         prevModels.map(model => ({
           ...model,
           selected: modelIds.includes(model.id)
         }))
       );
-
-      // If this is a thread, fetch full thread history
-      if (session.threadId) {
-        try {
-          const threadData = await getThreadHistory(session.threadId);
-          const threadMessages = threadData.messages.flatMap((msg: any) => [
-            { role: 'user' as const, content: msg.prompt },
-            ...Object.entries(msg.responses).map(([modelId, content]) => ({
-              role: 'assistant' as const,
-              content: content as string,
-              modelId,
-            })),
-          ]);
-          setMessages(threadMessages);
-        } catch (error) {
-          console.error('Failed to fetch thread history:', error);
-        }
-      }
     }
   };
 
