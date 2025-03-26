@@ -2,6 +2,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   modelId?: string;
+  id?: string;
 }
 
 export interface Model {
@@ -17,6 +18,8 @@ export interface ChatSession {
   title: string;
   messages: Message[];
   selectedModels: string[];
+  threadId?: string;
+  parentId?: string;
 }
 
 export interface UsageData {

@@ -32,6 +32,8 @@ class ChatController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $prompt = $data['prompt'];
         $models = $data['models'];
+        $threadId = $data['threadId'] ?? null;
+        $parentId = $data['parentId'] ?? null;
         
         $user = $this->getUser();
         $organization = $user->getOrganization();
@@ -44,12 +46,27 @@ class ChatController extends AbstractController
             ->setPrompt($prompt)
             ->setResponses($responses)
             ->setCreatedAt(new \DateTime());
+
+        // Handle thread logic
+        if ($threadId) {
+            $chatHistory->setThreadId($threadId);
+        } else {
+            $chatHistory->setThreadId(uniqid('thread_'));
+        }
+
+        if ($parentId) {
+            $parent = $em->getRepository(ChatHistory::class)->find($parentId);
+            if ($parent) {
+                $chatHistory->setParent($parent);
+            }
+        }
         
         $em->persist($chatHistory);
         $em->flush();
         
         return $this->json([
             'responses' => $responses,
+            'threadId' => $chatHistory->getThreadId(),
             'usage' => [
                 'user' => $user->getChatHistories()->count(),
                 'organization' => $organization->getUsageCount()
@@ -62,5 +79,57 @@ class ChatController extends AbstractController
     {
         $user = $this->getUser();
         return $this->json($user->getChatHistories());
+    }
+
+    #[Route('/chat/thread/{threadId}', methods: ['GET'])]
+    public function getThread(string $threadId, EntityManagerInterface $em): JsonResponse
+    {
+        $user = $this->getUser();
+        $thread = $em->getRepository(ChatHistory::class)
+            ->findOneBy(['threadId' => $threadId, 'user' => $user]);
+
+        if (!$thread) {
+            return $this->json(['error' => 'Thread not found'], 404);
+        }
+
+        // Get all messages in the thread
+        $messages = $this->getThreadMessages($thread);
+        
+        return $this->json([
+            'threadId' => $threadId,
+            'messages' => $messages
+        ]);
+    }
+
+    private function getThreadMessages(ChatHistory $thread): array
+    {
+        $messages = [];
+        $current = $thread;
+        
+        // Get root message
+        while ($current->getParent()) {
+            $current = $current->getParent();
+        }
+        
+        // Build message chain
+        $messages[] = [
+            'id' => $current->getId(),
+            'prompt' => $current->getPrompt(),
+            'responses' => $current->getResponses(),
+            'createdAt' => $current->getCreatedAt()->format('Y-m-d H:i:s')
+        ];
+        
+        // Get all children
+        $children = $current->getChildren();
+        foreach ($children as $child) {
+            $messages[] = [
+                'id' => $child->getId(),
+                'prompt' => $child->getPrompt(),
+                'responses' => $child->getResponses(),
+                'createdAt' => $child->getCreatedAt()->format('Y-m-d H:i:s')
+            ];
+        }
+        
+        return $messages;
     }
 }

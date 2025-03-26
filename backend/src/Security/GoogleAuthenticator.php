@@ -101,7 +101,9 @@ class GoogleAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        // Let the controller handle the failure
-        return null;
+        // Redirect to frontend with error
+        return new RedirectResponse(
+            ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=' . urlencode($exception->getMessage())
+        );
     }
 }

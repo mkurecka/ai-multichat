@@ -18,7 +18,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, selected
         if (message.trim() && !disabled && !loading) {
             setLoading(true);
             try {
-                const { responses } = await sendMessageToModels(selectedModels, message);
+                const { responses } = await sendMessageToModels(message, selectedModels);
                 onSendMessage(responses, message); // Pass the responses and the prompt to the parent
                 setMessage('');
             } catch (error) {

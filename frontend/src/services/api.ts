@@ -191,30 +191,17 @@ export const refreshModels = async (): Promise<Model[]> => {
 };
 
 // Send a message to the selected models and get responses
-export const sendMessageToModels = async (
-  modelIds: string[],
-  prompt: string
-): Promise<{ responses: Message[]; usage: UsageData }> => {
+export const sendMessageToModels = async (prompt: string, models: string[], threadId?: string, parentId?: string): Promise<any> => {
   try {
     const response = await api.post('/chat', {
       prompt,
-      models: modelIds,
+      models,
+      threadId,
+      parentId
     });
-
-    const responses: Message[] = Object.entries(response.data.responses).map(
-      ([modelId, content]) => ({
-        role: 'assistant',
-        content: content as string,
-        modelId,
-      })
-    );
-
-    return {
-      responses,
-      usage: response.data.usage,
-    };
+    return response.data;
   } catch (error) {
-    console.error('Error sending message to models:', error);
+    console.error('Error sending message:', error);
     throw error;
   }
 };
@@ -226,6 +213,16 @@ export const getChatHistory = async (): Promise<any[]> => {
     return response.data;
   } catch (error) {
     console.error('Error fetching chat history:', error);
+    throw error;
+  }
+};
+
+export const getThreadHistory = async (threadId: string): Promise<any> => {
+  try {
+    const response = await api.get(`/chat/thread/${threadId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching thread history:', error);
     throw error;
   }
 };

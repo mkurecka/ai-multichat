@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Message, Model, ChatSession } from './types';
-import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh } from './services/api';
+import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory } from './services/api';
 import { useNavigate } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
@@ -110,12 +110,48 @@ function App() {
     
     // Update messages with user message and model responses
     setMessages(prevMessages => [...prevMessages, userMessage, ...responses]);
+
+    // Get current thread ID or create new one
+    const currentThreadId = currentSessionId || undefined;
+    const lastMessage = messages[messages.length - 1];
+    const parentId = lastMessage?.id;
+
+    // Send message to API
+    try {
+      const result = await sendMessageToModels(prompt, models.filter(m => m.selected).map(m => m.id), currentThreadId, parentId);
+      
+      // Update thread ID if this is a new thread
+      if (!currentThreadId && result.threadId) {
+        setCurrentSessionId(result.threadId);
+      }
+
+      // Fetch updated chat history
+      const history = await getChatHistory();
+      const sessions: ChatSession[] = history.map((entry: any) => ({
+        id: entry.id.toString(),
+        title: entry.prompt,
+        threadId: entry.threadId,
+        parentId: entry.parentId,
+        messages: [
+          { role: 'user' as const, content: entry.prompt },
+          ...Object.entries(entry.responses).map(([modelId, content]) => ({
+            role: 'assistant' as const,
+            content: content as string,
+            modelId,
+          })),
+        ],
+        selectedModels: [],
+      }));
+      setChatHistory(sessions);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
 
-  const handleSelectChat = (sessionId: string) => {
+  const handleSelectChat = async (sessionId: string) => {
     const session = chatHistory.find(s => s.id === sessionId);
     if (session) {
-      setCurrentSessionId(sessionId);
+      setCurrentSessionId(session.threadId || sessionId);
       setMessages(session.messages);
       
       // Update model selection based on the chat
@@ -126,6 +162,24 @@ function App() {
           selected: modelIds.includes(model.id)
         }))
       );
+
+      // If this is a thread, fetch full thread history
+      if (session.threadId) {
+        try {
+          const threadData = await getThreadHistory(session.threadId);
+          const threadMessages = threadData.messages.flatMap((msg: any) => [
+            { role: 'user' as const, content: msg.prompt },
+            ...Object.entries(msg.responses).map(([modelId, content]) => ({
+              role: 'assistant' as const,
+              content: content as string,
+              modelId,
+            })),
+          ]);
+          setMessages(threadMessages);
+        } catch (error) {
+          console.error('Failed to fetch thread history:', error);
+        }
+      }
     }
   };
 
@@ -142,7 +196,7 @@ function App() {
   return (
     <div className="flex h-screen max-h-screen overflow-hidden">
       {/* Chat History Sidebar */}
-      <div className={`bg-white border-r flex flex-col transition-all duration-300 ${showChatHistory ? 'w-72' : 'w-0'}`}>
+      <div className={`bg-white border-l flex flex-col transition-all duration-300 ${showChatHistory ? 'w-72' : 'w-0'}`}>
         {showChatHistory && (
           <ChatHistory
             chatSessions={chatHistory}
@@ -155,9 +209,9 @@ function App() {
       {/* Toggle Chat History Button */}
       <button
         onClick={toggleChatHistory}
-        className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 rounded-r-md p-1 shadow-sm z-10"
+        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 rounded-l-md p-1 shadow-sm z-10"
       >
-        {showChatHistory ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+        {showChatHistory ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
       </button>
 
       {/* Main Content */}
