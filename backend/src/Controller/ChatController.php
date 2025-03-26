@@ -11,6 +11,7 @@ use App\Service\ModelService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\ChatHistory;
 use Symfony\Component\Serializer\SerializerInterface;
+use App\Entity\Thread;
 
 #[Route('/api')]
 class ChatController extends AbstractController
@@ -34,52 +35,78 @@ class ChatController extends AbstractController
         $prompt = $data['prompt'];
         $models = $data['models'];
         $threadId = $data['threadId'] ?? null;
-        $parentId = $data['parentId'] ?? null;
         
         $user = $this->getUser();
         $organization = $user->getOrganization();
         $organization->setUsageCount($organization->getUsageCount() + 1);
         
-        $responses = $openRouter->generateResponse($prompt, $models);
-        
-        $chatHistory = new ChatHistory();
-        $chatHistory->setUser($user)
-            ->setPrompt($prompt)
-            ->setResponses($responses)
-            ->setCreatedAt(new \DateTime());
-
-        // Handle thread logic
+        // Find or create thread
+        $thread = null;
         if ($threadId) {
-            $chatHistory->setThreadId($threadId);
-        } else {
-            $chatHistory->setThreadId(uniqid('thread_'));
-        }
-
-        if ($parentId) {
-            $parent = $em->getRepository(ChatHistory::class)->find($parentId);
-            if ($parent) {
-                $chatHistory->setParent($parent);
-            }
+            $thread = $em->getRepository(Thread::class)
+                ->findOneBy(['threadId' => $threadId, 'user' => $user]);
         }
         
-        $em->persist($chatHistory);
+        if (!$thread) {
+            $thread = new Thread();
+            $thread->setUser($user);
+            $em->persist($thread);
+        }
+        
+        // Generate responses for each model
+        $responses = [];
+        foreach ($models as $modelId) {
+            $response = $openRouter->generateResponse($prompt, [$modelId]);
+            
+            $chatHistory = new ChatHistory();
+            $chatHistory->setThread($thread)
+                ->setPrompt($prompt)
+                ->setResponse($response)
+                ->setModelId($modelId)
+                ->setOpenRouterId($response['id'] ?? null);
+            
+            $em->persist($chatHistory);
+            $responses[$modelId] = $response['choices'][0]['message']['content'] ?? '';
+        }
+        
         $em->flush();
         
         return $this->json([
             'responses' => $responses,
-            'threadId' => $chatHistory->getThreadId(),
+            'threadId' => $thread->getThreadId(),
             'usage' => [
-                'user' => $user->getChatHistories()->count(),
+                'user' => $user->getThreads()->count(),
                 'organization' => $organization->getUsageCount()
             ]
         ]);
     }
     
     #[Route('/chat/history', methods: ['GET'])]
-    public function history(SerializerInterface $serializer): JsonResponse
+    public function history(): JsonResponse
     {
         $user = $this->getUser();
-        $data = $serializer->normalize($user->getChatHistories(), null, ['groups' => ['chat_history:read']]);
+        $threads = $user->getThreads();
+        $data = [];
+        
+        foreach ($threads as $thread) {
+            // Get the latest chat history for this thread
+            $latestHistory = $thread->getChatHistories()->last();
+            if ($latestHistory) {
+                $data[] = [
+                    'id' => $thread->getId(),
+                    'prompt' => $latestHistory->getPrompt(),
+                    'responses' => [$latestHistory->getModelId() => $latestHistory->getResponse()['choices'][0]['message']['content'] ?? ''],
+                    'threadId' => $thread->getThreadId(),
+                    'createdAt' => $thread->getCreatedAt()->format('Y-m-d H:i:s')
+                ];
+            }
+        }
+        
+        // Sort by creation date, newest first
+        usort($data, function($a, $b) {
+            return strtotime($b['createdAt']) - strtotime($a['createdAt']);
+        });
+        
         return $this->json($data);
     }
 
@@ -87,51 +114,24 @@ class ChatController extends AbstractController
     public function getThread(string $threadId, EntityManagerInterface $em): JsonResponse
     {
         $user = $this->getUser();
-        $thread = $em->getRepository(ChatHistory::class)
+        $thread = $em->getRepository(Thread::class)
             ->findOneBy(['threadId' => $threadId, 'user' => $user]);
-
+            
         if (!$thread) {
-            return $this->json(['error' => 'Thread not found'], 404);
+            throw $this->createNotFoundException('Thread not found');
         }
-
-        // Get all messages in the thread
-        $messages = $this->getThreadMessages($thread);
         
-        return $this->json([
-            'threadId' => $threadId,
-            'messages' => $messages
-        ]);
-    }
-
-    private function getThreadMessages(ChatHistory $thread): array
-    {
         $messages = [];
-        $current = $thread;
-        
-        // Get root message
-        while ($current->getParent()) {
-            $current = $current->getParent();
-        }
-        
-        // Build message chain
-        $messages[] = [
-            'id' => $current->getId(),
-            'prompt' => $current->getPrompt(),
-            'responses' => $current->getResponses(),
-            'createdAt' => $current->getCreatedAt()->format('Y-m-d H:i:s')
-        ];
-        
-        // Get all children
-        $children = $current->getChildren();
-        foreach ($children as $child) {
+        foreach ($thread->getChatHistories() as $history) {
             $messages[] = [
-                'id' => $child->getId(),
-                'prompt' => $child->getPrompt(),
-                'responses' => $child->getResponses(),
-                'createdAt' => $child->getCreatedAt()->format('Y-m-d H:i:s')
+                'prompt' => $history->getPrompt(),
+                'responses' => [$history->getModelId() => $history->getResponse()['choices'][0]['message']['content'] ?? ''],
+                'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
             ];
         }
         
-        return $messages;
+        return $this->json([
+            'messages' => $messages
+        ]);
     }
 }

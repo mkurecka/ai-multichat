@@ -20,12 +20,7 @@ class OpenRouterService
     public function getModels(): array
     {
         try {
-            $response = $this->client->request('GET', self::API_URL . '/models', [
-                'headers' => [
-                    'Authorization' => "Bearer {$this->apiKey}",
-                    'X-Title' => 'AI MultiChat'
-                ]
-            ]);
+            $response = $this->client->request('GET', self::API_URL . '/models');
             
             if ($response->getStatusCode() !== 200) {
                 throw new HttpException($response->getStatusCode(), 'Failed to fetch models from OpenRouter');

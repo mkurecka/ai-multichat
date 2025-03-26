@@ -35,13 +35,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?Organization $organization = null;
 
-    #[ORM\OneToMany(targetEntity: ChatHistory::class, mappedBy: "user")]
-    #[Groups(['user:read'])]
-    private Collection $chatHistories;
+    #[ORM\OneToMany(targetEntity: Thread::class, mappedBy: "user", cascade: ["persist", "remove"])]
+    private Collection $threads;
 
     public function __construct()
     {
-        $this->chatHistories = new ArrayCollection();
+        $this->threads = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -73,27 +72,27 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getChatHistories(): Collection
+    public function getThreads(): Collection
     {
-        return $this->chatHistories;
+        return $this->threads;
     }
 
-    public function addChatHistory(ChatHistory $chatHistory): self
+    public function addThread(Thread $thread): self
     {
-        if (!$this->chatHistories->contains($chatHistory)) {
-            $this->chatHistories->add($chatHistory);
-            $chatHistory->setUser($this);
+        if (!$this->threads->contains($thread)) {
+            $this->threads->add($thread);
+            $thread->setUser($this);
         }
 
         return $this;
     }
 
-    public function removeChatHistory(ChatHistory $chatHistory): self
+    public function removeThread(Thread $thread): self
     {
-        if ($this->chatHistories->removeElement($chatHistory)) {
+        if ($this->threads->removeElement($thread)) {
             // set the owning side to null (unless already changed)
-            if ($chatHistory->getUser() === $this) {
-                $chatHistory->setUser(null);
+            if ($thread->getUser() === $this) {
+                $thread->setUser(null);
             }
         }
 

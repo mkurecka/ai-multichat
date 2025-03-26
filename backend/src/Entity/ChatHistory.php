@@ -2,12 +2,8 @@
 
 namespace App\Entity;
 
-use App\Entity\User;
 use DateTime;
 use Doctrine\ORM\Mapping as ORM;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 class ChatHistory
@@ -15,41 +11,30 @@ class ChatHistory
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['chat_history:read'])]
     private ?int $id = null;
     
-    #[ORM\ManyToOne(targetEntity: User::class)]
-    #[Groups(['chat_history:read'])]
-    private User $user;
+    #[ORM\ManyToOne(targetEntity: Thread::class, inversedBy: "chatHistories")]
+    #[ORM\JoinColumn(nullable: false)]
+    private Thread $thread;
     
     #[ORM\Column(type: "text")]
-    #[Groups(['chat_history:read'])]
     private string $prompt;
     
     #[ORM\Column(type: "json")]
-    #[Groups(['chat_history:read'])]
-    private array $responses;
+    private array $response;
+    
+    #[ORM\Column(type: "string")]
+    private string $modelId;
+    
+    #[ORM\Column(type: "string", nullable: true)]
+    private ?string $openRouterId = null;
     
     #[ORM\Column(type: "datetime")]
-    #[Groups(['chat_history:read'])]
     private DateTime $createdAt;
-
-    #[ORM\Column(type: "string", nullable: true)]
-    #[Groups(['chat_history:read'])]
-    private ?string $threadId = null;
-
-    #[ORM\ManyToOne(targetEntity: self::class, inversedBy: "children")]
-    #[ORM\JoinColumn(name: "parent_id", referencedColumnName: "id", nullable: true)]
-    #[Groups(['chat_history:read'])]
-    private ?self $parent = null;
-
-    #[ORM\OneToMany(targetEntity: self::class, mappedBy: "parent")]
-    #[Groups(['chat_history:read'])]
-    private Collection $children;
 
     public function __construct()
     {
-        $this->children = new ArrayCollection();
+        $this->createdAt = new DateTime();
     }
 
     public function getId(): ?int
@@ -57,15 +42,14 @@ class ChatHistory
         return $this->id;
     }
 
-    public function getUser(): User
+    public function getThread(): Thread
     {
-        return $this->user;
+        return $this->thread;
     }
 
-    public function setUser(User $user): self
+    public function setThread(Thread $thread): self
     {
-        $this->user = $user;
-
+        $this->thread = $thread;
         return $this;
     }
 
@@ -77,19 +61,39 @@ class ChatHistory
     public function setPrompt(string $prompt): self
     {
         $this->prompt = $prompt;
-
         return $this;
     }
 
-    public function getResponses(): array
+    public function getResponse(): array
     {
-        return $this->responses;
+        return $this->response;
     }
 
-    public function setResponses(array $responses): self
+    public function setResponse(array $response): self
     {
-        $this->responses = $responses;
+        $this->response = $response;
+        return $this;
+    }
 
+    public function getModelId(): string
+    {
+        return $this->modelId;
+    }
+
+    public function setModelId(string $modelId): self
+    {
+        $this->modelId = $modelId;
+        return $this;
+    }
+
+    public function getOpenRouterId(): ?string
+    {
+        return $this->openRouterId;
+    }
+
+    public function setOpenRouterId(?string $openRouterId): self
+    {
+        $this->openRouterId = $openRouterId;
         return $this;
     }
 
@@ -101,53 +105,6 @@ class ChatHistory
     public function setCreatedAt(DateTime $createdAt): self
     {
         $this->createdAt = $createdAt;
-
-        return $this;
-    }
-
-    public function getThreadId(): ?string
-    {
-        return $this->threadId;
-    }
-
-    public function setThreadId(?string $threadId): self
-    {
-        $this->threadId = $threadId;
-        return $this;
-    }
-
-    public function getParent(): ?self
-    {
-        return $this->parent;
-    }
-
-    public function setParent(?self $parent): self
-    {
-        $this->parent = $parent;
-        return $this;
-    }
-
-    public function getChildren(): Collection
-    {
-        return $this->children;
-    }
-
-    public function addChild(self $child): self
-    {
-        if (!$this->children->contains($child)) {
-            $this->children->add($child);
-            $child->setParent($this);
-        }
-        return $this;
-    }
-
-    public function removeChild(self $child): self
-    {
-        if ($this->children->removeElement($child)) {
-            if ($child->getParent() === $this) {
-                $child->setParent(null);
-            }
-        }
         return $this;
     }
 }
