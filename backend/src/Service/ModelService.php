@@ -39,19 +39,24 @@ class ModelService
     
     private function formatModels(array $rawModels): array
     {
+        if (empty($rawModels)) {
+            return [];
+        }
+
         $formattedModels = [];
         
-        // Check if the response has a 'data' key (OpenRouter API format)
-        if (isset($rawModels['data'])) {
-            foreach ($rawModels['data'] as $model) {
-                $formattedModels[] = [
-                    'id' => $model['id'],
-                    'name' => $model['name'] ?? $model['id'],
-                    'description' => $model['description'] ?? null,
-                    'provider' => $this->extractProviderFromId($model['id']),
-                    'selected' => false
-                ];
+        foreach ($rawModels as $model) {
+            if (!isset($model['id'])) {
+                continue;
             }
+
+            $formattedModels[] = [
+                'id' => $model['id'],
+                'name' => $model['name'] ?? $model['id'],
+                'description' => $model['description'] ?? null,
+                'provider' => $this->extractProviderFromId($model['id']),
+                'selected' => false
+            ];
         }
         
         return $formattedModels;

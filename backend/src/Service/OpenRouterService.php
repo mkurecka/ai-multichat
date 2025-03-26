@@ -27,8 +27,10 @@ class OpenRouterService
             }
             
             $data = $response->toArray();
+            error_log('OpenRouter API Response: ' . json_encode($data));
             return $data['data'] ?? [];
         } catch (\Exception $e) {
+            error_log('OpenRouter API Error: ' . $e->getMessage());
             throw new HttpException(500, 'Failed to fetch models: ' . $e->getMessage());
         }
     }
@@ -69,9 +71,25 @@ class OpenRouterService
                     throw new HttpException(500, 'Invalid response format from OpenRouter');
                 }
                 
-                $responses[$model] = $data['choices'][0]['message']['content'];
+                $responses[$model] = [
+                    'content' => $data['choices'][0]['message']['content'],
+                    'id' => $data['id'] ?? null,
+                    'usage' => [
+                        'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
+                        'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
+                        'total_tokens' => $data['usage']['total_tokens'] ?? 0
+                    ]
+                ];
             } catch (\Exception $e) {
-                $responses[$model] = 'Error: ' . $e->getMessage();
+                $responses[$model] = [
+                    'content' => 'Error: ' . $e->getMessage(),
+                    'id' => null,
+                    'usage' => [
+                        'prompt_tokens' => 0,
+                        'completion_tokens' => 0,
+                        'total_tokens' => 0
+                    ]
+                ];
             }
         }
         return $responses;

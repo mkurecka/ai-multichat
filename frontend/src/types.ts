@@ -3,6 +3,11 @@ export interface Message {
   content: string;
   modelId?: string;
   id?: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export interface Model {

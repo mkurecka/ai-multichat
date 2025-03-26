@@ -56,17 +56,26 @@ class ChatController extends AbstractController
         // Generate responses for each model
         $responses = [];
         foreach ($models as $modelId) {
-            $response = $openRouter->generateResponse($prompt, [$modelId]);
+            $modelResponses = $openRouter->generateResponse($prompt, [$modelId]);
+            if (!isset($modelResponses[$modelId])) {
+                continue;
+            }
+            
+            $modelResponse = $modelResponses[$modelId];
             
             $chatHistory = new ChatHistory();
             $chatHistory->setThread($thread)
                 ->setPrompt($prompt)
-                ->setResponse($response)
+                ->setResponse($modelResponse)
                 ->setModelId($modelId)
-                ->setOpenRouterId($response['id'] ?? null);
+                ->setOpenRouterId($modelResponse['id']);
             
             $em->persist($chatHistory);
-            $responses[$modelId] = $response['choices'][0]['message']['content'] ?? '';
+            
+            $responses[$modelId] = [
+                'content' => $modelResponse['content'],
+                'usage' => $modelResponse['usage']
+            ];
         }
         
         $em->flush();
@@ -95,7 +104,7 @@ class ChatController extends AbstractController
                 $data[] = [
                     'id' => $thread->getId(),
                     'prompt' => $latestHistory->getPrompt(),
-                    'responses' => [$latestHistory->getModelId() => $latestHistory->getResponse()['choices'][0]['message']['content'] ?? ''],
+                    'responses' => [$latestHistory->getModelId() => $latestHistory->getResponse()['content']],
                     'threadId' => $thread->getThreadId(),
                     'createdAt' => $thread->getCreatedAt()->format('Y-m-d H:i:s')
                 ];
@@ -125,7 +134,7 @@ class ChatController extends AbstractController
         foreach ($thread->getChatHistories() as $history) {
             $messages[] = [
                 'prompt' => $history->getPrompt(),
-                'responses' => [$history->getModelId() => $history->getResponse()['choices'][0]['message']['content'] ?? ''],
+                'responses' => [$history->getModelId() => $history->getResponse()['content']],
                 'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
             ];
         }

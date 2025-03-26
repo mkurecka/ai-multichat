@@ -1,6 +1,6 @@
 import React from 'react';
 import { Message } from '../types';
-import { User, Bot } from 'lucide-react';
+import { User, Bot, Activity } from 'lucide-react';
 
 interface ChatMessageProps {
     message: Message;
@@ -19,8 +19,19 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, modelName }) => {
             </div>
 
             <div className="flex-1">
-                <div className="font-medium text-sm text-gray-500 mb-1">
-                    {isUser ? 'You' : modelName || 'Assistant'}
+                <div className="flex items-center justify-between mb-1">
+                    <div className="font-medium text-sm text-gray-500">
+                        {isUser ? 'You' : modelName || 'Assistant'}
+                    </div>
+                    {!isUser && message.usage && (
+                        <div className="flex items-center text-xs text-gray-500">
+                            <Activity size={14} className="mr-1" />
+                            <span>
+                                {message.usage.total_tokens} tokens
+                                ({message.usage.prompt_tokens} prompt + {message.usage.completion_tokens} completion)
+                            </span>
+                        </div>
+                    )}
                 </div>
                 <div className="text-gray-800 whitespace-pre-wrap">
                     {message.content}
