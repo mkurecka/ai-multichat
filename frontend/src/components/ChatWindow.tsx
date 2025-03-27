@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Message, Model } from '../types';
 import ChatMessage from './ChatMessage';
 import ModelCheckbox from './ModelCheckbox';
@@ -13,8 +13,13 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle, onSendMessage, isLoading }) => {
-  // Get selected models - add null check to prevent error
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedModels = models ? models.filter(model => model.selected) : [];
+
+  // Auto scroll to bottom when messages change or streaming
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
   // Group messages by user message and responses
   const groupedMessages: { userMessage: Message, responses: Message[] }[] = [];
@@ -72,45 +77,48 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle
             </div>
           </div>
         ) : (
-          groupedMessages.map((group, groupIndex) => (
-            <div key={groupIndex} className="space-y-4">
-              {/* User message */}
-              <ChatMessage
-                message={group.userMessage}
-                modelName={undefined}
-              />
+          <>
+            {groupedMessages.map((group, groupIndex) => (
+              <div key={groupIndex} className="space-y-4">
+                {/* User message */}
+                <ChatMessage
+                  message={group.userMessage}
+                  modelName={undefined}
+                />
 
-              {/* Model responses in a horizontal scrollable container */}
-              {group.responses.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Model Responses:</h3>
-                  <div className="overflow-x-auto pb-2">
-                    <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
-                      {group.responses.map((response, responseIndex) => {
-                        const model = models ? models.find(m => m.id === response.modelId) : undefined;
-                        return (
-                          <div
-                            key={responseIndex}
-                            className="w-80 flex-shrink-0 border border-gray-200 rounded-lg overflow-hidden bg-white"
-                          >
-                            <div className="bg-gray-50 p-2 border-b border-gray-200">
-                              <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
+                {/* Model responses in a horizontal scrollable container */}
+                {group.responses.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Model Responses:</h3>
+                    <div className="overflow-x-auto pb-2">
+                      <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
+                        {group.responses.map((response, responseIndex) => {
+                          const model = models ? models.find(m => m.id === response.modelId) : undefined;
+                          return (
+                            <div
+                              key={responseIndex}
+                              className="w-80 flex-shrink-0 border border-gray-200 rounded-lg overflow-hidden bg-white"
+                            >
+                              <div className="bg-gray-50 p-2 border-b border-gray-200">
+                                <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
+                              </div>
+                              <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
+                                {response.content}
+                                {isLoading && responseIndex === group.responses.length - 1 && (
+                                  <span className="inline-block ml-1 animate-pulse">▊</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
-                              {response.content}
-                              {isLoading && responseIndex === group.responses.length - 1 && (
-                                <span className="inline-block ml-1 animate-pulse">▊</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </>
         )}
       </div>
 
@@ -122,6 +130,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle
           disabled={selectedModels.length === 0 || isLoading}
         />
       </div>
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="fixed bottom-20 right-4 bg-white rounded-lg shadow-lg p-3 flex items-center space-x-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span className="text-sm text-gray-600">Generating response...</span>
+        </div>
+      )}
     </div>
   );
 };
