@@ -30,12 +30,10 @@ class CheckOpenRouterCostsCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $io->title('Checking OpenRouter costs...');
 
-        // Get all chat histories with openRouterId but no cost
+        // Get all chat histories with openRouterId
         $chatHistories = $this->entityManager->getRepository(ChatHistory::class)
             ->createQueryBuilder('ch')
-            ->leftJoin('App\Entity\ChatCost', 'cc', 'WITH', 'cc.chatHistory = ch')
             ->where('ch.openRouterId IS NOT NULL')
-            ->andWhere('cc.id IS NULL')
             ->getQuery()
             ->getResult();
 
@@ -46,7 +44,14 @@ class CheckOpenRouterCostsCommand extends Command
             try {
                 $data = $this->openRouterService->getGenerationData($chatHistory->getOpenRouterId());
                 
-                $chatCost = new ChatCost();
+                // Find existing cost or create new one
+                $chatCost = $this->entityManager->getRepository(ChatCost::class)
+                    ->findOneBy(['openRouterId' => $chatHistory->getOpenRouterId()]);
+                
+                if (!$chatCost) {
+                    $chatCost = new ChatCost();
+                }
+                
                 $chatCost->setChatHistory($chatHistory)
                     ->setTotalCost($data['total_cost'] ?? 0.0)
                     ->setOpenRouterId($chatHistory->getOpenRouterId())

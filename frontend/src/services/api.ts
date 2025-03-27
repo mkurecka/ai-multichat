@@ -425,9 +425,10 @@ export const createThread = async (): Promise<{ threadId: string }> => {
 export interface ThreadCost {
   threadId: string;
   title: string;
-  totalCost: number;
   messageCount: number;
   lastMessageDate: string;
+  totalCost: number;
+  totalTokens: number;
 }
 
 export const getThreadCosts = async (): Promise<ThreadCost[]> => {

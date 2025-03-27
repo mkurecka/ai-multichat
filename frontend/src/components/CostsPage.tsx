@@ -66,19 +66,23 @@ const CostsPage: React.FC = () => {
             className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start mb-2">
-              <h2 className="text-lg font-semibold truncate">{thread.title}</h2>
-              <span className="text-green-600 font-semibold">
+              <div className="flex flex-col">
+                <div className="text-sm font-medium text-gray-900">
+                  {thread.title}
+                </div>
+                <div className="text-sm text-gray-500">
+                  {thread.messageCount} messages
+                </div>
+                <div className="text-sm text-gray-500">
+                  {new Date(thread.lastMessageDate).toLocaleString()}
+                </div>
+              </div>
+              <div className="text-green-600 font-semibold">
                 {formatCurrency(thread.totalCost)}
-              </span>
+              </div>
             </div>
             <div className="text-sm text-gray-500">
-              {thread.messageCount} messages • {new Date(thread.lastMessageDate).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {thread.totalTokens.toLocaleString()} tokens
             </div>
           </div>
         ))}

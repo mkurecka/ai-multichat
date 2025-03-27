@@ -439,34 +439,39 @@ class ChatController extends AbstractController
         $user = $this->getUser();
         
         $qb = $em->createQueryBuilder();
-        $qb->select('t.threadId', 't.title', 'COUNT(ch.id) as messageCount', 'MAX(ch.createdAt) as lastMessageDate')
+        $qb->select('t.threadId', 't.title', 't.createdAt as threadCreatedAt', 'COUNT(ch.id) as messageCount')
            ->from(Thread::class, 't')
            ->leftJoin('t.chatHistories', 'ch')
            ->where('t.user = :user')
            ->setParameter('user', $user)
-           ->groupBy('t.threadId', 't.title')
-           ->orderBy('lastMessageDate', 'DESC');
+           ->groupBy('t.threadId', 't.title', 't.createdAt')
+           ->orderBy('t.createdAt', 'DESC');
         
         $threads = $qb->getQuery()->getResult();
         
         // Get costs for each thread
         $threadCosts = [];
         foreach ($threads as $thread) {
-            $costs = $em->createQueryBuilder()
-                ->select('SUM(cc.totalUsage) as totalCost')
+            // Get total costs and tokens for this thread
+            $stats = $em->createQueryBuilder()
+                ->select('COALESCE(SUM(cc.totalCost), 0) as totalCost')
+                ->addSelect('COALESCE(SUM(cc.tokensPrompt), 0) as totalPromptTokens')
+                ->addSelect('COALESCE(SUM(cc.tokensCompletion), 0) as totalCompletionTokens')
                 ->from('App\Entity\ChatCost', 'cc')
-                ->join('App\Entity\ChatHistory', 'ch', 'WITH', 'cc.chatHistory = ch')
-                ->where('ch.thread = :threadId')
+                ->join('cc.chatHistory', 'ch')
+                ->join('ch.thread', 't')
+                ->where('t.threadId = :threadId')
                 ->setParameter('threadId', $thread['threadId'])
                 ->getQuery()
-                ->getSingleScalarResult() ?? 0;
+                ->getSingleResult();
                 
             $threadCosts[] = [
                 'threadId' => $thread['threadId'],
                 'title' => $thread['title'],
                 'messageCount' => (int)$thread['messageCount'],
-                'lastMessageDate' => $thread['lastMessageDate'] instanceof \DateTime ? $thread['lastMessageDate']->format('Y-m-d H:i:s') : null,
-                'totalCost' => (float)$costs
+                'lastMessageDate' => $thread['threadCreatedAt']->format('Y-m-d H:i:s'),
+                'totalCost' => (float)$stats['totalCost'],
+                'totalTokens' => (int)($stats['totalPromptTokens'] + $stats['totalCompletionTokens'])
             ];
         }
         
