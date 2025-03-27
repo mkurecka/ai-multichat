@@ -432,4 +432,44 @@ class ChatController extends AbstractController
             'threadId' => $thread->getThreadId()
         ]);
     }
+
+    #[Route('/chat/costs', methods: ['GET'])]
+    public function getCosts(EntityManagerInterface $em): JsonResponse
+    {
+        $user = $this->getUser();
+        
+        $qb = $em->createQueryBuilder();
+        $qb->select('t.threadId', 't.title', 'COUNT(ch.id) as messageCount', 'MAX(ch.createdAt) as lastMessageDate')
+           ->from(Thread::class, 't')
+           ->leftJoin('t.chatHistories', 'ch')
+           ->where('t.user = :user')
+           ->setParameter('user', $user)
+           ->groupBy('t.threadId', 't.title')
+           ->orderBy('lastMessageDate', 'DESC');
+        
+        $threads = $qb->getQuery()->getResult();
+        
+        // Get costs for each thread
+        $threadCosts = [];
+        foreach ($threads as $thread) {
+            $costs = $em->createQueryBuilder()
+                ->select('SUM(cc.totalUsage) as totalCost')
+                ->from('App\Entity\ChatCost', 'cc')
+                ->join('App\Entity\ChatHistory', 'ch', 'WITH', 'cc.chatHistory = ch')
+                ->where('ch.thread = :threadId')
+                ->setParameter('threadId', $thread['threadId'])
+                ->getQuery()
+                ->getSingleScalarResult() ?? 0;
+                
+            $threadCosts[] = [
+                'threadId' => $thread['threadId'],
+                'title' => $thread['title'],
+                'messageCount' => (int)$thread['messageCount'],
+                'lastMessageDate' => $thread['lastMessageDate'] instanceof \DateTime ? $thread['lastMessageDate']->format('Y-m-d H:i:s') : null,
+                'totalCost' => (float)$costs
+            ];
+        }
+        
+        return $this->json($threadCosts);
+    }
 }

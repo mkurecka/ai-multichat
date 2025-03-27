@@ -5,7 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
 import ChatHistory from './components/ChatHistory';
-import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, User, DollarSign } from 'lucide-react';
+import CostsPage from './components/CostsPage';
+import { Routes, Route } from 'react-router-dom';
 
 function App() {
   const navigate = useNavigate();
@@ -404,9 +406,28 @@ function App() {
       <div className="fixed top-0 left-0 right-0 bg-white border-b z-10">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-full"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            <button
+              onClick={() => navigate(1)}
+              className="p-2 hover:bg-gray-100 rounded-full"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
             <h1 className="text-xl font-semibold">AI MultiChat</h1>
           </div>
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/costs')}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            >
+              <DollarSign size={18} />
+              <span>Costs</span>
+            </button>
             <div className="flex items-center space-x-2 text-gray-600">
               <User size={18} />
               <span>{userEmail}</span>

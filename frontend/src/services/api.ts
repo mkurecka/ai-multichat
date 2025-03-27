@@ -421,3 +421,21 @@ export const createThread = async (): Promise<{ threadId: string }> => {
     throw error;
   }
 };
+
+export interface ThreadCost {
+  threadId: string;
+  title: string;
+  totalCost: number;
+  messageCount: number;
+  lastMessageDate: string;
+}
+
+export const getThreadCosts = async (): Promise<ThreadCost[]> => {
+  try {
+    const response = await api.get<ThreadCost[]>('/chat/costs');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching thread costs:', error);
+    throw error;
+  }
+};

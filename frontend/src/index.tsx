@@ -5,6 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import App from './App';
 import Login from './components/Login';
 import Callback from './components/Callback';
+import CostsPage from './components/CostsPage';
 import './index.css';
 
 // Protected Route Component
@@ -24,6 +25,14 @@ createRoot(document.getElementById('root')!).render(
                     element={
                         <ProtectedRoute>
                             <App />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/costs"
+                    element={
+                        <ProtectedRoute>
+                            <CostsPage />
                         </ProtectedRoute>
                     }
                 />
