@@ -124,6 +124,7 @@ class ChatController extends AbstractController
                                     'done' => true, 
                                     'modelId' => $modelId, 
                                     'threadId' => $thread->getThreadId(),
+                                    'promptId' => $promptId,
                                     'content' => $content,
                                     'usage' => [
                                         'prompt_tokens' => 0,
@@ -146,7 +147,9 @@ class ChatController extends AbstractController
                                     $content .= $parsed['choices'][0]['delta']['content'];
                                     echo "data: " . json_encode([
                                         'content' => $parsed['choices'][0]['delta']['content'],
-                                        'modelId' => $modelId
+                                        'modelId' => $modelId,
+                                        'threadId' => $thread->getThreadId(),
+                                        'promptId' => $promptId
                                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                                     flush();
                                 }
@@ -154,7 +157,9 @@ class ChatController extends AbstractController
                                     $usage = $parsed['choices'][0]['delta']['usage'];
                                     echo "data: " . json_encode([
                                         'usage' => $usage,
-                                        'modelId' => $modelId
+                                        'modelId' => $modelId,
+                                        'threadId' => $thread->getThreadId(),
+                                        'promptId' => $promptId
                                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                                     flush();
                                 }

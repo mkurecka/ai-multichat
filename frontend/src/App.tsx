@@ -199,18 +199,30 @@ function App() {
         selectedModelIds,
         currentSessionId || undefined,
         undefined,
-        (modelId, content: string | { content: string }) => {
+        (modelId, content: string | { content: string }, promptId: string) => {
           const contentString = typeof content === 'string' ? content : content.content || JSON.stringify(content);
           setMessages(prev => {
             const newMessages = [...prev];
-            const lastMessage = newMessages[newMessages.length - 1];
-            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
-              lastMessage.content = contentString;
+            // Find the message with matching modelId, threadId and promptId
+            const existingMessageIndex = newMessages.findIndex(msg => 
+              msg.role === 'assistant' && 
+              msg.modelId === modelId &&
+              msg.threadId === currentSessionId &&
+              msg.promptId === promptId
+            );
+
+            if (existingMessageIndex !== -1) {
+              newMessages[existingMessageIndex] = {
+                ...newMessages[existingMessageIndex],
+                content: contentString
+              };
             } else {
               newMessages.push({
                 role: 'assistant' as const,
                 content: contentString,
-                modelId: modelId
+                modelId: modelId,
+                threadId: currentSessionId,
+                promptId: promptId
               });
             }
             return newMessages;
@@ -224,11 +236,17 @@ function App() {
             if (existingSession) {
               return prev.map(session => {
                 if (session.threadId === currentSessionId) {
-                  const lastMessage = session.messages[session.messages.length - 1];
-                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
+                  const existingMessageIndex = session.messages.findIndex(msg => 
+                    msg.role === 'assistant' && 
+                    msg.modelId === modelId &&
+                    msg.threadId === currentSessionId &&
+                    msg.promptId === promptId
+                  );
+
+                  if (existingMessageIndex !== -1) {
                     const updatedMessages = [...session.messages];
-                    updatedMessages[updatedMessages.length - 1] = {
-                      ...lastMessage,
+                    updatedMessages[existingMessageIndex] = {
+                      ...updatedMessages[existingMessageIndex],
                       content: contentString
                     };
                     return { ...session, messages: updatedMessages };
@@ -238,32 +256,9 @@ function App() {
                       messages: [...session.messages, {
                         role: 'assistant',
                         content: contentString,
-                        modelId: modelId
-                      }]
-                    };
-                  }
-                }
-                return session;
-              });
-            } else {
-              // Only update if no threadId exists
-              return prev.map(session => {
-                if (!session.threadId && session.id === Date.now().toString()) {
-                  const lastMessage = session.messages[session.messages.length - 1];
-                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
-                    const updatedMessages = [...session.messages];
-                    updatedMessages[updatedMessages.length - 1] = {
-                      ...lastMessage,
-                      content: contentString
-                    };
-                    return { ...session, messages: updatedMessages };
-                  } else {
-                    return {
-                      ...session,
-                      messages: [...session.messages, {
-                        role: 'assistant',
-                        content: contentString,
-                        modelId: modelId
+                        modelId: modelId,
+                        threadId: currentSessionId,
+                        promptId: promptId
                       }]
                     };
                   }
@@ -271,6 +266,38 @@ function App() {
                 return session;
               });
             }
+            // Only update if no threadId exists
+            return prev.map(session => {
+              if (!session.threadId && session.id === Date.now().toString()) {
+                const existingMessageIndex = session.messages.findIndex(msg => 
+                  msg.role === 'assistant' && 
+                  msg.modelId === modelId &&
+                  msg.threadId === currentSessionId &&
+                  msg.promptId === promptId
+                );
+
+                if (existingMessageIndex !== -1) {
+                  const updatedMessages = [...session.messages];
+                  updatedMessages[existingMessageIndex] = {
+                    ...updatedMessages[existingMessageIndex],
+                    content: contentString
+                  };
+                  return { ...session, messages: updatedMessages };
+                } else {
+                  return {
+                    ...session,
+                    messages: [...session.messages, {
+                      role: 'assistant',
+                      content: contentString,
+                      modelId: modelId,
+                      threadId: currentSessionId,
+                      promptId: promptId
+                    }]
+                  };
+                }
+              }
+              return session;
+            });
           });
         }
       );

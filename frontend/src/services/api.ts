@@ -196,7 +196,7 @@ export const sendMessageToModels = async (
   modelIds: string[],
   threadId?: string,
   parentId?: string,
-  onStream?: (modelId: string, content: string) => void
+  onStream?: (modelId: string, content: string, promptId: string) => void
 ): Promise<any> => {
   try {
     // Generate a unique promptId before sending
@@ -240,15 +240,23 @@ export const sendMessageToModels = async (
             let content = '';
             let openRouterId = null;
             let currentThreadId = threadId;
+            let buffer = '';
 
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
 
               const chunk = decoder.decode(value);
-              const lines = chunk.split('\n').filter(line => line.trim() !== '');
+              buffer += chunk;
+
+              // Process complete lines
+              const lines = buffer.split('\n');
+              // Keep the last (potentially incomplete) line in the buffer
+              buffer = lines.pop() || '';
 
               for (const line of lines) {
+                if (line.trim() === '') continue;
+                
                 if (line.startsWith('data: ')) {
                   const data = line.slice(6);
                   if (data === '[DONE]') {
@@ -264,7 +272,7 @@ export const sendMessageToModels = async (
                       // Update content with the final response
                       if (parsed.content) {
                         content = parsed.content;
-                        onStream(modelId, content);
+                        onStream(modelId, content, promptId);
                       }
                       return {
                         modelId,
@@ -283,7 +291,7 @@ export const sendMessageToModels = async (
                     }
                     if (parsed.content) {
                       content += parsed.content;
-                      onStream(modelId, content);
+                      onStream(modelId, content, promptId);
                     }
                     if (parsed.threadId) {
                       currentThreadId = parsed.threadId;
@@ -292,6 +300,49 @@ export const sendMessageToModels = async (
                     console.error('Error parsing streaming response:', e);
                     // Skip malformed data and continue
                     continue;
+                  }
+                }
+              }
+            }
+
+            // Process any remaining data in the buffer
+            if (buffer.trim()) {
+              const line = buffer.trim();
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data !== '[DONE]' && data.trim()) {
+                  try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.done) {
+                      currentThreadId = parsed.threadId || currentThreadId;
+                      if (parsed.content) {
+                        content = parsed.content;
+                        onStream(modelId, content, promptId);
+                      }
+                      return {
+                        modelId,
+                        content: parsed.content || content,
+                        usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+                        id: openRouterId,
+                        threadId: currentThreadId,
+                        response: {
+                          content: parsed.content || content,
+                          usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+                        }
+                      };
+                    }
+                    if (parsed.id) {
+                      openRouterId = parsed.id;
+                    }
+                    if (parsed.content) {
+                      content += parsed.content;
+                      onStream(modelId, content, promptId);
+                    }
+                    if (parsed.threadId) {
+                      currentThreadId = parsed.threadId;
+                    }
+                  } catch (e) {
+                    console.error('Error parsing final streaming response:', e);
                   }
                 }
               }

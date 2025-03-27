@@ -3,6 +3,8 @@ export interface Message {
   content: string | { content: string } | any;
   modelId?: string;
   id?: string;
+  threadId?: string | null;
+  promptId?: string;
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
