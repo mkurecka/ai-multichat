@@ -196,11 +196,18 @@ export const sendMessageToModels = async (
   modelIds: string[],
   threadId?: string,
   parentId?: string,
-  onStream?: (modelId: string, content: string, promptId: string) => void
+  onStream?: (modelId: string, content: string, promptId: string, threadId: string) => void
 ): Promise<any> => {
   try {
-    // Generate a unique promptId before sending
+    // Generate a unique promptId for this prompt
     const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // If no threadId provided, create a new thread first
+    let currentThreadId = threadId;
+    if (!currentThreadId) {
+      const { threadId: newThreadId } = await createThread();
+      currentThreadId = newThreadId;
+    }
 
     if (onStream) {
       // For streaming, we'll handle all selected models
@@ -219,7 +226,7 @@ export const sendMessageToModels = async (
               body: JSON.stringify({
                 prompt,
                 models: [modelId],
-                threadId,
+                threadId: currentThreadId,
                 parentId,
                 promptId,
                 stream: true
@@ -239,7 +246,6 @@ export const sendMessageToModels = async (
             const decoder = new TextDecoder();
             let content = '';
             let openRouterId = null;
-            let currentThreadId = threadId;
             let buffer = '';
 
             while (true) {
@@ -268,33 +274,18 @@ export const sendMessageToModels = async (
                     
                     const parsed = JSON.parse(data);
                     if (parsed.done) {
-                      currentThreadId = parsed.threadId || currentThreadId;
                       // Update content with the final response
                       if (parsed.content) {
                         content = parsed.content;
-                        onStream(modelId, content, promptId);
+                        onStream(modelId, content, promptId, currentThreadId);
                       }
-                      return {
-                        modelId,
-                        content: parsed.content || content,
-                        usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-                        id: openRouterId,
-                        threadId: currentThreadId,
-                        response: {
-                          content: parsed.content || content,
-                          usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-                        }
-                      };
                     }
                     if (parsed.id) {
                       openRouterId = parsed.id;
                     }
                     if (parsed.content) {
                       content += parsed.content;
-                      onStream(modelId, content, promptId);
-                    }
-                    if (parsed.threadId) {
-                      currentThreadId = parsed.threadId;
+                      onStream(modelId, content, promptId, currentThreadId);
                     }
                   } catch (e) {
                     console.error('Error parsing streaming response:', e);
@@ -314,32 +305,17 @@ export const sendMessageToModels = async (
                   try {
                     const parsed = JSON.parse(data);
                     if (parsed.done) {
-                      currentThreadId = parsed.threadId || currentThreadId;
                       if (parsed.content) {
                         content = parsed.content;
-                        onStream(modelId, content, promptId);
+                        onStream(modelId, content, promptId, currentThreadId);
                       }
-                      return {
-                        modelId,
-                        content: parsed.content || content,
-                        usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-                        id: openRouterId,
-                        threadId: currentThreadId,
-                        response: {
-                          content: parsed.content || content,
-                          usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-                        }
-                      };
                     }
                     if (parsed.id) {
                       openRouterId = parsed.id;
                     }
                     if (parsed.content) {
                       content += parsed.content;
-                      onStream(modelId, content, promptId);
-                    }
-                    if (parsed.threadId) {
-                      currentThreadId = parsed.threadId;
+                      onStream(modelId, content, promptId, currentThreadId);
                     }
                   } catch (e) {
                     console.error('Error parsing final streaming response:', e);
@@ -361,14 +337,14 @@ export const sendMessageToModels = async (
               content: `Error: ${error.message}`,
               usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
               id: null,
-              threadId: threadId
+              threadId: currentThreadId
             };
           }
         })
       );
 
       // Process all responses, including errors
-      const combinedResponses = responses.reduce((acc: { responses: Record<string, { content: string; usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }; id: string | null }>; threadId: string | undefined }, result) => {
+      const combinedResponses = responses.reduce((acc: { responses: Record<string, { content: string; usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }; id: string | null }>; threadId: string }, result) => {
         if (result.status === 'fulfilled') {
           const response = result.value;
           acc.responses[response.modelId] = {
@@ -376,12 +352,20 @@ export const sendMessageToModels = async (
             usage: response.usage,
             id: response.id
           };
-          if (!acc.threadId && response.threadId) {
-            acc.threadId = response.threadId;
-          }
+          acc.threadId = currentThreadId;
         }
         return acc;
-      }, { responses: {}, threadId: undefined });
+      }, { responses: {}, threadId: currentThreadId });
+
+      // Ensure we have all responses
+      if (Object.keys(combinedResponses.responses).length !== modelIds.length) {
+        console.warn('Some model responses were not received:', {
+          expected: modelIds.length,
+          received: Object.keys(combinedResponses.responses).length,
+          models: modelIds,
+          responses: Object.keys(combinedResponses.responses)
+        });
+      }
 
       return combinedResponses;
     } else {
@@ -389,7 +373,7 @@ export const sendMessageToModels = async (
       const response = await api.post('/chat', {
         prompt,
         models: modelIds,
-        threadId,
+        threadId: currentThreadId,
         parentId,
         stream: false
       });

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
 import ChatHistory from './components/ChatHistory';
-import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react';
 
 function App() {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const MAX_MODELS = 16;
   const hasMessages = messages.length > 0;
@@ -47,6 +48,12 @@ function App() {
       // Check if token needs to be refreshed
       try {
         await checkTokenRefresh();
+        // Get user email from token
+        const token = localStorage.getItem('token');
+        if (token) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          setUserEmail(payload.email);
+        }
       } catch (error) {
         console.error('Error checking token:', error);
         // If token refresh fails, redirect to login
@@ -162,66 +169,72 @@ function App() {
       }
     };
 
-    // Add user message immediately
-    const userMessage: Message = {
-      role: 'user',
-      content: prompt,
-      modelId: selectedModelIds[0]
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-
-    // Update chat history with user message
-    setChatHistory(prev => {
-      // Find existing session with matching threadId
-      const existingSession = prev.find(session => session.threadId === currentSessionId);
-      
-      if (existingSession) {
-        // Update existing session
-        return prev.map(session => 
-          session.threadId === currentSessionId
-            ? { ...session, messages: [...session.messages, userMessage] }
-            : session
-        );
-      } else {
-        // Create new session only if no threadId exists
-        return prev.map(session => 
-          (!session.threadId && session.id === Date.now().toString())
-            ? { ...session, messages: [...session.messages, userMessage] }
-            : session
-        );
-      }
-    });
-
     try {
+      // Get promptId from sendMessageToModels
+      const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Add user message immediately
+      const userMessage: Message = {
+        role: 'user',
+        content: prompt,
+        modelId: selectedModelIds[0],
+        promptId: promptId,
+        threadId: currentSessionId
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+
+      // Update chat history with user message
+      setChatHistory(prev => {
+        // Find existing session with matching threadId
+        const existingSession = prev.find(session => session.threadId === currentSessionId);
+        
+        if (existingSession) {
+          // Update existing session
+          return prev.map(session => 
+            session.threadId === currentSessionId
+              ? { ...session, messages: [...session.messages, userMessage] }
+              : session
+          );
+        }
+        return prev;
+      });
+
       const response = await sendMessageToModels(
         prompt,
         selectedModelIds,
         currentSessionId || undefined,
         undefined,
-        (modelId, content: string | { content: string }, promptId: string) => {
+        (modelId, content: string | { content: string }, promptId: string, threadId?: string) => {
           const contentString = typeof content === 'string' ? content : content.content || JSON.stringify(content);
+          
+          // Update currentSessionId if we got a new threadId
+          if (threadId) {
+            setCurrentSessionId(threadId);
+          }
+
           setMessages(prev => {
             const newMessages = [...prev];
             // Find the message with matching modelId, threadId and promptId
             const existingMessageIndex = newMessages.findIndex(msg => 
               msg.role === 'assistant' && 
               msg.modelId === modelId &&
-              msg.threadId === currentSessionId &&
+              msg.threadId === (threadId || currentSessionId) &&
               msg.promptId === promptId
             );
 
             if (existingMessageIndex !== -1) {
               newMessages[existingMessageIndex] = {
                 ...newMessages[existingMessageIndex],
-                content: contentString
+                content: contentString,
+                threadId: threadId || currentSessionId
               };
             } else {
               newMessages.push({
                 role: 'assistant' as const,
                 content: contentString,
                 modelId: modelId,
-                threadId: currentSessionId,
+                threadId: threadId || currentSessionId,
                 promptId: promptId
               });
             }
@@ -231,15 +244,15 @@ function App() {
           // Update chat history with streaming content
           setChatHistory(prev => {
             // Find existing session with matching threadId
-            const existingSession = prev.find(session => session.threadId === currentSessionId);
+            const existingSession = prev.find(session => session.threadId === (threadId || currentSessionId));
             
             if (existingSession) {
               return prev.map(session => {
-                if (session.threadId === currentSessionId) {
+                if (session.threadId === (threadId || currentSessionId)) {
                   const existingMessageIndex = session.messages.findIndex(msg => 
                     msg.role === 'assistant' && 
                     msg.modelId === modelId &&
-                    msg.threadId === currentSessionId &&
+                    msg.threadId === (threadId || currentSessionId) &&
                     msg.promptId === promptId
                   );
 
@@ -247,7 +260,8 @@ function App() {
                     const updatedMessages = [...session.messages];
                     updatedMessages[existingMessageIndex] = {
                       ...updatedMessages[existingMessageIndex],
-                      content: contentString
+                      content: contentString,
+                      threadId: threadId || currentSessionId
                     };
                     return { ...session, messages: updatedMessages };
                   } else {
@@ -257,7 +271,7 @@ function App() {
                         role: 'assistant',
                         content: contentString,
                         modelId: modelId,
-                        threadId: currentSessionId,
+                        threadId: threadId || currentSessionId,
                         promptId: promptId
                       }]
                     };
@@ -266,70 +280,37 @@ function App() {
                 return session;
               });
             }
-            // Only update if no threadId exists
-            return prev.map(session => {
-              if (!session.threadId && session.id === Date.now().toString()) {
-                const existingMessageIndex = session.messages.findIndex(msg => 
-                  msg.role === 'assistant' && 
-                  msg.modelId === modelId &&
-                  msg.threadId === currentSessionId &&
-                  msg.promptId === promptId
-                );
-
-                if (existingMessageIndex !== -1) {
-                  const updatedMessages = [...session.messages];
-                  updatedMessages[existingMessageIndex] = {
-                    ...updatedMessages[existingMessageIndex],
-                    content: contentString
-                  };
-                  return { ...session, messages: updatedMessages };
-                } else {
-                  return {
-                    ...session,
-                    messages: [...session.messages, {
-                      role: 'assistant',
-                      content: contentString,
-                      modelId: modelId,
-                      threadId: currentSessionId,
-                      promptId: promptId
-                    }]
-                  };
-                }
-              }
-              return session;
-            });
+            return prev;
           });
         }
       );
 
-      // Handle the final response
+      // Update currentSessionId if we got a new threadId from the response
       if (response.threadId) {
         setCurrentSessionId(response.threadId);
-        
-        // Update chat history to ensure threadId is set correctly
-        setChatHistory(prev => {
-          // Find existing session with matching threadId
-          const existingSession = prev.find(session => session.threadId === response.threadId);
-          
-          if (existingSession) {
-            return prev.map(session => 
-              session.threadId === response.threadId
-                ? { ...session, threadId: response.threadId }
-                : session
-            );
-          } else {
-            // Only update if no threadId exists
-            return prev.map(session => 
-              (!session.threadId && session.id === Date.now().toString())
-                ? { ...session, threadId: response.threadId }
-                : session
-            );
-          }
-        });
+        // Update chat history with new threadId
+        setChatHistory(prev => prev.map(session => 
+          session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString())
+            ? { ...session, threadId: response.threadId }
+            : session
+        ));
+        // Update all messages with new threadId
+        setMessages(prev => prev.map(msg => ({
+          ...msg,
+          threadId: response.threadId
+        })));
+      }
 
-        // Reload thread data to ensure consistency
+      // Only reload thread data if we don't have streaming responses
+      const hasStreamingResponses = messages.some(msg => 
+        msg.role === 'assistant' && 
+        msg.threadId === currentSessionId && 
+        msg.promptId === promptId
+      );
+      
+      if (!hasStreamingResponses && currentSessionId) {
         setTimeout(async () => {
-          await reloadThreadData(response.threadId);
+          await reloadThreadData(currentSessionId);
         }, 500);
       }
     } catch (error: any) {
@@ -419,81 +400,75 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Chat History Sidebar */}
-      <div className={`w-64 bg-white border-r ${showChatHistory ? '' : 'hidden'}`}>
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Chat History</h2>
-        </div>
-        <div className="overflow-y-auto h-full">
-          {chatHistory.map((session) => (
-            <div
-              key={session.threadId || session.id}
-              className={`p-4 cursor-pointer hover:bg-gray-50 ${
-                currentSessionId === (session.threadId || session.id) ? 'bg-gray-50' : ''
-              }`}
-              onClick={() => handleSelectChat(session.id)}
-            >
-              <h3 className="font-medium truncate">{session.title || 'New Chat'}</h3>
-              <p className="text-sm text-gray-500 truncate">
-                {session.messages[session.messages.length - 1] 
-                  ? getMessageContent(session.messages[session.messages.length - 1])
-                  : 'No messages'}
-              </p>
+      {/* Top Menubar */}
+      <div className="fixed top-0 left-0 right-0 bg-white border-b z-10">
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-xl font-semibold">AI MultiChat</h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-gray-600">
+              <User size={18} />
+              <span>{userEmail}</span>
             </div>
-          ))}
+            <button
+              onClick={logout}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            >
+              <LogOut size={18} />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white border-b p-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={toggleChatHistory}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-            <h1 className="text-xl font-semibold">AI MultiChat</h1>
+      {/* Main Content */}
+      <div className="flex w-full pt-14">
+        {/* Chat History Sidebar */}
+        <div className={`w-64 bg-white border-r ${showChatHistory ? '' : 'hidden'}`}>
+          <div className="p-4 border-b">
+            <h2 className="text-lg font-semibold">Chat History</h2>
           </div>
-          <button
-            onClick={handleStartNewChat}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            New Chat
-          </button>
+          <div className="overflow-y-auto h-full">
+            {chatHistory.map((session) => (
+              <div
+                key={session.threadId || session.id}
+                className={`p-4 cursor-pointer hover:bg-gray-50 ${
+                  currentSessionId === (session.threadId || session.id) ? 'bg-gray-50' : ''
+                }`}
+                onClick={() => handleSelectChat(session.id)}
+              >
+                <h3 className="font-medium truncate">{session.title || 'New Chat'}</h3>
+                <p className="text-sm text-gray-500 truncate">
+                  {session.messages[session.messages.length - 1] 
+                    ? getMessageContent(session.messages[session.messages.length - 1])
+                    : 'No messages'}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Model Selector */}
-        <div className="bg-white border-b p-3">
-          <ModelSelector
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Model Selector */}
+          <div className="bg-white border-b p-3">
+            <ModelSelector
+              models={models}
+              onModelToggle={handleModelToggle}
+              maxModels={MAX_MODELS}
+            />
+          </div>
+
+          {/* Chat Window */}
+          <ChatWindow
+            messages={messages}
             models={models}
             onModelToggle={handleModelToggle}
-            maxModels={MAX_MODELS}
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
           />
         </div>
-
-        {/* Chat Window */}
-        <ChatWindow
-          messages={messages}
-          models={models}
-          onModelToggle={handleModelToggle}
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-        />
       </div>
     </div>
   );
