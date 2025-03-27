@@ -55,7 +55,12 @@ class ModelService
                 'name' => $model['name'] ?? $model['id'],
                 'description' => $model['description'] ?? null,
                 'provider' => $this->extractProviderFromId($model['id']),
-                'selected' => false
+                'selected' => false,
+                'pricing' => [
+                    'prompt' => $model['pricing']['prompt'] ?? null,
+                    'completion' => $model['pricing']['completion'] ?? null,
+                    'unit' => 'tokens'
+                ]
             ];
         }
         

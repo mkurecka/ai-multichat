@@ -16,6 +16,11 @@ export interface Model {
   description?: string;
   provider?: string;
   selected: boolean;
+  pricing?: {
+    prompt: number;
+    completion: number;
+    unit: string;
+  };
 }
 
 export interface ChatSession {

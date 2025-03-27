@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Message, Model, ChatSession } from './types';
-import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory } from './services/api';
+import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory, logout } from './services/api';
 import { useNavigate } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
 import ChatHistory from './components/ChatHistory';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 
 function App() {
   const navigate = useNavigate();
@@ -177,17 +177,19 @@ function App() {
         }
       } else {
         // Handle non-streaming response
-        const responses = (response as { responses: Record<string, { content: string }> }).responses;
-        const newMessages: Message[] = Object.entries(responses).map(([modelId, response]) => ({
+        const apiResponse = response as { id: string; usage: { total_tokens: number; prompt_tokens: number; completion_tokens: number }; content: string };
+        const newMessage: Message = {
           role: 'assistant' as const,
-          content: response.content,
-          modelId
-        }));
+          content: apiResponse.content,
+          modelId: selectedModelIds[0],
+          id: apiResponse.id,
+          usage: apiResponse.usage
+        };
 
-        setMessages(prev => [...prev, ...newMessages]);
+        setMessages(prev => [...prev, newMessage]);
 
         // Update chat history
-        if ((response as { threadId: string }).threadId) {
+        if (currentSessionId) {
           const updatedHistory = await getChatHistory();
           setChatHistory(updatedHistory);
         }
@@ -236,6 +238,17 @@ function App() {
 
   return (
     <div className="flex h-screen max-h-screen overflow-hidden">
+      {/* Header */}
+      <div className="absolute top-0 right-0 p-4 z-20">
+        <button
+          onClick={logout}
+          className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+        >
+          <LogOut size={18} />
+          <span>Logout</span>
+        </button>
+      </div>
+
       {/* Chat History Sidebar */}
       <div className={`bg-white border-l flex flex-col transition-all duration-300 ${showChatHistory ? 'w-72' : 'w-0'}`}>
         {showChatHistory && (

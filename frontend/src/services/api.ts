@@ -320,3 +320,9 @@ export const getThreadHistory = async (threadId: string): Promise<any> => {
     throw error;
   }
 };
+
+// Function to handle user logout
+export const logout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/login';
+};
