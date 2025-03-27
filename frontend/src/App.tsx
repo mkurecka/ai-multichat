@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Message, Model, ChatSession } from './types';
 import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory, logout, createThread } from './services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
 import ChatHistory from './components/ChatHistory';
 import { ChevronLeft, ChevronRight, LogOut, User, DollarSign } from 'lucide-react';
 import CostsPage from './components/CostsPage';
-import { Routes, Route } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { Header } from './components/Header';
 
 function App() {
   const navigate = useNavigate();
@@ -402,94 +403,65 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Top Menubar */}
+      {/* Header */}
       <div className="fixed top-0 left-0 right-0 bg-white border-b z-10">
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-2 hover:bg-gray-100 rounded-full"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => navigate(1)}
-              className="p-2 hover:bg-gray-100 rounded-full"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-            <h1 className="text-xl font-semibold">AI MultiChat</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate('/costs')}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-            >
-              <DollarSign size={18} />
-              <span>Costs</span>
-            </button>
-            <div className="flex items-center space-x-2 text-gray-600">
-              <User size={18} />
-              <span>{userEmail}</span>
-            </div>
-            <button
-              onClick={logout}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-            >
-              <LogOut size={18} />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
+        <Header />
       </div>
 
       {/* Main Content */}
-      <div className="flex w-full pt-14">
-        {/* Chat History Sidebar */}
-        <div className={`w-64 bg-white border-r ${showChatHistory ? '' : 'hidden'}`}>
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold">Chat History</h2>
-          </div>
-          <div className="overflow-y-auto h-full">
-            {chatHistory.map((session) => (
-              <div
-                key={session.threadId || session.id}
-                className={`p-4 cursor-pointer hover:bg-gray-50 ${
-                  currentSessionId === (session.threadId || session.id) ? 'bg-gray-50' : ''
-                }`}
-                onClick={() => handleSelectChat(session.id)}
-              >
-                <h3 className="font-medium truncate">{session.title || 'New Chat'}</h3>
-                <p className="text-sm text-gray-500 truncate">
-                  {session.messages[session.messages.length - 1] 
-                    ? getMessageContent(session.messages[session.messages.length - 1])
-                    : 'No messages'}
-                </p>
+      <div className="flex w-full pt-16">
+        <Routes>
+          <Route path="/costs" element={<CostsPage />} />
+          <Route path="/" element={
+            <>
+              {/* Chat History Sidebar */}
+              <div className={`w-64 bg-white border-r ${showChatHistory ? '' : 'hidden'}`}>
+                <div className="p-4 border-b">
+                  <h2 className="text-lg font-semibold">Chat History</h2>
+                </div>
+                <div className="overflow-y-auto h-full">
+                  {chatHistory.map((session) => (
+                    <div
+                      key={session.threadId || session.id}
+                      className={`p-4 cursor-pointer hover:bg-gray-50 ${
+                        currentSessionId === (session.threadId || session.id) ? 'bg-gray-50' : ''
+                      }`}
+                      onClick={() => handleSelectChat(session.id)}
+                    >
+                      <h3 className="font-medium truncate">{session.title || 'New Chat'}</h3>
+                      <p className="text-sm text-gray-500 truncate">
+                        {session.messages[session.messages.length - 1] 
+                          ? getMessageContent(session.messages[session.messages.length - 1])
+                          : 'No messages'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Model Selector */}
-          <div className="bg-white border-b p-3">
-            <ModelSelector
-              models={models}
-              onModelToggle={handleModelToggle}
-              maxModels={MAX_MODELS}
-            />
-          </div>
+              {/* Main Chat Area */}
+              <div className="flex-1 flex flex-col">
+                {/* Model Selector */}
+                <div className="bg-white border-b p-3">
+                  <ModelSelector
+                    models={models}
+                    onModelToggle={handleModelToggle}
+                    maxModels={MAX_MODELS}
+                  />
+                </div>
 
-          {/* Chat Window */}
-          <ChatWindow
-            messages={messages}
-            models={models}
-            onModelToggle={handleModelToggle}
-            onSendMessage={handleSendMessage}
-            isLoading={isLoading}
-          />
-        </div>
+                {/* Chat Window */}
+                <ChatWindow
+                  messages={messages}
+                  models={models}
+                  onModelToggle={handleModelToggle}
+                  onSendMessage={handleSendMessage}
+                  isLoading={isLoading}
+                />
+              </div>
+            </>
+          } />
+        </Routes>
       </div>
     </div>
   );

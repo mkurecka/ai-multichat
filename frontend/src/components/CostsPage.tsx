@@ -34,7 +34,7 @@ const CostsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -42,7 +42,7 @@ const CostsPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="text-red-500">{error}</div>
       </div>
     );
@@ -50,7 +50,7 @@ const CostsPage: React.FC = () => {
 
   if (threadCosts.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="text-gray-500">No threads found</div>
       </div>
     );
