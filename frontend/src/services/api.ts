@@ -261,12 +261,21 @@ export const sendMessageToModels = async (
                     const parsed = JSON.parse(data);
                     if (parsed.done) {
                       currentThreadId = parsed.threadId || currentThreadId;
+                      // Update content with the final response
+                      if (parsed.content) {
+                        content = parsed.content;
+                        onStream(modelId, content);
+                      }
                       return {
                         modelId,
-                        content,
-                        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+                        content: parsed.content || content,
+                        usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
                         id: openRouterId,
-                        threadId: currentThreadId
+                        threadId: currentThreadId,
+                        response: {
+                          content: parsed.content || content,
+                          usage: parsed.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+                        }
                       };
                     }
                     if (parsed.id) {

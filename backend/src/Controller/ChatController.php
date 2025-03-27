@@ -105,7 +105,14 @@ class ChatController extends AbstractController
                                 $chatHistory->setThread($thread)
                                     ->setPrompt($prompt)
                                     ->setPromptId($promptId)
-                                    ->setResponse(['content' => $content])
+                                    ->setResponse([
+                                        'content' => $content,
+                                        'usage' => [
+                                            'prompt_tokens' => 0,
+                                            'completion_tokens' => 0,
+                                            'total_tokens' => 0
+                                        ]
+                                    ])
                                     ->setModelId($modelId)
                                     ->setOpenRouterId($openRouterId);
                                 
@@ -113,7 +120,17 @@ class ChatController extends AbstractController
                                 $em->flush();
                                 $historySaved = true;
                                 
-                                echo "data: " . json_encode(['done' => true, 'modelId' => $modelId, 'threadId' => $thread->getThreadId()]) . "\n\n";
+                                echo "data: " . json_encode([
+                                    'done' => true, 
+                                    'modelId' => $modelId, 
+                                    'threadId' => $thread->getThreadId(),
+                                    'content' => $content,
+                                    'usage' => [
+                                        'prompt_tokens' => 0,
+                                        'completion_tokens' => 0,
+                                        'total_tokens' => 0
+                                    ]
+                                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
                                 flush();
                                 continue;
                             }

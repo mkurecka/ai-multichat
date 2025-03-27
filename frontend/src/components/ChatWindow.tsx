@@ -116,7 +116,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onM
                               <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
                             </div>
                             <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
-                              {typeof response.content === 'string' ? response.content : JSON.stringify(response.content)}
+                              {typeof response.content === 'string' 
+                                ? response.content 
+                                : typeof response.content === 'object' && response.content !== null
+                                  ? response.content.content || JSON.stringify(response.content)
+                                  : JSON.stringify(response.content)}
                               {isLoading && responseIndex === group.responses.length - 1 && (
                                 <span className="inline-block ml-1 animate-pulse">▊</span>
                               )}
