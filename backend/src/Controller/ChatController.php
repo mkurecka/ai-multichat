@@ -76,6 +76,7 @@ class ChatController extends AbstractController
                 $stream = $modelResponse['stream'];
                 $content = '';
                 $openRouterId = null;
+                $historySaved = false;  // Add this flag
                 
                 while (!feof($stream)) {
                     $chunk = fread($stream, 8192);
@@ -97,6 +98,7 @@ class ChatController extends AbstractController
                                 
                                 $em->persist($chatHistory);
                                 $em->flush();
+                                $historySaved = true;  // Set the flag
                                 
                                 echo "data: " . json_encode(['done' => true, 'modelId' => $modelId, 'threadId' => $thread->getThreadId()]) . "\n\n";
                                 flush();
@@ -126,7 +128,7 @@ class ChatController extends AbstractController
                 }
 
                 // If we get here without a [DONE] message, save what we have
-                if (!empty($content)) {
+                if (!$historySaved && !empty($content)) {
                     $chatHistory = new ChatHistory();
                     $chatHistory->setThread($thread)
                         ->setPrompt($prompt)

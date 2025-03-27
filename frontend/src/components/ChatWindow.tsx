@@ -114,7 +114,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle
         <div className="p-4 border-t">
           <ChatInput
               selectedModels={selectedModels.map(model => model.id)}
-              onSendMessage={onSendMessage}
+              onSendMessage={(message) => onSendMessage(messages, message)}
               disabled={selectedModels.length === 0}
           />
         </div>

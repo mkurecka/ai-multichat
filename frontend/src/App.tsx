@@ -16,6 +16,8 @@ function App() {
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
 
   const MAX_MODELS = 16;
   const hasMessages = messages.length > 0;
@@ -101,66 +103,104 @@ function App() {
     );
   };
 
-  const handleSendMessage = async (responses: Message[], prompt: string) => {
-    // Add user message
-    const userMessage: Message = { role: 'user', content: prompt };
-    
-    // Update messages with user message and empty responses
-    const emptyResponses = models
-      .filter(m => m.selected)
-      .map(m => ({ role: 'assistant' as const, content: '', modelId: m.id }));
-    
-    setMessages(prevMessages => [...prevMessages, userMessage, ...emptyResponses]);
+  const handleSendMessage = async (messages: Message[], prompt: string) => {
+    if (!prompt.trim()) return;
 
-    // Get current thread ID or create new one
-    const currentThreadId = currentSessionId || undefined;
-    const lastMessage = messages[messages.length - 1];
-    const parentId = lastMessage?.id;
+    // Get selected models
+    const selectedModelIds = models.filter(m => m.selected).map(m => m.id);
+    if (selectedModelIds.length === 0) return;
 
-    // Send message to API with streaming
+    const userMessage: Message = {
+      role: 'user',
+      content: prompt,
+      modelId: selectedModelIds[0] // Use first model for user message
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
     try {
-      const result = await sendMessageToModels(
-        prompt,
-        models.filter(m => m.selected).map(m => m.id),
-        currentThreadId,
-        parentId,
-        (modelId, content) => {
-          setMessages(prevMessages => {
-            const newMessages = [...prevMessages];
-            const responseIndex = newMessages.findIndex(
-              m => m.role === 'assistant' && m.modelId === modelId
-            );
-            if (responseIndex !== -1) {
-              newMessages[responseIndex] = {
-                ...newMessages[responseIndex],
-                content
-              };
-            }
-            return newMessages;
-          });
-        }
-      );
+      const response = await sendMessageToModels(prompt, selectedModelIds, currentSessionId || undefined);
       
-      // Update thread ID if this is a new thread
-      if (!currentThreadId && result.threadId) {
-        setCurrentSessionId(result.threadId);
-      }
+      if (response instanceof ReadableStream) {
+        const reader = response.getReader();
+        const decoder = new TextDecoder();
+        let currentModelId = selectedModelIds[0];
+        let currentContent = '';
+        let currentThreadId = currentSessionId;
 
-      // Fetch updated chat history
-      const history = await getChatHistory();
-      const sessions: ChatSession[] = history.map((entry: any) => ({
-        id: entry.id.toString(),
-        title: entry.title,
-        threadId: entry.threadId,
-        messages: entry.messages.map((msg: any) => [
-          { role: 'user' as const, content: msg.prompt },
-          { role: 'assistant' as const, content: Object.values(msg.responses)[0] as string, modelId: msg.modelId }
-        ]).flat(),
-        selectedModels: [],
-      }));
-      setChatHistory(sessions);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.done) {
+                currentThreadId = data.threadId;
+                // Update session with new thread ID if needed
+                if (!currentSessionId) {
+                  setCurrentSessionId(data.threadId);
+                }
+                break;
+              }
+
+              if (data.content) {
+                currentContent += data.content;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const lastMessage = newMessages[newMessages.length - 1];
+                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === currentModelId) {
+                    lastMessage.content = currentContent;
+                  } else {
+                    newMessages.push({
+                      role: 'assistant' as const,
+                      content: currentContent,
+                      modelId: currentModelId
+                    });
+                  }
+                  return newMessages;
+                });
+              }
+            }
+          }
+        }
+
+        // Update chat history with the new message
+        if (currentThreadId) {
+          const updatedHistory = await getChatHistory();
+          setChatHistory(updatedHistory);
+        }
+      } else {
+        // Handle non-streaming response
+        const responses = (response as { responses: Record<string, { content: string }> }).responses;
+        const newMessages: Message[] = Object.entries(responses).map(([modelId, response]) => ({
+          role: 'assistant' as const,
+          content: response.content,
+          modelId
+        }));
+
+        setMessages(prev => [...prev, ...newMessages]);
+
+        // Update chat history
+        if ((response as { threadId: string }).threadId) {
+          const updatedHistory = await getChatHistory();
+          setChatHistory(updatedHistory);
+        }
+      }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Error sending message:', error);
+      setMessages(prev => [...prev, {
+        role: 'assistant' as const,
+        content: 'Error: Failed to send message. Please try again.',
+        modelId: selectedModelIds[0]
+      }]);
+    } finally {
+      setIsLoading(false);
     }
   };
 

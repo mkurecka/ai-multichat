@@ -3,7 +3,7 @@ import { Send } from 'lucide-react';
 import { Message } from '../types';
 
 interface ChatInputProps {
-    onSendMessage: (messages: Message[], prompt: string) => void;
+    onSendMessage: (message: string) => void;
     disabled: boolean;
     selectedModels: string[];
 }
@@ -17,10 +17,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, selected
         if (message.trim() && !disabled && !loading) {
             setLoading(true);
             try {
-                // Create a temporary user message
-                const userMessage: Message = { role: 'user', content: message };
-                // Call parent handler with empty responses array (will be filled by parent)
-                onSendMessage([], message);
+                onSendMessage(message);
                 setMessage('');
             } catch (error) {
                 console.error('Failed to send message:', error);
