@@ -162,11 +162,26 @@ function App() {
     setMessages(prev => [...prev, userMessage]);
 
     // Update chat history with user message
-    setChatHistory(prev => prev.map(session => 
-      (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString()))
-        ? { ...session, messages: [...session.messages, userMessage] }
-        : session
-    ));
+    setChatHistory(prev => {
+      // Find existing session with matching threadId
+      const existingSession = prev.find(session => session.threadId === currentSessionId);
+      
+      if (existingSession) {
+        // Update existing session
+        return prev.map(session => 
+          session.threadId === currentSessionId
+            ? { ...session, messages: [...session.messages, userMessage] }
+            : session
+        );
+      } else {
+        // Create new session only if no threadId exists
+        return prev.map(session => 
+          (!session.threadId && session.id === Date.now().toString())
+            ? { ...session, messages: [...session.messages, userMessage] }
+            : session
+        );
+      }
+    });
 
     try {
       const response = await sendMessageToModels(
@@ -192,35 +207,89 @@ function App() {
           });
 
           // Update chat history with streaming content
-          setChatHistory(prev => prev.map(session => {
-            if (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString())) {
-              const lastMessage = session.messages[session.messages.length - 1];
-              if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
-                const updatedMessages = [...session.messages];
-                updatedMessages[updatedMessages.length - 1] = {
-                  ...lastMessage,
-                  content: contentString
-                };
-                return { ...session, messages: updatedMessages };
-              } else {
-                return {
-                  ...session,
-                  messages: [...session.messages, {
-                    role: 'assistant',
-                    content: contentString,
-                    modelId: modelId
-                  }]
-                };
-              }
+          setChatHistory(prev => {
+            // Find existing session with matching threadId
+            const existingSession = prev.find(session => session.threadId === currentSessionId);
+            
+            if (existingSession) {
+              return prev.map(session => {
+                if (session.threadId === currentSessionId) {
+                  const lastMessage = session.messages[session.messages.length - 1];
+                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
+                    const updatedMessages = [...session.messages];
+                    updatedMessages[updatedMessages.length - 1] = {
+                      ...lastMessage,
+                      content: contentString
+                    };
+                    return { ...session, messages: updatedMessages };
+                  } else {
+                    return {
+                      ...session,
+                      messages: [...session.messages, {
+                        role: 'assistant',
+                        content: contentString,
+                        modelId: modelId
+                      }]
+                    };
+                  }
+                }
+                return session;
+              });
+            } else {
+              // Only update if no threadId exists
+              return prev.map(session => {
+                if (!session.threadId && session.id === Date.now().toString()) {
+                  const lastMessage = session.messages[session.messages.length - 1];
+                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
+                    const updatedMessages = [...session.messages];
+                    updatedMessages[updatedMessages.length - 1] = {
+                      ...lastMessage,
+                      content: contentString
+                    };
+                    return { ...session, messages: updatedMessages };
+                  } else {
+                    return {
+                      ...session,
+                      messages: [...session.messages, {
+                        role: 'assistant',
+                        content: contentString,
+                        modelId: modelId
+                      }]
+                    };
+                  }
+                }
+                return session;
+              });
             }
-            return session;
-          }));
+          });
         }
       );
 
       // Handle the final response
       if (response.threadId) {
         setCurrentSessionId(response.threadId);
+        
+        // Update chat history to ensure threadId is set correctly
+        setChatHistory(prev => {
+          // Find existing session with matching threadId
+          const existingSession = prev.find(session => session.threadId === response.threadId);
+          
+          if (existingSession) {
+            return prev.map(session => 
+              session.threadId === response.threadId
+                ? { ...session, threadId: response.threadId }
+                : session
+            );
+          } else {
+            // Only update if no threadId exists
+            return prev.map(session => 
+              (!session.threadId && session.id === Date.now().toString())
+                ? { ...session, threadId: response.threadId }
+                : session
+            );
+          }
+        });
+
         // Reload thread data to ensure consistency
         setTimeout(async () => {
           await reloadThreadData(response.threadId);

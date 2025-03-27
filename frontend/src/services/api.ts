@@ -199,6 +199,9 @@ export const sendMessageToModels = async (
   onStream?: (modelId: string, content: string) => void
 ): Promise<any> => {
   try {
+    // Generate a unique promptId before sending
+    const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     if (onStream) {
       // For streaming, we'll handle all selected models
       const responses = await Promise.allSettled(
@@ -218,6 +221,7 @@ export const sendMessageToModels = async (
                 models: [modelId],
                 threadId,
                 parentId,
+                promptId,
                 stream: true
               })
             });
@@ -253,12 +257,13 @@ export const sendMessageToModels = async (
                   try {
                     const parsed = JSON.parse(data);
                     if (parsed.done) {
+                      currentThreadId = parsed.threadId || currentThreadId;
                       return {
                         modelId,
                         content,
                         usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
                         id: openRouterId,
-                        threadId: parsed.threadId || currentThreadId
+                        threadId: currentThreadId
                       };
                     }
                     if (parsed.id) {
@@ -267,6 +272,9 @@ export const sendMessageToModels = async (
                     if (parsed.content) {
                       content += parsed.content;
                       onStream(modelId, content);
+                    }
+                    if (parsed.threadId) {
+                      currentThreadId = parsed.threadId;
                     }
                   } catch (e) {
                     console.error('Error parsing streaming response:', e);

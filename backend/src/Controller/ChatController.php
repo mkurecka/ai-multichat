@@ -32,16 +32,21 @@ class ChatController extends AbstractController
     }
     
     #[Route('/chat', methods: ['POST'])]
-    public function chat(Request $request, OpenRouterService $openRouter, EntityManagerInterface $em): Response
+    public function chat(Request $request, EntityManagerInterface $em, OpenRouterService $openRouter): Response
     {
         $data = json_decode($request->getContent(), true);
         $prompt = $data['prompt'] ?? null;
         $models = $data['models'] ?? [];
         $threadId = $data['threadId'] ?? null;
         $stream = $data['stream'] ?? false;
+        $promptId = $data['promptId'] ?? null;
         
         if (!$prompt || empty($models)) {
             throw new HttpException(400, 'Prompt and models are required');
+        }
+
+        if (!$promptId) {
+            throw new HttpException(400, 'PromptId is required');
         }
         
         $user = $this->getUser();
@@ -62,9 +67,6 @@ class ChatController extends AbstractController
             $em->flush();
         }
 
-        // Generate a unique promptId for this prompt - this will be shared across all model responses
-        $promptId = uniqid('prompt_', true);
-        
         if ($stream) {
             // For streaming, we'll handle one model at a time
             $modelId = $models[0]; // Get first model for streaming
@@ -200,7 +202,7 @@ class ChatController extends AbstractController
             return $this->json([
                 'responses' => $responses,
                 'threadId' => $thread->getThreadId(),
-                'promptId' => $promptId, // Return the promptId
+                'promptId' => $promptId,
                 'usage' => [
                     'user' => $user->getThreads()->count(),
                     'organization' => $organization->getUsageCount()
