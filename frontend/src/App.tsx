@@ -116,8 +116,73 @@ function App() {
       modelId: selectedModelIds[0] // Use first model for user message
     };
 
+    // Update messages immediately with user message
     setMessages(prev => [...prev, userMessage]);
+
+    // Update chat history with user message
+    if (!currentSessionId) {
+      // If no current session, create a new one in the chat history
+      const newSession: ChatSession = {
+        id: Date.now().toString(), // Temporary ID until server responds
+        title: prompt,
+        messages: [userMessage],
+        selectedModels: selectedModelIds,
+      };
+      setChatHistory(prev => [newSession, ...prev]);
+    } else {
+      // Update existing session
+      setChatHistory(prev => prev.map(session => 
+        session.threadId === currentSessionId
+          ? { ...session, messages: [...session.messages, userMessage] }
+          : session
+      ));
+    }
+
     setIsLoading(true);
+
+    const reloadThreadData = async (threadId: string) => {
+      try {
+        console.log('Reloading thread data for:', threadId);
+        // Get the latest thread data
+        const threadData = await getThreadHistory(threadId);
+        console.log('Received thread data:', threadData);
+        
+        if (threadData && threadData.messages) {
+          // Update messages with the latest from server
+          const updatedMessages: Message[] = [];
+          for (const msg of threadData.messages) {
+            // Add user message
+            updatedMessages.push({
+              role: 'user',
+              content: msg.prompt,
+              modelId: msg.modelId
+            });
+            
+            // Add assistant message if it exists
+            if (msg.responses) {
+              Object.entries(msg.responses).forEach(([modelId, content]) => {
+                updatedMessages.push({
+                  role: 'assistant',
+                  content: content as string,
+                  modelId: modelId
+                });
+              });
+            }
+          }
+          console.log('Setting updated messages:', updatedMessages);
+          setMessages(updatedMessages);
+          
+          // Also update current session in chat history
+          setChatHistory(prev => prev.map(session => 
+            session.threadId === threadId
+              ? { ...session, messages: updatedMessages }
+              : session
+          ));
+        }
+      } catch (error) {
+        console.error('Error reloading thread data:', error);
+      }
+    };
 
     try {
       const response = await sendMessageToModels(prompt, selectedModelIds, currentSessionId || undefined);
@@ -146,6 +211,12 @@ function App() {
                 if (!currentSessionId) {
                   setCurrentSessionId(data.threadId);
                 }
+                // Reload thread data to ensure consistency
+                if (currentThreadId && typeof currentThreadId === 'string') {
+                  setTimeout(async () => {
+                    await reloadThreadData(currentThreadId as string);
+                  }, 500); // Add a small delay to ensure server has processed the message
+                }
                 break;
               }
 
@@ -165,19 +236,37 @@ function App() {
                   }
                   return newMessages;
                 });
+                // Update chat history with streaming content
+                setChatHistory(prev => prev.map(session => {
+                  if (session.threadId === currentThreadId || (!session.threadId && session.id === Date.now().toString())) {
+                    const lastMessage = session.messages[session.messages.length - 1];
+                    if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === currentModelId) {
+                      const updatedMessages = [...session.messages];
+                      updatedMessages[updatedMessages.length - 1] = {
+                        ...lastMessage,
+                        content: currentContent
+                      };
+                      return { ...session, messages: updatedMessages };
+                    } else {
+                      return {
+                        ...session,
+                        messages: [...session.messages, {
+                          role: 'assistant',
+                          content: currentContent,
+                          modelId: currentModelId
+                        }]
+                      };
+                    }
+                  }
+                  return session;
+                }));
               }
             }
           }
         }
-
-        // Update chat history with the new message
-        if (currentThreadId) {
-          const updatedHistory = await getChatHistory();
-          setChatHistory(updatedHistory);
-        }
       } else {
         // Handle non-streaming response
-        const apiResponse = response as { id: string; usage: { total_tokens: number; prompt_tokens: number; completion_tokens: number }; content: string };
+        const apiResponse = response as { id: string; usage: { total_tokens: number; prompt_tokens: number; completion_tokens: number }; content: string; threadId: string };
         const newMessage: Message = {
           role: 'assistant' as const,
           content: apiResponse.content,
@@ -188,19 +277,56 @@ function App() {
 
         setMessages(prev => [...prev, newMessage]);
 
-        // Update chat history
-        if (currentSessionId) {
-          const updatedHistory = await getChatHistory();
-          setChatHistory(updatedHistory);
+        // Update chat history with assistant message
+        setChatHistory(prev => prev.map(session => 
+          (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString()))
+            ? { ...session, messages: [...session.messages, newMessage] }
+            : session
+        ));
+
+        // Reload thread data to ensure consistency
+        if (apiResponse.threadId) {
+          setTimeout(async () => {
+            await reloadThreadData(apiResponse.threadId);
+          }, 500); // Add a small delay to ensure server has processed the message
         }
       }
-    } catch (error) {
+    } catch (error: any) {  // Using any here since we need to access response property
       console.error('Error sending message:', error);
-      setMessages(prev => [...prev, {
+      let errorMessage = 'Error: Failed to send message. Please try again.';
+      
+      // Check if it's a timeout error
+      if (error.response?.status === 500 && error.response?.data?.detail?.includes('Maximum execution time')) {
+        errorMessage = 'The request took too long to process. Please try again or try with a shorter message.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = `Error: ${error.response.data.detail}`;
+      }
+
+      const errorResponse: Message = {
         role: 'assistant' as const,
-        content: 'Error: Failed to send message. Please try again.',
+        content: errorMessage,
         modelId: selectedModelIds[0]
-      }]);
+      };
+      
+      setMessages(prev => [...prev, errorResponse]);
+      
+      // Update chat history with error message
+      setChatHistory(prev => prev.map(session => 
+        (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString()))
+          ? { ...session, messages: [...session.messages, errorResponse] }
+          : session
+      ));
+
+      // If we have a thread ID, try to reload it after error
+      if (currentSessionId) {
+        setTimeout(async () => {
+          try {
+            await reloadThreadData(currentSessionId);
+          } catch (reloadError) {
+            console.error('Error reloading thread after error:', reloadError);
+          }
+        }, 1000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -226,10 +352,13 @@ function App() {
     }
   };
 
-  const handleStartNewChat = () => {
+  const handleStartNewChat = async () => {
     setCurrentSessionId(null);
     setMessages([]);
     setModels(prevModels => prevModels.map(model => ({ ...model, selected: false })));
+    // Update chat history to show the new empty thread
+    const updatedHistory = await getChatHistory();
+    setChatHistory(updatedHistory);
   };
 
   const toggleChatHistory = () => {

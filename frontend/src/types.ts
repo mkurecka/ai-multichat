@@ -28,7 +28,7 @@ export interface ChatSession {
   title: string;
   messages: Message[];
   selectedModels: string[];
-  threadId?: string;
+  threadId?: string | null;
   parentId?: string;
 }
 
