@@ -34,6 +34,32 @@ class OpenRouterService
             throw new HttpException(500, 'Failed to fetch models: ' . $e->getMessage());
         }
     }
+
+    public function getGenerationData(string $generationId): array
+    {
+        try {
+            $response = $this->client->request('GET', self::API_URL . '/generation', [
+                'headers' => [
+                    'Authorization' => "Bearer {$this->apiKey}",
+                    'X-Title' => 'AI MultiChat',
+                    'Content-Type' => 'application/json'
+                ],
+                'query' => [
+                    'id' => $generationId
+                ]
+            ]);
+
+            if ($response->getStatusCode() !== 200) {
+                throw new HttpException($response->getStatusCode(), 'Failed to fetch generation data from OpenRouter');
+            }
+
+            $data = $response->toArray();
+            return $data['data'] ?? [];
+        } catch (\Exception $e) {
+            error_log('OpenRouter API Error: ' . $e->getMessage());
+            throw new HttpException(500, 'Failed to fetch generation data: ' . $e->getMessage());
+        }
+    }
     
     public function generateResponse(string $prompt, array $models, bool $stream = false): array
     {
