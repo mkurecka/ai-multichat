@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Message, Model, ChatSession } from './types';
-import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory, logout } from './services/api';
+import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory, logout, createThread } from './services/api';
 import { useNavigate } from 'react-router-dom';
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
@@ -356,12 +356,24 @@ function App() {
   };
 
   const handleStartNewChat = async () => {
-    setCurrentSessionId(null);
-    setMessages([]);
-    setModels(prevModels => prevModels.map(model => ({ ...model, selected: false })));
-    // Update chat history to show the new empty thread
-    const updatedHistory = await getChatHistory();
-    setChatHistory(updatedHistory);
+    try {
+      // Create a new thread immediately
+      const { threadId } = await createThread();
+      setCurrentSessionId(threadId);
+      setMessages([]);
+      setModels(prevModels => prevModels.map(model => ({ ...model, selected: false })));
+      
+      // Add the new thread to chat history
+      setChatHistory(prev => [{
+        id: Date.now().toString(),
+        title: 'New Chat',
+        threadId: threadId,
+        messages: [],
+        selectedModels: []
+      }, ...prev]);
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+    }
   };
 
   const toggleChatHistory = () => {

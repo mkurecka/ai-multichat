@@ -363,3 +363,13 @@ export const logout = () => {
   localStorage.removeItem('token');
   window.location.href = '/login';
 };
+
+export const createThread = async (): Promise<{ threadId: string }> => {
+  try {
+    const response = await api.post('/chat/thread');
+    return response.data;
+  } catch (error) {
+    console.error('Error creating thread:', error);
+    throw error;
+  }
+};
