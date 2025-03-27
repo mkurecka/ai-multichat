@@ -14,6 +14,9 @@ class Thread
     #[ORM\Column]
     private ?int $id = null;
 
+    #[ORM\Column(type: "string", length: 255)]
+    private string $title;
+
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: "threads")]
     #[ORM\JoinColumn(nullable: false)]
     private User $user;
@@ -31,12 +34,22 @@ class Thread
     {
         $this->chatHistories = new ArrayCollection();
         $this->createdAt = new \DateTime();
-        $this->threadId = uniqid('thread_');
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getTitle(): string
+    {
+        return $this->title;
+    }
+
+    public function setTitle(string $title): self
+    {
+        $this->title = $title;
+        return $this;
     }
 
     public function getUser(): User

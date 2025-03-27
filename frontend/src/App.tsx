@@ -352,6 +352,15 @@ function App() {
           </button>
         </div>
 
+        {/* Model Selector */}
+        <div className="bg-white border-b p-3">
+          <ModelSelector
+            models={models}
+            onModelToggle={handleModelToggle}
+            maxModels={MAX_MODELS}
+          />
+        </div>
+
         {/* Chat Window */}
         <ChatWindow
           messages={messages}

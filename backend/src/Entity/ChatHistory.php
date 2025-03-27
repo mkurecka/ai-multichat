@@ -20,6 +20,9 @@ class ChatHistory
     #[ORM\Column(type: "text")]
     private string $prompt;
     
+    #[ORM\Column(type: "string")]
+    private string $promptId;
+    
     #[ORM\Column(type: "json")]
     private array $response;
     
@@ -35,6 +38,7 @@ class ChatHistory
     public function __construct()
     {
         $this->createdAt = new DateTime();
+        $this->promptId = uniqid('prompt_');
     }
 
     public function getId(): ?int
@@ -61,6 +65,17 @@ class ChatHistory
     public function setPrompt(string $prompt): self
     {
         $this->prompt = $prompt;
+        return $this;
+    }
+
+    public function getPromptId(): string
+    {
+        return $this->promptId;
+    }
+
+    public function setPromptId(string $promptId): self
+    {
+        $this->promptId = $promptId;
         return $this;
     }
 

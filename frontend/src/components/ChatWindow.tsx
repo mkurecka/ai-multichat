@@ -12,6 +12,12 @@ interface ChatWindowProps {
   isLoading?: boolean;
 }
 
+interface GroupedMessage {
+  userMessage: Message;
+  responses: Message[];
+  timestamp: string;
+}
+
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle, onSendMessage, isLoading }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedModels = models ? models.filter(model => model.selected) : [];
@@ -21,37 +27,42 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Group messages by user message and responses
-  const groupedMessages: { userMessage: Message, responses: Message[] }[] = [];
-
+  // Group messages by prompt and timestamp
+  const groupedMessages: GroupedMessage[] = [];
+  
   if (messages && messages.length > 0) {
+    let currentGroup: GroupedMessage | null = null;
+    
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
-
+      
       if (message.role === 'user') {
-        // Find all assistant responses that follow this user message
-        const responses: Message[] = [];
-        let j = i + 1;
-
-        while (j < messages.length && messages[j].role === 'assistant') {
-          responses.push(messages[j]);
-          j++;
+        // If we have a previous group, add it to our list
+        if (currentGroup) {
+          groupedMessages.push(currentGroup);
         }
-
-        groupedMessages.push({
+        
+        // Start a new group with this user message
+        currentGroup = {
           userMessage: message,
-          responses
-        });
-
-        // Skip the responses we've already processed
-        i = j - 1;
+          responses: [],
+          timestamp: new Date().toISOString() // You might want to get this from the message
+        };
+      } else if (message.role === 'assistant' && currentGroup) {
+        // Add assistant message to current group
+        currentGroup.responses.push(message);
       }
+    }
+    
+    // Don't forget to add the last group
+    if (currentGroup) {
+      groupedMessages.push(currentGroup);
     }
   }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Model selection bar - add null check */}
+      {/* Model selection bar */}
       {selectedModels.length > 0 && (
         <div className="bg-white border-b p-2 flex items-center overflow-x-auto">
           <div className="text-sm font-medium text-gray-500 mr-3">Active models:</div>
@@ -67,7 +78,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle
         </div>
       )}
 
-      {/* Chat messages - make sure it's scrollable */}
+      {/* Chat messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-8">
         {!messages || messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-gray-400 text-center p-8">
@@ -86,32 +97,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, models, onModelToggle
                   modelName={undefined}
                 />
 
-                {/* Model responses in a horizontal scrollable container */}
+                {/* Model responses in a grid layout */}
                 {group.responses.length > 0 && (
                   <div className="mt-4">
                     <h3 className="text-sm font-medium text-gray-500 mb-2">Model Responses:</h3>
-                    <div className="overflow-x-auto pb-2">
-                      <div className="flex space-x-4" style={{ minWidth: 'max-content' }}>
-                        {group.responses.map((response, responseIndex) => {
-                          const model = models ? models.find(m => m.id === response.modelId) : undefined;
-                          return (
-                            <div
-                              key={responseIndex}
-                              className="w-80 flex-shrink-0 border border-gray-200 rounded-lg overflow-hidden bg-white"
-                            >
-                              <div className="bg-gray-50 p-2 border-b border-gray-200">
-                                <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
-                              </div>
-                              <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
-                                {response.content}
-                                {isLoading && responseIndex === group.responses.length - 1 && (
-                                  <span className="inline-block ml-1 animate-pulse">▊</span>
-                                )}
-                              </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {group.responses.map((response, responseIndex) => {
+                        const model = models ? models.find(m => m.id === response.modelId) : undefined;
+                        return (
+                          <div
+                            key={responseIndex}
+                            className="border border-gray-200 rounded-lg overflow-hidden bg-white"
+                          >
+                            <div className="bg-gray-50 p-2 border-b border-gray-200">
+                              <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
+                              {response.content}
+                              {isLoading && responseIndex === group.responses.length - 1 && (
+                                <span className="inline-block ml-1 animate-pulse">▊</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

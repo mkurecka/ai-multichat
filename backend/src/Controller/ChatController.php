@@ -35,31 +35,46 @@ class ChatController extends AbstractController
     public function chat(Request $request, OpenRouterService $openRouter, EntityManagerInterface $em): Response
     {
         $data = json_decode($request->getContent(), true);
-        echo json_encode($data);
-        $prompt = $data['prompt'];
-        $models = $data['models'];
+        $prompt = $data['prompt'] ?? null;
+        $models = $data['models'] ?? [];
         $threadId = $data['threadId'] ?? null;
         $stream = $data['stream'] ?? false;
         
-        $user = $this->getUser();
-        $organization = $user->getOrganization();
-        $organization->setUsageCount($organization->getUsageCount() + 1);
-        
-        // Find or create thread
-        $thread = null;
-        if ($threadId) {
-            $thread = $em->getRepository(Thread::class)
-                ->findOneBy(['threadId' => $threadId, 'user' => $user]);
+        if (!$prompt || empty($models)) {
+            throw new HttpException(400, 'Prompt and models are required');
         }
         
-        if (!$thread) {
+        $user = $this->getUser();
+        $organization = $user->getOrganization();
+        
+        // Get or create thread
+        if ($threadId) {
+            $thread = $em->getRepository(Thread::class)->find($threadId);
+            if (!$thread) {
+                throw new HttpException(404, 'Thread not found');
+            }
+        } else {
             $thread = new Thread();
+            $thread->setTitle(substr($prompt, 0, 100));
             $thread->setUser($user);
-            $thread->setThreadId(uniqid('thread_', true));
+            $thread->setThreadId(uniqid('thread_'));
             $em->persist($thread);
             $em->flush();
         }
 
+        // Generate a unique promptId
+        $promptId = uniqid('prompt_');
+
+        // Save the prompt immediately
+        $chatHistory = new ChatHistory();
+        $chatHistory->setThread($thread);
+        $chatHistory->setPrompt($prompt);
+        $chatHistory->setPromptId($promptId);
+        $chatHistory->setResponse([]);  // Empty responses for now
+        $chatHistory->setCreatedAt(new \DateTime());
+        $em->persist($chatHistory);
+        $em->flush();
+        
         if ($stream) {
             // For streaming, we'll handle one model at a time
             $modelId = $models[0]; // Get first model for streaming
@@ -72,7 +87,7 @@ class ChatController extends AbstractController
             $modelResponse = $modelResponses[$modelId];
             
             // Create a new StreamedResponse
-            $response = new StreamedResponse(function() use ($modelResponse, $modelId, $prompt, $thread, $em) {
+            $response = new StreamedResponse(function() use ($modelResponse, $modelId, $prompt, $thread, $em, $promptId) {
                 $stream = $modelResponse['stream'];
                 $content = '';
                 $openRouterId = null;
@@ -92,6 +107,7 @@ class ChatController extends AbstractController
                                 $chatHistory = new ChatHistory();
                                 $chatHistory->setThread($thread)
                                     ->setPrompt($prompt)
+                                    ->setPromptId($promptId)
                                     ->setResponse(['content' => $content])
                                     ->setModelId($modelId)
                                     ->setOpenRouterId($openRouterId);
@@ -132,6 +148,7 @@ class ChatController extends AbstractController
                     $chatHistory = new ChatHistory();
                     $chatHistory->setThread($thread)
                         ->setPrompt($prompt)
+                        ->setPromptId($promptId)
                         ->setResponse(['content' => $content])
                         ->setModelId($modelId)
                         ->setOpenRouterId($openRouterId);
@@ -162,6 +179,7 @@ class ChatController extends AbstractController
                 $chatHistory = new ChatHistory();
                 $chatHistory->setThread($thread)
                     ->setPrompt($prompt)
+                    ->setPromptId($promptId)
                     ->setResponse($modelResponse)
                     ->setModelId($modelId)
                     ->setOpenRouterId($modelResponse['id']);
@@ -204,12 +222,41 @@ class ChatController extends AbstractController
             
             if (!empty($histories)) {
                 $messages = [];
+                $currentPromptId = null;
+                $currentPromptResponses = [];
+                
                 foreach ($histories as $history) {
-                    $messages[] = [
+                    if ($currentPromptId !== $history->getPromptId()) {
+                        // If we have responses from previous prompt, add them
+                        if (!empty($currentPromptResponses)) {
+                            $messages[] = [
+                                'prompt' => $currentPromptResponses[0]['prompt'],
+                                'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                                'createdAt' => $currentPromptResponses[0]['createdAt'],
+                                'promptId' => $currentPromptId
+                            ];
+                        }
+                        
+                        // Start new group
+                        $currentPromptId = $history->getPromptId();
+                        $currentPromptResponses = [];
+                    }
+                    
+                    $currentPromptResponses[] = [
                         'prompt' => $history->getPrompt(),
-                        'responses' => [$history->getModelId() => $history->getResponse()['content']],
-                        'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s'),
-                        'modelId' => $history->getModelId()
+                        'response' => $history->getResponse()['content'],
+                        'modelId' => $history->getModelId(),
+                        'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+                    ];
+                }
+                
+                // Don't forget to add the last group
+                if (!empty($currentPromptResponses)) {
+                    $messages[] = [
+                        'prompt' => $currentPromptResponses[0]['prompt'],
+                        'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                        'createdAt' => $currentPromptResponses[0]['createdAt'],
+                        'promptId' => $currentPromptId
                     ];
                 }
                 
@@ -250,12 +297,41 @@ class ChatController extends AbstractController
             return $a->getCreatedAt() <=> $b->getCreatedAt();
         });
         
+        $currentPromptId = null;
+        $currentPromptResponses = [];
+        
         foreach ($histories as $history) {
-            $messages[] = [
+            if ($currentPromptId !== $history->getPromptId()) {
+                // If we have responses from previous prompt, add them
+                if (!empty($currentPromptResponses)) {
+                    $messages[] = [
+                        'prompt' => $currentPromptResponses[0]['prompt'],
+                        'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                        'createdAt' => $currentPromptResponses[0]['createdAt'],
+                        'promptId' => $currentPromptId
+                    ];
+                }
+                
+                // Start new group
+                $currentPromptId = $history->getPromptId();
+                $currentPromptResponses = [];
+            }
+            
+            $currentPromptResponses[] = [
                 'prompt' => $history->getPrompt(),
-                'responses' => [$history->getModelId() => $history->getResponse()['content']],
-                'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s'),
-                'modelId' => $history->getModelId()
+                'response' => $history->getResponse()['content'],
+                'modelId' => $history->getModelId(),
+                'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+            ];
+        }
+        
+        // Don't forget to add the last group
+        if (!empty($currentPromptResponses)) {
+            $messages[] = [
+                'prompt' => $currentPromptResponses[0]['prompt'],
+                'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                'createdAt' => $currentPromptResponses[0]['createdAt'],
+                'promptId' => $currentPromptId
             ];
         }
         
