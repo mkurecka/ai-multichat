@@ -82,7 +82,11 @@ function App() {
           threadId: entry.threadId,
           messages: entry.messages.map((msg: any) => [
             { role: 'user' as const, content: msg.prompt },
-            { role: 'assistant' as const, content: Object.values(msg.responses)[0] as string, modelId: msg.modelId }
+            ...Object.entries(msg.responses).map(([modelId, response]: [string, any]) => ({
+              role: 'assistant' as const,
+              content: typeof response === 'string' ? response : response.content || JSON.stringify(response),
+              modelId
+            }))
           ]).flat(),
           selectedModels: [],
         }));
@@ -170,16 +174,17 @@ function App() {
         selectedModelIds,
         currentSessionId || undefined,
         undefined,
-        (modelId, content) => {
+        (modelId, content: string | { content: string }) => {
+          const contentString = typeof content === 'string' ? content : content.content || JSON.stringify(content);
           setMessages(prev => {
             const newMessages = [...prev];
             const lastMessage = newMessages[newMessages.length - 1];
             if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
-              lastMessage.content = content;
+              lastMessage.content = contentString;
             } else {
               newMessages.push({
                 role: 'assistant' as const,
-                content: content,
+                content: contentString,
                 modelId: modelId
               });
             }
@@ -194,7 +199,7 @@ function App() {
                 const updatedMessages = [...session.messages];
                 updatedMessages[updatedMessages.length - 1] = {
                   ...lastMessage,
-                  content: content
+                  content: contentString
                 };
                 return { ...session, messages: updatedMessages };
               } else {
@@ -202,7 +207,7 @@ function App() {
                   ...session,
                   messages: [...session.messages, {
                     role: 'assistant',
-                    content: content,
+                    content: contentString,
                     modelId: modelId
                   }]
                 };

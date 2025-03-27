@@ -49,7 +49,7 @@ class ChatController extends AbstractController
         
         // Get or create thread
         if ($threadId) {
-            $thread = $em->getRepository(Thread::class)->find($threadId);
+            $thread = $em->getRepository(Thread::class)->findOneBy(['threadId' => $threadId]);
             if (!$thread) {
                 throw new HttpException(404, 'Thread not found');
             }
@@ -57,23 +57,13 @@ class ChatController extends AbstractController
             $thread = new Thread();
             $thread->setTitle(substr($prompt, 0, 100));
             $thread->setUser($user);
-            $thread->setThreadId(uniqid('thread_'));
+            $thread->setThreadId(uniqid('thread_', true));
             $em->persist($thread);
             $em->flush();
         }
 
-        // Generate a unique promptId
-        $promptId = uniqid('prompt_');
-
-        // Save the prompt immediately
-        $chatHistory = new ChatHistory();
-        $chatHistory->setThread($thread);
-        $chatHistory->setPrompt($prompt);
-        $chatHistory->setPromptId($promptId);
-        $chatHistory->setResponse([]);  // Empty responses for now
-        $chatHistory->setCreatedAt(new \DateTime());
-        $em->persist($chatHistory);
-        $em->flush();
+        // Generate a unique promptId for this prompt - this will be shared across all model responses
+        $promptId = uniqid('prompt_', true);
         
         if ($stream) {
             // For streaming, we'll handle one model at a time
@@ -91,7 +81,7 @@ class ChatController extends AbstractController
                 $stream = $modelResponse['stream'];
                 $content = '';
                 $openRouterId = null;
-                $historySaved = false;  // Add this flag
+                $historySaved = false;
                 
                 while (!feof($stream)) {
                     $chunk = fread($stream, 8192);
@@ -114,7 +104,7 @@ class ChatController extends AbstractController
                                 
                                 $em->persist($chatHistory);
                                 $em->flush();
-                                $historySaved = true;  // Set the flag
+                                $historySaved = true;
                                 
                                 echo "data: " . json_encode(['done' => true, 'modelId' => $modelId, 'threadId' => $thread->getThreadId()]) . "\n\n";
                                 flush();
@@ -161,12 +151,23 @@ class ChatController extends AbstractController
             $response->headers->set('Content-Type', 'text/event-stream');
             $response->headers->set('Cache-Control', 'no-cache');
             $response->headers->set('Connection', 'keep-alive');
-            $response->headers->set('X-Accel-Buffering', 'no'); // Disable nginx buffering
+            $response->headers->set('X-Accel-Buffering', 'no');
             
             return $response;
         } else {
             // Non-streaming response
             $responses = [];
+            
+            // Save initial prompt only once
+            $chatHistory = new ChatHistory();
+            $chatHistory->setThread($thread)
+                ->setPrompt($prompt)
+                ->setPromptId($promptId)
+                ->setResponse([])
+                ->setModelId('user_prompt') // Use a special identifier for user prompts
+                ->setCreatedAt(new \DateTime());
+            $em->persist($chatHistory);
+            
             foreach ($models as $modelId) {
                 $modelResponses = $openRouter->generateResponse($prompt, [$modelId]);
                 
@@ -176,10 +177,12 @@ class ChatController extends AbstractController
                 
                 $modelResponse = $modelResponses[$modelId];
                 
+                // Create a separate ChatHistory entry for each model response
+                // but with the same promptId to group them together
                 $chatHistory = new ChatHistory();
                 $chatHistory->setThread($thread)
                     ->setPrompt($prompt)
-                    ->setPromptId($promptId)
+                    ->setPromptId($promptId) // Same promptId for all models
                     ->setResponse($modelResponse)
                     ->setModelId($modelId)
                     ->setOpenRouterId($modelResponse['id']);
@@ -197,6 +200,7 @@ class ChatController extends AbstractController
             return $this->json([
                 'responses' => $responses,
                 'threadId' => $thread->getThreadId(),
+                'promptId' => $promptId, // Return the promptId
                 'usage' => [
                     'user' => $user->getThreads()->count(),
                     'organization' => $organization->getUsageCount()
@@ -204,6 +208,7 @@ class ChatController extends AbstractController
             ]);
         }
     }
+
     
     #[Route('/chat/history', methods: ['GET'])]
     public function history(): JsonResponse
@@ -244,7 +249,7 @@ class ChatController extends AbstractController
                     
                     $currentPromptResponses[] = [
                         'prompt' => $history->getPrompt(),
-                        'response' => $history->getResponse()['content'],
+                        'response' => $history->getResponse(),
                         'modelId' => $history->getModelId(),
                         'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
                     ];
@@ -319,7 +324,7 @@ class ChatController extends AbstractController
             
             $currentPromptResponses[] = [
                 'prompt' => $history->getPrompt(),
-                'response' => $history->getResponse()['content'],
+                'response' => $history->getResponse(),
                 'modelId' => $history->getModelId(),
                 'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
             ];
