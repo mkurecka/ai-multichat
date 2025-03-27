@@ -130,11 +130,25 @@ class ChatController extends AbstractController
                                     echo "data: " . json_encode([
                                         'content' => $parsed['choices'][0]['delta']['content'],
                                         'modelId' => $modelId
-                                    ]) . "\n\n";
+                                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                    flush();
+                                }
+                                if (isset($parsed['choices'][0]['delta']['usage'])) {
+                                    $usage = $parsed['choices'][0]['delta']['usage'];
+                                    echo "data: " . json_encode([
+                                        'usage' => $usage,
+                                        'modelId' => $modelId
+                                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
                                     flush();
                                 }
                             } catch (\Exception $e) {
                                 error_log('Error parsing streaming response: ' . $e->getMessage());
+                                // Send error message to client
+                                echo "data: " . json_encode([
+                                    'error' => 'Error processing response',
+                                    'modelId' => $modelId
+                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
+                                flush();
                             }
                         }
                     }
@@ -146,7 +160,14 @@ class ChatController extends AbstractController
                     $chatHistory->setThread($thread)
                         ->setPrompt($prompt)
                         ->setPromptId($promptId)
-                        ->setResponse(['content' => $content])
+                        ->setResponse([
+                            'content' => $content,
+                            'usage' => [
+                                'prompt_tokens' => 0,
+                                'completion_tokens' => 0,
+                                'total_tokens' => 0
+                            ]
+                        ])
                         ->setModelId($modelId)
                         ->setOpenRouterId($openRouterId);
                     
@@ -170,7 +191,14 @@ class ChatController extends AbstractController
             $userPromptHistory->setThread($thread) // Using the same thread for all
                 ->setPrompt($prompt)
                 ->setPromptId($promptId)
-                ->setResponse([])
+                ->setResponse([
+                    'content' => '',
+                    'usage' => [
+                        'prompt_tokens' => 0,
+                        'completion_tokens' => 0,
+                        'total_tokens' => 0
+                    ]
+                ])
                 ->setModelId('user_prompt')
                 ->setCreatedAt(new \DateTime());
             $em->persist($userPromptHistory);
@@ -190,7 +218,14 @@ class ChatController extends AbstractController
                 $modelHistory->setThread($thread) // Using the same thread
                     ->setPrompt($prompt)
                     ->setPromptId($promptId)
-                    ->setResponse($modelResponse)
+                    ->setResponse([
+                        'content' => $modelResponse['content'],
+                        'usage' => $modelResponse['usage'] ?? [
+                            'prompt_tokens' => 0,
+                            'completion_tokens' => 0,
+                            'total_tokens' => 0
+                        ]
+                    ])
                     ->setModelId($modelId)
                     ->setOpenRouterId($modelResponse['id']);
                 
@@ -198,7 +233,11 @@ class ChatController extends AbstractController
                 
                 $responses[$modelId] = [
                     'content' => $modelResponse['content'],
-                    'usage' => $modelResponse['usage']
+                    'usage' => $modelResponse['usage'] ?? [
+                        'prompt_tokens' => 0,
+                        'completion_tokens' => 0,
+                        'total_tokens' => 0
+                    ]
                 ];
             }
             

@@ -255,6 +255,9 @@ export const sendMessageToModels = async (
                     break;
                   }
                   try {
+                    // Skip empty or malformed data
+                    if (!data.trim()) continue;
+                    
                     const parsed = JSON.parse(data);
                     if (parsed.done) {
                       currentThreadId = parsed.threadId || currentThreadId;
@@ -278,7 +281,8 @@ export const sendMessageToModels = async (
                     }
                   } catch (e) {
                     console.error('Error parsing streaming response:', e);
-                    throw new Error('Failed to parse streaming response');
+                    // Skip malformed data and continue
+                    continue;
                   }
                 }
               }

@@ -1,6 +1,6 @@
 export interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
+  role: 'user' | 'assistant';
+  content: string | { content: string } | any;
   modelId?: string;
   id?: string;
   usage?: {
@@ -15,7 +15,7 @@ export interface Model {
   name: string;
   description?: string;
   provider?: string;
-  selected: boolean;
+  selected?: boolean;
   pricing?: {
     prompt: number;
     completion: number;

@@ -22,6 +22,16 @@ function App() {
   const MAX_MODELS = 16;
   const hasMessages = messages.length > 0;
 
+  // Helper function to safely get message content
+  const getMessageContent = (message: Message): string => {
+    if (!message?.content) return '';
+    if (typeof message.content === 'string') return message.content;
+    if (typeof message.content === 'object' && message.content !== null) {
+      return message.content.content || JSON.stringify(message.content);
+    }
+    return JSON.stringify(message.content);
+  };
+
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -398,7 +408,9 @@ function App() {
             >
               <h3 className="font-medium truncate">{session.title || 'New Chat'}</h3>
               <p className="text-sm text-gray-500 truncate">
-                {session.messages[session.messages.length - 1]?.content || 'No messages'}
+                {session.messages[session.messages.length - 1] 
+                  ? getMessageContent(session.messages[session.messages.length - 1])
+                  : 'No messages'}
               </p>
             </div>
           ))}
