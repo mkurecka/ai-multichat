@@ -104,61 +104,27 @@ function App() {
   };
 
   const handleSendMessage = async (messages: Message[], prompt: string) => {
-    if (!prompt.trim()) return;
-
-    // Get selected models
-    const selectedModelIds = models.filter(m => m.selected).map(m => m.id);
-    if (selectedModelIds.length === 0) return;
-
-    const userMessage: Message = {
-      role: 'user',
-      content: prompt,
-      modelId: selectedModelIds[0] // Use first model for user message
-    };
-
-    // Update messages immediately with user message
-    setMessages(prev => [...prev, userMessage]);
-
-    // Update chat history with user message
-    if (!currentSessionId) {
-      // If no current session, create a new one in the chat history
-      const newSession: ChatSession = {
-        id: Date.now().toString(), // Temporary ID until server responds
-        title: prompt,
-        messages: [userMessage],
-        selectedModels: selectedModelIds,
-      };
-      setChatHistory(prev => [newSession, ...prev]);
-    } else {
-      // Update existing session
-      setChatHistory(prev => prev.map(session => 
-        session.threadId === currentSessionId
-          ? { ...session, messages: [...session.messages, userMessage] }
-          : session
-      ));
-    }
-
     setIsLoading(true);
+    const selectedModelIds = models.filter(model => model.selected).map(model => model.id);
+    
+    if (selectedModelIds.length === 0) {
+      setIsLoading(false);
+      return;
+    }
 
     const reloadThreadData = async (threadId: string) => {
       try {
-        console.log('Reloading thread data for:', threadId);
-        // Get the latest thread data
         const threadData = await getThreadHistory(threadId);
-        console.log('Received thread data:', threadData);
         
         if (threadData && threadData.messages) {
-          // Update messages with the latest from server
           const updatedMessages: Message[] = [];
           for (const msg of threadData.messages) {
-            // Add user message
             updatedMessages.push({
               role: 'user',
               content: msg.prompt,
               modelId: msg.modelId
             });
             
-            // Add assistant message if it exists
             if (msg.responses) {
               Object.entries(msg.responses).forEach(([modelId, content]) => {
                 updatedMessages.push({
@@ -169,10 +135,8 @@ function App() {
               });
             }
           }
-          console.log('Setting updated messages:', updatedMessages);
           setMessages(updatedMessages);
           
-          // Also update current session in chat history
           setChatHistory(prev => prev.map(session => 
             session.threadId === threadId
               ? { ...session, messages: updatedMessages }
@@ -184,118 +148,83 @@ function App() {
       }
     };
 
+    // Add user message immediately
+    const userMessage: Message = {
+      role: 'user',
+      content: prompt,
+      modelId: selectedModelIds[0]
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+
+    // Update chat history with user message
+    setChatHistory(prev => prev.map(session => 
+      (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString()))
+        ? { ...session, messages: [...session.messages, userMessage] }
+        : session
+    ));
+
     try {
-      const response = await sendMessageToModels(prompt, selectedModelIds, currentSessionId || undefined);
-      
-      if (response instanceof ReadableStream) {
-        const reader = response.getReader();
-        const decoder = new TextDecoder();
-        let currentModelId = selectedModelIds[0];
-        let currentContent = '';
-        let currentThreadId = currentSessionId;
+      const response = await sendMessageToModels(
+        prompt,
+        selectedModelIds,
+        currentSessionId || undefined,
+        undefined,
+        (modelId, content) => {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMessage = newMessages[newMessages.length - 1];
+            if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
+              lastMessage.content = content;
+            } else {
+              newMessages.push({
+                role: 'assistant' as const,
+                content: content,
+                modelId: modelId
+              });
+            }
+            return newMessages;
+          });
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.done) {
-                currentThreadId = data.threadId;
-                // Update session with new thread ID if needed
-                if (!currentSessionId) {
-                  setCurrentSessionId(data.threadId);
-                }
-                // Reload thread data to ensure consistency
-                if (currentThreadId && typeof currentThreadId === 'string') {
-                  setTimeout(async () => {
-                    await reloadThreadData(currentThreadId as string);
-                  }, 500); // Add a small delay to ensure server has processed the message
-                }
-                break;
-              }
-
-              if (data.content) {
-                currentContent += data.content;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const lastMessage = newMessages[newMessages.length - 1];
-                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === currentModelId) {
-                    lastMessage.content = currentContent;
-                  } else {
-                    newMessages.push({
-                      role: 'assistant' as const,
-                      content: currentContent,
-                      modelId: currentModelId
-                    });
-                  }
-                  return newMessages;
-                });
-                // Update chat history with streaming content
-                setChatHistory(prev => prev.map(session => {
-                  if (session.threadId === currentThreadId || (!session.threadId && session.id === Date.now().toString())) {
-                    const lastMessage = session.messages[session.messages.length - 1];
-                    if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === currentModelId) {
-                      const updatedMessages = [...session.messages];
-                      updatedMessages[updatedMessages.length - 1] = {
-                        ...lastMessage,
-                        content: currentContent
-                      };
-                      return { ...session, messages: updatedMessages };
-                    } else {
-                      return {
-                        ...session,
-                        messages: [...session.messages, {
-                          role: 'assistant',
-                          content: currentContent,
-                          modelId: currentModelId
-                        }]
-                      };
-                    }
-                  }
-                  return session;
-                }));
+          // Update chat history with streaming content
+          setChatHistory(prev => prev.map(session => {
+            if (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString())) {
+              const lastMessage = session.messages[session.messages.length - 1];
+              if (lastMessage && lastMessage.role === 'assistant' && lastMessage.modelId === modelId) {
+                const updatedMessages = [...session.messages];
+                updatedMessages[updatedMessages.length - 1] = {
+                  ...lastMessage,
+                  content: content
+                };
+                return { ...session, messages: updatedMessages };
+              } else {
+                return {
+                  ...session,
+                  messages: [...session.messages, {
+                    role: 'assistant',
+                    content: content,
+                    modelId: modelId
+                  }]
+                };
               }
             }
-          }
+            return session;
+          }));
         }
-      } else {
-        // Handle non-streaming response
-        const apiResponse = response as { id: string; usage: { total_tokens: number; prompt_tokens: number; completion_tokens: number }; content: string; threadId: string };
-        const newMessage: Message = {
-          role: 'assistant' as const,
-          content: apiResponse.content,
-          modelId: selectedModelIds[0],
-          id: apiResponse.id,
-          usage: apiResponse.usage
-        };
+      );
 
-        setMessages(prev => [...prev, newMessage]);
-
-        // Update chat history with assistant message
-        setChatHistory(prev => prev.map(session => 
-          (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString()))
-            ? { ...session, messages: [...session.messages, newMessage] }
-            : session
-        ));
-
+      // Handle the final response
+      if (response.threadId) {
+        setCurrentSessionId(response.threadId);
         // Reload thread data to ensure consistency
-        if (apiResponse.threadId) {
-          setTimeout(async () => {
-            await reloadThreadData(apiResponse.threadId);
-          }, 500); // Add a small delay to ensure server has processed the message
-        }
+        setTimeout(async () => {
+          await reloadThreadData(response.threadId);
+        }, 500);
       }
-    } catch (error: any) {  // Using any here since we need to access response property
+    } catch (error: any) {
       console.error('Error sending message:', error);
       let errorMessage = 'Error: Failed to send message. Please try again.';
       
-      // Check if it's a timeout error
       if (error.response?.status === 500 && error.response?.data?.detail?.includes('Maximum execution time')) {
         errorMessage = 'The request took too long to process. Please try again or try with a shorter message.';
       } else if (error.response?.data?.detail) {
@@ -366,59 +295,71 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden">
-      {/* Header */}
-      <div className="absolute top-0 right-0 p-4 z-20">
-        <button
-          onClick={logout}
-          className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-        >
-          <LogOut size={18} />
-          <span>Logout</span>
-        </button>
-      </div>
-
+    <div className="flex h-screen bg-gray-100">
       {/* Chat History Sidebar */}
-      <div className={`bg-white border-l flex flex-col transition-all duration-300 ${showChatHistory ? 'w-72' : 'w-0'}`}>
-        {showChatHistory && (
-          <ChatHistory
-            chatSessions={chatHistory}
-            onSelectChat={handleSelectChat}
-            onStartNewChat={handleStartNewChat}
-          />
-        )}
+      <div className={`w-64 bg-white border-r ${showChatHistory ? '' : 'hidden'}`}>
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold">Chat History</h2>
+        </div>
+        <div className="overflow-y-auto h-full">
+          {chatHistory.map((session) => (
+            <div
+              key={session.threadId || session.id}
+              className={`p-4 cursor-pointer hover:bg-gray-50 ${
+                currentSessionId === (session.threadId || session.id) ? 'bg-gray-50' : ''
+              }`}
+              onClick={() => handleSelectChat(session.id)}
+            >
+              <h3 className="font-medium truncate">{session.title || 'New Chat'}</h3>
+              <p className="text-sm text-gray-500 truncate">
+                {session.messages[session.messages.length - 1]?.content || 'No messages'}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Toggle Chat History Button */}
-      <button
-        onClick={toggleChatHistory}
-        className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white border border-gray-200 rounded-l-md p-1 shadow-sm z-10"
-      >
-        {showChatHistory ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-      </button>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col p-4 overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-hidden gap-4">
-          {showModelSelector && (
-            <div className={`${hasMessages ? 'h-auto' : ''}`}>
-              <ModelSelector
-                models={models}
-                onModelToggle={handleModelToggle}
-                maxModels={MAX_MODELS}
-              />
-            </div>
-          )}
-
-          <div className={`flex-1 flex flex-col overflow-hidden bg-gray-50 rounded-lg shadow ${hasMessages ? 'flex-grow' : ''}`}>
-            <ChatWindow
-              messages={messages}
-              models={models}
-              onModelToggle={handleModelToggle}
-              onSendMessage={handleSendMessage}
-            />
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-white border-b p-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={toggleChatHistory}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+            <h1 className="text-xl font-semibold">AI MultiChat</h1>
           </div>
+          <button
+            onClick={handleStartNewChat}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            New Chat
+          </button>
         </div>
+
+        {/* Chat Window */}
+        <ChatWindow
+          messages={messages}
+          models={models}
+          onModelToggle={handleModelToggle}
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );

@@ -218,7 +218,8 @@ export const sendMessageToModels = async (
       });
 
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Network response was not ok');
       }
 
       const reader = response.body?.getReader();
@@ -267,6 +268,7 @@ export const sendMessageToModels = async (
               }
             } catch (e) {
               console.error('Error parsing streaming response:', e);
+              throw new Error('Failed to parse streaming response');
             }
           }
         }
