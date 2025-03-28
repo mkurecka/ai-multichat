@@ -1,0 +1,15 @@
+<div class="flex space-x-4" data-controller="message-input">
+    <div class="flex-1">
+        <textarea data-message-input-target="input"
+                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                  rows="3"
+                  placeholder="Type your message..."
+                  data-action="keydown->message-input#handleKeydown"></textarea>
+    </div>
+    <div class="flex items-end">
+        <button data-action="click->message-input#sendMessage"
+                class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            Send
+        </button>
+    </div>
+</div> 

@@ -25,7 +25,26 @@ return [
     '@hotwired/turbo' => [
         'version' => '7.3.0',
     ],
+    'turbo' => [
+        'path' => './assets/turbo.js',
+        'entrypoint' => true,
+    ],
     'axios' => [
         'version' => '1.8.4',
+    ],
+    'lucide' => [
+        'version' => '0.344.0',
+    ],
+    'controllers/chat_controller' => [
+        'path' => './assets/controllers/chat_controller.js',
+    ],
+    'controllers/model_selector_controller' => [
+        'path' => './assets/controllers/model_selector_controller.js',
+    ],
+    'controllers/message_input_controller' => [
+        'path' => './assets/controllers/message_input_controller.js',
+    ],
+    'controllers/chat_history_controller' => [
+        'path' => './assets/controllers/chat_history_controller.js',
     ],
 ];

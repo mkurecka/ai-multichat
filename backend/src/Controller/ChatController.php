@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use App\Service\OpenRouterService;
 use App\Service\ModelService;
+use App\Service\PromptIdService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\ChatHistory;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -15,10 +16,15 @@ use App\Entity\Thread;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api')]
 class ChatController extends AbstractController
 {
+    public function __construct(
+        private PromptIdService $promptIdService
+    ) {}
+
     #[Route('/models', methods: ['GET'])]
     public function getModels(ModelService $modelService): JsonResponse
     {
@@ -26,12 +32,14 @@ class ChatController extends AbstractController
     }
     
     #[Route('/models/refresh', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
     public function refreshModels(ModelService $modelService): JsonResponse
     {
         return $this->json($modelService->refreshModels());
     }
 
     #[Route('/chat', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
     public function chat(Request $request, EntityManagerInterface $em, OpenRouterService $openRouter): Response
     {
         $data = json_decode($request->getContent(), true);
@@ -39,18 +47,16 @@ class ChatController extends AbstractController
         $models = $data['models'] ?? [];
         $threadId = $data['threadId'] ?? null;
         $stream = $data['stream'] ?? false;
-        $promptId = $data['promptId'] ?? null;
         
         if (!$prompt || empty($models)) {
             throw new HttpException(400, 'Prompt and models are required');
         }
-    
-        if (!$promptId) {
-            throw new HttpException(400, 'PromptId is required');
-        }
         
         $user = $this->getUser();
         $organization = $user->getOrganization();
+        
+        // Generate a new prompt ID for this chat window
+        $promptId = $this->promptIdService->generatePromptId();
         
         // Handle thread creation or retrieval
         if ($threadId) {
@@ -113,27 +119,15 @@ class ChatController extends AbstractController
                                             'total_tokens' => 0
                                         ]
                                     ])
-                                    ->setModelId($modelId)
-                                    ->setOpenRouterId($openRouterId);
+                                    ->setModelId($modelId);
                                 
                                 $em->persist($chatHistory);
                                 $em->flush();
                                 $historySaved = true;
                                 
-                                echo "data: " . json_encode([
-                                    'done' => true, 
-                                    'modelId' => $modelId, 
-                                    'threadId' => $thread->getThreadId(),
-                                    'promptId' => $promptId,
-                                    'content' => $content,
-                                    'usage' => [
-                                        'prompt_tokens' => 0,
-                                        'completion_tokens' => 0,
-                                        'total_tokens' => 0
-                                    ]
-                                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+                                echo "data: [DONE]\n\n";
                                 flush();
-                                continue;
+                                break;
                             }
                             
                             try {
@@ -164,20 +158,15 @@ class ChatController extends AbstractController
                                     flush();
                                 }
                             } catch (\Exception $e) {
-                                error_log('Error parsing streaming response: ' . $e->getMessage());
-                                // Send error message to client
-                                echo "data: " . json_encode([
-                                    'error' => 'Error processing response',
-                                    'modelId' => $modelId
-                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                                flush();
+                                // Log error but continue processing
+                                error_log('Error processing stream data: ' . $e->getMessage());
                             }
                         }
                     }
                 }
-    
-                // If we get here without a [DONE] message, save what we have
-                if (!$historySaved && !empty($content)) {
+                
+                if (!$historySaved) {
+                    // If we didn't save the history yet, save it now
                     $chatHistory = new ChatHistory();
                     $chatHistory->setThread($thread)
                         ->setPrompt($prompt)
@@ -190,8 +179,7 @@ class ChatController extends AbstractController
                                 'total_tokens' => 0
                             ]
                         ])
-                        ->setModelId($modelId)
-                        ->setOpenRouterId($openRouterId);
+                        ->setModelId($modelId);
                     
                     $em->persist($chatHistory);
                     $em->flush();
@@ -201,81 +189,37 @@ class ChatController extends AbstractController
             $response->headers->set('Content-Type', 'text/event-stream');
             $response->headers->set('Cache-Control', 'no-cache');
             $response->headers->set('Connection', 'keep-alive');
-            $response->headers->set('X-Accel-Buffering', 'no');
             
             return $response;
-        } else {
-            // Non-streaming response
-            $responses = [];
-            
-            // Save initial user prompt only once
-            $userPromptHistory = new ChatHistory();
-            $userPromptHistory->setThread($thread) // Using the same thread for all
+        }
+        
+        // For non-streaming, handle all models at once
+        $modelResponses = $openRouter->sendPrompt($prompt, $models);
+        
+        foreach ($modelResponses as $modelId => $response) {
+            $chatHistory = new ChatHistory();
+            $chatHistory->setThread($thread)
                 ->setPrompt($prompt)
                 ->setPromptId($promptId)
                 ->setResponse([
-                    'content' => '',
-                    'usage' => [
+                    'content' => $response['content'],
+                    'usage' => $response['usage'] ?? [
                         'prompt_tokens' => 0,
                         'completion_tokens' => 0,
                         'total_tokens' => 0
                     ]
                 ])
-                ->setModelId('user_prompt')
-                ->setCreatedAt(new \DateTime());
-            $em->persist($userPromptHistory);
+                ->setModelId($modelId);
             
-            // Process all models but use the same thread
-            foreach ($models as $modelId) {
-                $modelResponses = $openRouter->generateResponse($prompt, [$modelId]);
-                
-                if (!isset($modelResponses[$modelId])) {
-                    continue;
-                }
-                
-                $modelResponse = $modelResponses[$modelId];
-                
-                // Create a ChatHistory entry for this model but with the same thread
-                $modelHistory = new ChatHistory();
-                $modelHistory->setThread($thread) // Using the same thread
-                    ->setPrompt($prompt)
-                    ->setPromptId($promptId)
-                    ->setResponse([
-                        'content' => $modelResponse['content'],
-                        'usage' => $modelResponse['usage'] ?? [
-                            'prompt_tokens' => 0,
-                            'completion_tokens' => 0,
-                            'total_tokens' => 0
-                        ]
-                    ])
-                    ->setModelId($modelId)
-                    ->setOpenRouterId($modelResponse['id']);
-                
-                $em->persist($modelHistory);
-                
-                $responses[$modelId] = [
-                    'content' => $modelResponse['content'],
-                    'usage' => $modelResponse['usage'] ?? [
-                        'prompt_tokens' => 0,
-                        'completion_tokens' => 0,
-                        'total_tokens' => 0
-                    ]
-                ];
-            }
-            
-            // Flush once after all entities are prepared
-            $em->flush();
-            
-            return $this->json([
-                'responses' => $responses,
-                'threadId' => $thread->getThreadId(), // Return the same thread ID for all
-                'promptId' => $promptId,
-                'usage' => [
-                    'user' => $user->getThreads()->count(),
-                    'organization' => $organization->getUsageCount()
-                ]
-            ]);
+            $em->persist($chatHistory);
         }
+        
+        $em->flush();
+        
+        return $this->json([
+            'threadId' => $thread->getThreadId(),
+            'promptId' => $promptId
+        ]);
     }
 
     
@@ -287,7 +231,7 @@ class ChatController extends AbstractController
         $data = [];
         
         foreach ($threads as $thread) {
-            $histories = $thread->getChatHistories()->toArray();
+            $histories = $thread->getMessages()->toArray();
             
             // Sort histories by creation date, oldest first
             usort($histories, function($a, $b) {
@@ -364,7 +308,7 @@ class ChatController extends AbstractController
         }
         
         $messages = [];
-        $histories = $thread->getChatHistories()->toArray();
+        $histories = $thread->getMessages()->toArray();
         
         // Sort histories by creation date, oldest first
         usort($histories, function($a, $b) {

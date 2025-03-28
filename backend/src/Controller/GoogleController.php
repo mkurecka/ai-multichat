@@ -30,36 +30,10 @@ class GoogleController extends AbstractController
     }
 
     #[Route('/connect/google/check', name: 'connect_google_check')]
-    public function checkAction(Request $request, JWTService $jwtService): Response
+    public function checkAction(Request $request): Response
     {
         // This method is called after Google redirects back to your app
-        
-        // Get the authenticated user
-        $user = $this->getUser();
-        
-        if (!$user) {
-            // Redirect to frontend with error
-            return $this->redirect(
-                ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=authentication_failed'
-            );
-        }
-        
-        try {
-            // Create JWT token
-            $token = $jwtService->createToken($user);
-            
-            // Redirect to frontend with token
-            return $this->redirect(
-                ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?token=' . $token
-            );
-        } catch (\Exception $e) {
-            // Log the error
-            $this->logger->error('JWT token creation failed: ' . $e->getMessage());
-            
-            // Redirect to login with error
-            return $this->redirect(
-                ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=token_creation_failed'
-            );
-        }
+        // The authenticator will handle the authentication and redirect
+        return new Response('Processing authentication...');
     }
 }

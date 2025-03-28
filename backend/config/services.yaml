@@ -13,6 +13,9 @@ services:
     _defaults:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        public: false
+        bind:
+            $openRouterApiKey: '%env(OPENROUTER_API_KEY)%'
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
@@ -29,15 +32,7 @@ services:
     App\Service\OpenRouterService:
         arguments:
             $apiKey: '%openrouter_api_key%'
-            
-    # Cache adapter for models
-    models.cache:
-        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
-        arguments:
-            $namespace: 'models'
-            $defaultLifetime: '%openrouter_cache_ttl%'
-            
-    App\Service\ModelService:
-        arguments:
-            $cache: '@models.cache'
-            $cacheTtl: '%openrouter_cache_ttl%'
+
+    # Enable session autowiring
+    Symfony\Component\HttpFoundation\Session\SessionInterface:
+        factory: ['@session.factory', 'createSession']

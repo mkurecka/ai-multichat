@@ -18,8 +18,10 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
+use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface;
+use App\Service\JWTService;
 
-class GoogleAuthenticator extends OAuth2Authenticator
+class GoogleAuthenticator extends OAuth2Authenticator implements AuthenticationEntryPointInterface
 {
 
     public function __construct(
@@ -28,7 +30,15 @@ class GoogleAuthenticator extends OAuth2Authenticator
         private UserRepository $userRepository,
         private OrganizationRepository $organizationRepository,
         private EntityManagerInterface $entityManager,
+        private JWTService $jwtService,
     ) {
+    }
+
+    public function start(Request $request, AuthenticationException $authException = null): Response
+    {
+        return new RedirectResponse(
+            $this->router->generate('connect_google')
+        );
     }
 
     public function supports(Request $request): ?bool
@@ -95,15 +105,30 @@ class GoogleAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
-        // Let the controller handle the redirect with token
-        return null;
+        try {
+            // Create JWT token
+            $jwtToken = $this->jwtService->createToken($token->getUser());
+            
+            // Store the token in the session
+            $request->getSession()->set('jwt_token', $jwtToken);
+            
+            // Redirect to home page
+            return new RedirectResponse(
+                $this->router->generate('app_home')
+            );
+        } catch (\Exception $e) {
+            // If token creation fails, redirect to login with error
+            return new RedirectResponse(
+                $this->router->generate('app_login', ['error' => 'Token creation failed'])
+            );
+        }
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        // Redirect to frontend with error
+        // Redirect to backend login page with error
         return new RedirectResponse(
-            ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=' . urlencode($exception->getMessage())
+            $this->router->generate('app_login', ['error' => $exception->getMessage()])
         );
     }
 }

@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     libonig-dev \
     libxml2-dev \
+    curl \
+    gnupg \
     && docker-php-ext-install \
     pdo_mysql \
     zip \
@@ -18,6 +20,10 @@ RUN apt-get update && apt-get install -y \
     pcntl \
     bcmath \
     xml
+
+# Install Node.js and npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -31,6 +37,9 @@ RUN composer install --no-scripts --no-autoloader
 
 # Copy application files
 COPY . .
+
+# Install npm dependencies
+RUN npm install
 
 # Generate optimized autoloader
 RUN composer dump-autoload --optimize

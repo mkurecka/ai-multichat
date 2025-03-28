@@ -1,0 +1,19 @@
+<div class="p-4" data-controller="chat-history">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Chat History</h2>
+    <div class="space-y-2" data-chat-history-target="historyList">
+        {% for session in chatHistory %}
+            <div class="p-2 rounded-md hover:bg-gray-50 cursor-pointer {% if session.id == currentSessionId %}bg-indigo-50{% endif %}"
+                 data-action="click->chat-history#selectChat"
+                 data-chat-id="{{ session.id }}">
+                <div class="text-sm font-medium text-gray-900">{{ session.title }}</div>
+                <div class="text-xs text-gray-500">{{ session.messages|length }} messages</div>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="mt-4">
+        <button data-action="click->chat-history#startNewChat"
+                class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            New Chat
+        </button>
+    </div>
+</div> 

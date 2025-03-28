@@ -2,78 +2,152 @@
 
 namespace App\Service;
 
-use Symfony\Component\Cache\Adapter\AdapterInterface;
-use Symfony\Contracts\Cache\ItemInterface;
+use App\Entity\Model;
+use Doctrine\ORM\EntityManagerInterface;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 
 class ModelService
 {
-    private OpenRouterService $openRouterService;
-    private AdapterInterface $cache;
-    private int $cacheTtl;
-    
+    private const CACHE_TTL = 3600; // 1 hour in seconds
+
     public function __construct(
-        OpenRouterService $openRouterService,
-        AdapterInterface $cache,
-        int $cacheTtl = 3600 // Default 1 hour cache
-    ) {
-        $this->openRouterService = $openRouterService;
-        $this->cache = $cache;
-        $this->cacheTtl = $cacheTtl;
-    }
-    
+        private EntityManagerInterface $entityManager,
+        private OpenRouterService $openRouterService
+    ) {}
+
     public function getModels(): array
     {
-        return $this->cache->get('openrouter_models', function (ItemInterface $item) {
-            $item->expiresAfter($this->cacheTtl);
-            
-            $rawModels = $this->openRouterService->getModels();
-            return $this->formatModels($rawModels);
-        });
-    }
-    
-    public function refreshModels(): array
-    {
-        $this->cache->delete('openrouter_models');
-        return $this->getModels();
-    }
-    
-    private function formatModels(array $rawModels): array
-    {
-        if (empty($rawModels)) {
-            return [];
+        $models = $this->entityManager->getRepository(Model::class)->findAll();
+        
+        // Check if we need to refresh the cache
+        if (empty($models) || $this->isCacheExpired($models)) {
+            return $this->refreshModels();
         }
 
-        $formattedModels = [];
-        
-        foreach ($rawModels as $model) {
-            if (!isset($model['id'])) {
-                continue;
-            }
-
-            $formattedModels[] = [
-                'id' => $model['id'],
-                'name' => $model['name'] ?? $model['id'],
-                'description' => $model['description'] ?? null,
-                'provider' => $this->extractProviderFromId($model['id']),
+        return array_map(function (Model $model) {
+            return [
+                'id' => $model->getModelId(),
+                'name' => $model->getName(),
+                'description' => $model->getDescription(),
+                'provider' => $model->getProvider(),
                 'selected' => false,
                 'pricing' => [
-                    'prompt' => $model['pricing']['prompt'] ?? null,
-                    'completion' => $model['pricing']['completion'] ?? null,
-                    'unit' => 'tokens'
+                    'prompt' => $model->getPromptPrice(),
+                    'completion' => $model->getCompletionPrice(),
+                    'unit' => 'token'
                 ]
             ];
-        }
-        
-        return $formattedModels;
+        }, $models);
     }
-    
-    private function extractProviderFromId(string $id): ?string
+
+    private function isCacheExpired(array $models): bool
     {
-        // Extract provider from model ID (e.g., "anthropic/claude-3-opus" -> "anthropic")
-        if (strpos($id, '/') !== false) {
-            return explode('/', $id)[0];
+        if (empty($models)) {
+            return true;
         }
-        
-        return null;
+
+        // Check if any model's cache is expired
+        foreach ($models as $model) {
+            if (!$model->getUpdatedAt() || 
+                (time() - $model->getUpdatedAt()->getTimestamp()) > self::CACHE_TTL) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function refreshModels(): array
+    {
+        try {
+            // Get models from OpenRouter
+            $openRouterData = $this->openRouterService->getModels();
+            
+            if (!is_array($openRouterData)) {
+                throw new \RuntimeException('Invalid API response format: expected array');
+            }
+
+            $models = [];
+            foreach ($openRouterData as $modelData) {
+                if (!isset($modelData['id']) || !isset($modelData['name'])) {
+                    continue; // Skip invalid model data
+                }
+
+                // Try to find existing model
+                $model = $this->entityManager->getRepository(Model::class)->findOneBy([
+                    'provider' => 'openrouter',
+                    'modelId' => $modelData['id']
+                ]);
+
+                // Create new model if not found
+                if (!$model) {
+                    $model = new Model();
+                    $model->setModelId($modelData['id']);
+                    $model->setProvider('openrouter');
+                }
+
+                // Update model data
+                $model->setName($modelData['name']);
+                $model->setDescription($modelData['description'] ?? '');
+                
+                // Handle pricing data
+                $pricing = $modelData['pricing'] ?? [];
+                if (is_array($pricing)) {
+                    $model->setPromptPrice($pricing['prompt'] ?? 0);
+                    $model->setCompletionPrice($pricing['completion'] ?? 0);
+                } else {
+                    $price = is_numeric($pricing) ? $pricing : 0;
+                    $model->setPromptPrice($price);
+                    $model->setCompletionPrice($price);
+                }
+                
+                $model->setUpdatedAt(new \DateTimeImmutable());
+
+                $this->entityManager->persist($model);
+                $models[] = $model;
+            }
+
+            if (empty($models)) {
+                throw new \RuntimeException('No valid models found in API response');
+            }
+
+            $this->entityManager->flush();
+
+            return array_map(function (Model $model) {
+                return [
+                    'id' => $model->getModelId(),
+                    'name' => $model->getName(),
+                    'description' => $model->getDescription(),
+                    'provider' => $model->getProvider(),
+                    'selected' => false,
+                    'pricing' => [
+                        'prompt' => $model->getPromptPrice(),
+                        'completion' => $model->getCompletionPrice(),
+                        'unit' => 'token'
+                    ]
+                ];
+            }, $models);
+        } catch (\Exception $e) {
+            // Handle errors
+            $cachedModels = $this->entityManager->getRepository(Model::class)->findAll();
+            if (!empty($cachedModels)) {
+                return array_map(function (Model $model) {
+                    return [
+                        'id' => $model->getModelId(),
+                        'name' => $model->getName(),
+                        'description' => $model->getDescription(),
+                        'provider' => $model->getProvider(),
+                        'selected' => false,
+                        'pricing' => [
+                            'prompt' => $model->getPromptPrice(),
+                            'completion' => $model->getCompletionPrice(),
+                            'unit' => 'token'
+                        ]
+                    ];
+                }, $cachedModels);
+            }
+            throw new \RuntimeException('Failed to process models: ' . $e->getMessage());
+        }
     }
 }

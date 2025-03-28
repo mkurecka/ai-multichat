@@ -2,11 +2,12 @@
 
 namespace App\Entity;
 
+use App\Repository\ThreadRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: ThreadRepository::class)]
 class Thread
 {
     #[ORM\Id]
@@ -14,26 +15,26 @@ class Thread
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(type: "string", length: 255)]
-    private string $title;
+    #[ORM\Column(length: 255)]
+    private ?string $title = null;
 
-    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: "threads")]
+    #[ORM\Column(length: 255, unique: true)]
+    private ?string $threadId = null;
+
+    #[ORM\ManyToOne(inversedBy: 'threads')]
     #[ORM\JoinColumn(nullable: false)]
-    private User $user;
+    private ?User $user = null;
 
-    #[ORM\Column(type: "datetime")]
-    private \DateTime $createdAt;
+    #[ORM\OneToMany(mappedBy: 'thread', targetEntity: ChatHistory::class, orphanRemoval: true)]
+    private Collection $messages;
 
-    #[ORM\Column(type: "string", unique: true)]
-    private string $threadId;
-
-    #[ORM\OneToMany(targetEntity: ChatHistory::class, mappedBy: "thread", cascade: ["persist", "remove"])]
-    private Collection $chatHistories;
+    #[ORM\Column]
+    private ?\DateTimeImmutable $createdAt = null;
 
     public function __construct()
     {
-        $this->chatHistories = new ArrayCollection();
-        $this->createdAt = new \DateTime();
+        $this->messages = new ArrayCollection();
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -41,71 +42,74 @@ class Thread
         return $this->id;
     }
 
-    public function getTitle(): string
+    public function getTitle(): ?string
     {
         return $this->title;
     }
 
-    public function setTitle(string $title): self
+    public function setTitle(string $title): static
     {
         $this->title = $title;
         return $this;
     }
 
-    public function getUser(): User
-    {
-        return $this->user;
-    }
-
-    public function setUser(User $user): self
-    {
-        $this->user = $user;
-        return $this;
-    }
-
-    public function getCreatedAt(): \DateTime
-    {
-        return $this->createdAt;
-    }
-
-    public function setCreatedAt(\DateTime $createdAt): self
-    {
-        $this->createdAt = $createdAt;
-        return $this;
-    }
-
-    public function getThreadId(): string
+    public function getThreadId(): ?string
     {
         return $this->threadId;
     }
 
-    public function setThreadId(string $threadId): self
+    public function setThreadId(string $threadId): static
     {
         $this->threadId = $threadId;
         return $this;
     }
 
-    public function getChatHistories(): Collection
+    public function getUser(): ?User
     {
-        return $this->chatHistories;
+        return $this->user;
     }
 
-    public function addChatHistory(ChatHistory $chatHistory): self
+    public function setUser(?User $user): static
     {
-        if (!$this->chatHistories->contains($chatHistory)) {
-            $this->chatHistories->add($chatHistory);
-            $chatHistory->setThread($this);
+        $this->user = $user;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ChatHistory>
+     */
+    public function getMessages(): Collection
+    {
+        return $this->messages;
+    }
+
+    public function addMessage(ChatHistory $message): static
+    {
+        if (!$this->messages->contains($message)) {
+            $this->messages->add($message);
+            $message->setThread($this);
         }
         return $this;
     }
 
-    public function removeChatHistory(ChatHistory $chatHistory): self
+    public function removeMessage(ChatHistory $message): static
     {
-        if ($this->chatHistories->removeElement($chatHistory)) {
-            if ($chatHistory->getThread() === $this) {
-                $chatHistory->setThread(null);
+        if ($this->messages->removeElement($message)) {
+            if ($message->getThread() === $this) {
+                $message->setThread(null);
             }
         }
+        return $this;
+    }
+
+    public function getCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    {
+        $this->createdAt = $createdAt;
         return $this;
     }
 } 

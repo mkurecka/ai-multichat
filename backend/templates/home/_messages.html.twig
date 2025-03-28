@@ -1,0 +1,16 @@
+<div class="space-y-4">
+    {% for message in messages %}
+        <div class="flex {% if message.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+            <div class="max-w-3xl rounded-lg px-4 py-2 {% if message.role == 'user' %}bg-indigo-600 text-white{% else %}bg-white text-gray-900 shadow-sm{% endif %}">
+                <div class="text-sm">
+                    {% if message.role == 'assistant' %}
+                        <span class="font-semibold">{{ message.modelId }}</span>
+                    {% endif %}
+                </div>
+                <div class="mt-1">
+                    {{ message.content|raw }}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div> 

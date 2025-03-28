@@ -11,6 +11,10 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+        public_api:
+            pattern: ^/api/models$
+            stateless: true
+            security: false
         api:
             pattern: ^/api
             stateless: true
@@ -24,15 +28,18 @@ security:
             logout:
                 path: app_logout
                 target: app_home
+            entry_point: App\Security\GoogleAuthenticator
     
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google, roles: PUBLIC_ACCESS }
         - { path: ^/api/public, roles: PUBLIC_ACCESS }
         - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
+        - { path: ^/api/models, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: ROLE_USER }
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/profile, roles: ROLE_USER }
+        - { path: ^/, roles: ROLE_USER }
 
 when@test:
     security:
