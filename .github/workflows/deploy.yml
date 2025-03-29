@@ -1,0 +1,36 @@
+name: Deploy Application
+
+on:
+  push:
+    branches: [ master ]  # Trigger on push to main branch
+  pull_request:
+    branches: [ master ]  # Optional: Trigger on PRs to main
+  workflow_dispatch:    # Allow manual triggering
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Build application
+        run: npm run build
+        
+      - name: Deploy to production
+        # Choose one of the deployment methods below based on your hosting provider
+        # This is where you'd add your deployment step
+        run: echo "Add your deployment commands here"
