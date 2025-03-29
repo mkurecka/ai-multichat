@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getThreadCosts, ThreadCost } from '../services/api';
+import { Layout } from './Layout';
 
-const CostsPage: React.FC = () => {
+const CostsPage = () => {
   const [threadCosts, setThreadCosts] = useState<ThreadCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,37 +58,42 @@ const CostsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Costs Overview</h1>
-      <div className="grid gap-4">
-        {threadCosts.map((thread) => (
-          <div
-            key={thread.threadId}
-            className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex flex-col">
-                <div className="text-sm font-medium text-gray-900">
-                  {thread.title}
+    <Layout showSidebar={false}>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-4">Costs</h1>
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-2xl font-bold mb-6">Costs Overview</h1>
+          <div className="grid gap-4">
+            {threadCosts.map((thread) => (
+              <div
+                key={thread.threadId}
+                className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex flex-col">
+                    <div className="text-sm font-medium text-gray-900">
+                      {thread.title}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {thread.messageCount} messages
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {new Date(thread.lastMessageDate).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-green-600 font-semibold">
+                    {formatCurrency(thread.totalCost)}
+                  </div>
                 </div>
                 <div className="text-sm text-gray-500">
-                  {thread.messageCount} messages
-                </div>
-                <div className="text-sm text-gray-500">
-                  {new Date(thread.lastMessageDate).toLocaleString()}
+                  {thread.totalTokens.toLocaleString()} tokens
                 </div>
               </div>
-              <div className="text-green-600 font-semibold">
-                {formatCurrency(thread.totalCost)}
-              </div>
-            </div>
-            <div className="text-sm text-gray-500">
-              {thread.totalTokens.toLocaleString()} tokens
-            </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
