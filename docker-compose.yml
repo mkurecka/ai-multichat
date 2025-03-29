@@ -60,5 +60,55 @@ services:
       - nginx_backend
     command: npm run dev -- --host 0.0.0.0 --port 3000
 
+  # Test services
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./backend:/app
+    environment:
+      - APP_ENV=test
+      - DATABASE_URL=mysql://test:test@db-test:3306/test?serverVersion=8.0.32&charset=utf8mb4
+      - JWT_SECRET=test_secret
+      - OPENROUTER_API_KEY=test_key
+      - JWT_PASSPHRASE=test
+      - JWT_SECRET_KEY=/app/config/jwt/private.pem
+      - JWT_PUBLIC_KEY=/app/config/jwt/public.pem
+      - GOOGLE_CLIENT_ID=test_client_id
+      - GOOGLE_CLIENT_SECRET=test_client_secret
+    depends_on:
+      db-test:
+        condition: service_healthy
+
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./frontend:/app
+    environment:
+      - VITE_API_URL=http://backend-test:8000
+    depends_on:
+      - backend-test
+
+  db-test:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=test
+      - MYSQL_USER=test
+      - MYSQL_PASSWORD=test
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-test-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 volumes:
   database_data:
+  mysql-test-data:

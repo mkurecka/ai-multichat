@@ -1,133 +1,181 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import axios from 'axios';
-import { api } from '../api';
+import {
+  getModels,
+  getChatHistory,
+  sendMessageToModels,
+  refreshModels,
+  isAuthenticated,
+  checkTokenRefresh,
+  getThreadHistory,
+  logout,
+  createThread,
+} from '../api';
 
+// Mock axios
 vi.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-describe('API Service', () => {
+describe('API Services', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   describe('getModels', () => {
     it('fetches models successfully', async () => {
-      const mockResponse = {
-        data: [
-          {
-            id: 'gpt-4',
-            name: 'GPT-4',
-            description: 'OpenAI GPT-4',
-            pricing: {
-              prompt: 0.03,
-              completion: 0.06,
-              unit: '1K tokens'
-            }
-          }
-        ]
-      };
+      const mockModels = [{ id: '1', name: 'GPT-4' }];
+      mockedAxios.get.mockResolvedValueOnce({ data: mockModels });
 
-      mockedAxios.get.mockResolvedValueOnce(mockResponse);
-
-      const result = await api.getModels();
-
-      expect(result).toEqual(mockResponse.data);
+      const result = await getModels();
+      expect(result).toEqual(mockModels);
       expect(mockedAxios.get).toHaveBeenCalledWith('/api/models');
     });
 
     it('handles error when fetching models', async () => {
-      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch models'));
+      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch'));
 
-      await expect(api.getModels()).rejects.toThrow('Failed to fetch models');
+      await expect(getModels()).rejects.toThrow('Failed to fetch');
     });
   });
 
-  describe('sendMessage', () => {
-    it('sends message successfully', async () => {
-      const mockResponse = {
-        data: {
-          responses: [
-            {
-              content: 'Test response',
-              modelId: 'gpt-4',
-              usage: {
-                prompt_tokens: 10,
-                completion_tokens: 20,
-                total_tokens: 30
-              }
-            }
-          ]
-        }
-      };
+  describe('getChatHistory', () => {
+    it('fetches chat history successfully', async () => {
+      const mockHistory = [{ id: '1', title: 'Test Chat' }];
+      mockedAxios.get.mockResolvedValueOnce({ data: mockHistory });
 
+      const result = await getChatHistory();
+      expect(result).toEqual(mockHistory);
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/chat/history');
+    });
+
+    it('handles error when fetching chat history', async () => {
+      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch'));
+
+      await expect(getChatHistory()).rejects.toThrow('Failed to fetch');
+    });
+  });
+
+  describe('sendMessageToModels', () => {
+    it('sends message successfully', async () => {
+      const mockResponse = { data: { messages: [] } };
       mockedAxios.post.mockResolvedValueOnce(mockResponse);
 
-      const result = await api.sendMessage('Test message', ['gpt-4'], 'thread-123');
-
+      const result = await sendMessageToModels([], 'test message', ['1']);
       expect(result).toEqual(mockResponse.data);
       expect(mockedAxios.post).toHaveBeenCalledWith('/api/chat', {
-        message: 'Test message',
-        models: ['gpt-4'],
-        threadId: 'thread-123'
+        messages: [],
+        prompt: 'test message',
+        modelIds: ['1'],
       });
     });
 
     it('handles error when sending message', async () => {
-      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to send message'));
+      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to send'));
 
-      await expect(api.sendMessage('Test message', ['gpt-4'], 'thread-123'))
-        .rejects.toThrow('Failed to send message');
+      await expect(sendMessageToModels([], 'test message', ['1'])).rejects.toThrow('Failed to send');
+    });
+  });
+
+  describe('refreshModels', () => {
+    it('refreshes models successfully', async () => {
+      const mockModels = [{ id: '1', name: 'GPT-4' }];
+      mockedAxios.post.mockResolvedValueOnce({ data: mockModels });
+
+      const result = await refreshModels();
+      expect(result).toEqual(mockModels);
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/models/refresh');
+    });
+
+    it('handles error when refreshing models', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to refresh'));
+
+      await expect(refreshModels()).rejects.toThrow('Failed to refresh');
+    });
+  });
+
+  describe('isAuthenticated', () => {
+    it('returns true when token exists and is valid', () => {
+      localStorage.setItem('token', 'valid.token.here');
+      expect(isAuthenticated()).toBe(true);
+    });
+
+    it('returns false when token is missing', () => {
+      expect(isAuthenticated()).toBe(false);
+    });
+
+    it('returns false when token is expired', () => {
+      const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTYyMzkwMjIsImlhdCI6MTUxNjIzOTAyMn0.4Adcj3UFYzPUVaVF43FmMze0x28YqD5Qp0q9VQqX9Xk';
+      localStorage.setItem('token', expiredToken);
+      expect(isAuthenticated()).toBe(false);
+    });
+  });
+
+  describe('checkTokenRefresh', () => {
+    it('refreshes token successfully', async () => {
+      const mockResponse = { data: { token: 'new.token.here' } };
+      mockedAxios.post.mockResolvedValueOnce(mockResponse);
+
+      await checkTokenRefresh();
+      expect(localStorage.getItem('token')).toBe('new.token.here');
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/token/refresh');
+    });
+
+    it('handles error when refreshing token', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to refresh'));
+
+      await expect(checkTokenRefresh()).rejects.toThrow('Failed to refresh');
     });
   });
 
   describe('getThreadHistory', () => {
     it('fetches thread history successfully', async () => {
-      const mockResponse = {
-        data: {
-          messages: [
-            { role: 'user', content: 'Hello', modelId: 'gpt-4' },
-            { role: 'assistant', content: 'Hi there!', modelId: 'gpt-4' }
-          ]
-        }
-      };
+      const mockHistory = [{ id: '1', messages: [] }];
+      mockedAxios.get.mockResolvedValueOnce({ data: mockHistory });
 
-      mockedAxios.get.mockResolvedValueOnce(mockResponse);
-
-      const result = await api.getThreadHistory('thread-123');
-
-      expect(result).toEqual(mockResponse.data);
-      expect(mockedAxios.get).toHaveBeenCalledWith('/api/chat/thread/thread-123');
+      const result = await getThreadHistory('thread-1');
+      expect(result).toEqual(mockHistory);
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/chat/thread/thread-1');
     });
 
     it('handles error when fetching thread history', async () => {
-      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch thread history'));
+      mockedAxios.get.mockRejectedValueOnce(new Error('Failed to fetch'));
 
-      await expect(api.getThreadHistory('thread-123'))
-        .rejects.toThrow('Failed to fetch thread history');
+      await expect(getThreadHistory('thread-1')).rejects.toThrow('Failed to fetch');
+    });
+  });
+
+  describe('logout', () => {
+    it('logs out successfully', async () => {
+      localStorage.setItem('token', 'test.token');
+      mockedAxios.post.mockResolvedValueOnce({ data: { success: true } });
+
+      await logout();
+      expect(localStorage.getItem('token')).toBeNull();
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/logout');
+    });
+
+    it('handles error when logging out', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to logout'));
+
+      await expect(logout()).rejects.toThrow('Failed to logout');
     });
   });
 
   describe('createThread', () => {
     it('creates thread successfully', async () => {
-      const mockResponse = {
-        data: {
-          threadId: 'thread-123',
-          title: 'New Thread'
-        }
-      };
+      const mockThread = { id: '1', title: 'New Thread' };
+      mockedAxios.post.mockResolvedValueOnce({ data: mockThread });
 
-      mockedAxios.post.mockResolvedValueOnce(mockResponse);
-
-      const result = await api.createThread();
-
-      expect(result).toEqual(mockResponse.data);
+      const result = await createThread();
+      expect(result).toEqual(mockThread);
       expect(mockedAxios.post).toHaveBeenCalledWith('/api/chat/thread');
     });
 
     it('handles error when creating thread', async () => {
-      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to create thread'));
+      mockedAxios.post.mockRejectedValueOnce(new Error('Failed to create'));
 
-      await expect(api.createThread()).rejects.toThrow('Failed to create thread');
+      await expect(createThread()).rejects.toThrow('Failed to create');
     });
   });
 }); 

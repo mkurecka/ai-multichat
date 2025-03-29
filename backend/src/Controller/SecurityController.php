@@ -24,6 +24,29 @@ class SecurityController extends AbstractController
         // This method can be empty - it will be intercepted by the logout key on your firewall
     }
     
+    #[Route('/api/user/profile', name: 'api_user_profile', methods: ['GET'])]
+    public function getProfile(): JsonResponse
+    {
+        $user = $this->getUser();
+        
+        if (!$user) {
+            return new JsonResponse(['error' => 'unauthorized', 'message' => 'User not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        
+        return $this->json([
+            'id' => $user->getId(),
+            'email' => $user->getEmail(),
+            'name' => $user->getName(),
+            'roles' => $user->getRoles()
+        ]);
+    }
+    
+    #[Route('/api/logout', name: 'api_logout', methods: ['POST'])]
+    public function apiLogout(): JsonResponse
+    {
+        return new JsonResponse(['success' => true]);
+    }
+    
     #[Route('/api/token/refresh', name: 'api_token_refresh', methods: ['POST'])]
     public function refreshToken(Request $request, JWTService $jwtService, UserRepository $userRepository): JsonResponse
     {
@@ -51,19 +74,14 @@ class SecurityController extends AbstractController
                 return new JsonResponse(['error' => 'invalid_payload', 'message' => 'Invalid token payload: missing sub claim'], Response::HTTP_UNAUTHORIZED);
             }
             
-            // Find user by ID
-            $user = $userRepository->find($payload['sub']);
+            // Find user by email (which is the subject claim)
+            $user = $userRepository->findOneBy(['email' => $payload['sub']]);
             
             if (!$user) {
-                // Try to find by googleId as fallback
-                $user = $userRepository->findOneBy(['googleId' => $payload['googleId'] ?? '']);
-                
-                if (!$user) {
-                    return new JsonResponse([
-                        'error' => 'user_not_found', 
-                        'message' => 'User not found with ID: ' . $payload['sub']
-                    ], Response::HTTP_UNAUTHORIZED);
-                }
+                return new JsonResponse([
+                    'error' => 'user_not_found', 
+                    'message' => 'User not found with email: ' . $payload['sub']
+                ], Response::HTTP_UNAUTHORIZED);
             }
             
             try {

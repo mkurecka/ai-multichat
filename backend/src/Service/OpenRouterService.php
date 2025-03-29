@@ -57,6 +57,11 @@ class OpenRouterService
         $this->apiKey = $apiKey;
         $this->log('OpenRouterService initialized with API key: ' . substr($this->apiKey, 0, 4) . '...');
     }
+
+    public function setHttpClient(HttpClientInterface $client): void
+    {
+        $this->client = $client;
+    }
     
     /**
      * Get models from OpenRouter API
@@ -95,13 +100,14 @@ class OpenRouterService
                     'id' => $generationId
                 ]
             ]);
-
+            
             if ($response->getStatusCode() !== 200) {
                 throw new HttpException($response->getStatusCode(), 'Failed to fetch generation data from OpenRouter');
             }
-
+            
             $data = $response->toArray();
-            return $data['data'] ?? [];
+            $this->log('OpenRouter API Response: ' . json_encode($data));
+            return $data;
         } catch (\Exception $e) {
             $this->log('OpenRouter API Error: ' . $e->getMessage());
             throw new HttpException(500, 'Failed to fetch generation data: ' . $e->getMessage());
@@ -386,5 +392,44 @@ class OpenRouterService
         }
         
         return $messages;
+    }
+
+    public function sendMessage(string $message, array $models, array $context = []): array
+    {
+        try {
+            $response = $this->client->request('POST', self::API_URL . '/chat/completions', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'Content-Type' => 'application/json',
+                    'HTTP-Referer' => 'https://github.com/michalkurecka/ai-multichat',
+                    'X-Title' => 'AI MultiChat'
+                ],
+                'json' => [
+                    'model' => $models[0],
+                    'messages' => array_merge($context, [
+                        ['role' => 'user', 'content' => $message]
+                    ])
+                ]
+            ]);
+
+            $data = $response->toArray();
+
+            if (!isset($data['choices'][0]['message'])) {
+                throw new \Exception('Invalid response from OpenRouter API');
+            }
+
+            return [
+                'content' => $data['choices'][0]['message']['content'],
+                'role' => $data['choices'][0]['message']['role'],
+                'usage' => [
+                    'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
+                    'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
+                    'total_tokens' => $data['usage']['total_tokens'] ?? 0
+                ]
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Error sending message to OpenRouter: ' . $e->getMessage());
+            throw $e;
+        }
     }
 }

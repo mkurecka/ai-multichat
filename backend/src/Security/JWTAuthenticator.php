@@ -13,8 +13,9 @@ use Symfony\Component\Security\Http\Authenticator\AbstractAuthenticator;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
+use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface;
 
-class JWTAuthenticator extends AbstractAuthenticator
+class JWTAuthenticator extends AbstractAuthenticator implements AuthenticationEntryPointInterface
 {
 
     public function __construct(private JWTService $jwtService, private UserRepository $userRepository)
@@ -68,13 +69,8 @@ class JWTAuthenticator extends AbstractAuthenticator
             
             return new SelfValidatingPassport(
                 new UserBadge($payload['sub'], function ($userIdentifier) use ($payload) {
-                    // Try to find by ID first (for existing tokens)
-                    $user = $this->userRepository->find($userIdentifier);
-                    
-                    // If not found and we have a googleId in the payload, try that
-                    if (!$user && isset($payload['googleId'])) {
-                        $user = $this->userRepository->findOneBy(['googleId' => $payload['googleId']]);
-                    }
+                    // Find user by email (which is the subject claim)
+                    $user = $this->userRepository->findOneBy(['email' => $userIdentifier]);
                     
                     if (!$user) {
                         throw new AuthenticationException('User not found for token');
@@ -99,5 +95,13 @@ class JWTAuthenticator extends AbstractAuthenticator
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
         return new JsonResponse(['message' => 'Authentication failed: ' . $exception->getMessage()], Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function start(Request $request, AuthenticationException $authException = null): Response
+    {
+        return new JsonResponse(
+            ['message' => 'Authentication required'],
+            Response::HTTP_UNAUTHORIZED
+        );
     }
 }

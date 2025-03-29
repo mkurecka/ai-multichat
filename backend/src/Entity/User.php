@@ -20,11 +20,14 @@ class User implements UserInterface, JWTUserInterface
     #[ORM\Column(length: 180, unique: true)]
     private ?string $email = null;
 
-    #[ORM\Column]
-    private array $roles = [];
+    #[ORM\Column(length: 255)]
+    private ?string $name = null;
 
     #[ORM\Column(length: 255, unique: true)]
     private ?string $googleId = null;
+
+    #[ORM\Column(type: 'json')]
+    private array $roles = [];
 
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: Thread::class, orphanRemoval: true)]
     private Collection $threads;
@@ -32,11 +35,18 @@ class User implements UserInterface, JWTUserInterface
     public function __construct()
     {
         $this->threads = new ArrayCollection();
+        $this->roles = ['ROLE_USER'];
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+        return $this;
     }
 
     public function getEmail(): ?string
@@ -47,32 +57,18 @@ class User implements UserInterface, JWTUserInterface
     public function setEmail(string $email): static
     {
         $this->email = $email;
-
         return $this;
     }
 
-    public function getUserIdentifier(): string
+    public function getName(): ?string
     {
-        return (string) $this->email;
+        return $this->name;
     }
 
-    public function getRoles(): array
+    public function setName(string $name): static
     {
-        $roles = $this->roles;
-        $roles[] = 'ROLE_USER';
-
-        return array_unique($roles);
-    }
-
-    public function setRoles(array $roles): static
-    {
-        $this->roles = $roles;
-
+        $this->name = $name;
         return $this;
-    }
-
-    public function eraseCredentials(): void
-    {
     }
 
     public function getGoogleId(): ?string
@@ -83,8 +79,29 @@ class User implements UserInterface, JWTUserInterface
     public function setGoogleId(string $googleId): static
     {
         $this->googleId = $googleId;
-
         return $this;
+    }
+
+    public function getRoles(): array
+    {
+        $roles = $this->roles;
+        $roles[] = 'ROLE_USER';
+        return array_unique($roles);
+    }
+
+    public function setRoles(array $roles): static
+    {
+        $this->roles = $roles;
+        return $this;
+    }
+
+    public function eraseCredentials(): void
+    {
+    }
+
+    public function getUserIdentifier(): string
+    {
+        return $this->email;
     }
 
     public function getThreads(): Collection
@@ -123,6 +140,11 @@ class User implements UserInterface, JWTUserInterface
         $user = new self();
         $user->setEmail($username);
         $user->setRoles($payload['roles'] ?? ['ROLE_USER']);
+        $user->setName($payload['name'] ?? 'Unknown');
+        $user->setGoogleId($payload['googleId'] ?? 'unknown');
+        if (isset($payload['id'])) {
+            $user->setId($payload['id']);
+        }
         return $user;
     }
 }

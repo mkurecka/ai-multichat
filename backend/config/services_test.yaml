@@ -1,0 +1,3 @@
+services:
+    App\Security\TestUserProvider:
+        tags: ['security.user_provider'] 

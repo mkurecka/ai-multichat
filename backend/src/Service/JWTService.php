@@ -4,17 +4,21 @@ namespace App\Service;
 
 use App\Entity\User;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Doctrine\ORM\EntityManagerInterface;
 
 class JWTService
 {
     private JWTTokenManagerInterface $jwtManager;
     private int $tokenLifetime;
+    private EntityManagerInterface $entityManager;
 
     public function __construct(
         JWTTokenManagerInterface $jwtManager,
+        EntityManagerInterface $entityManager,
         int $tokenLifetime = 3600 * 24 * 7 // 7 days by default
     ) {
         $this->jwtManager = $jwtManager;
+        $this->entityManager = $entityManager;
         $this->tokenLifetime = $tokenLifetime;
     }
 
@@ -27,6 +31,8 @@ class JWTService
                 'email' => $user->getEmail(),
                 'id' => $user->getId(),
                 'googleId' => $user->getGoogleId(),
+                'name' => $user->getName(),
+                'roles' => $user->getRoles(),
                 'exp' => time() + $this->tokenLifetime // Add expiration time
             ];
             
@@ -41,6 +47,10 @@ class JWTService
             
             if (!$user->getGoogleId()) {
                 throw new \InvalidArgumentException('User googleId is missing');
+            }
+            
+            if (!$user->getName()) {
+                throw new \InvalidArgumentException('User name is missing');
             }
             
             return $this->jwtManager->createFromPayload($user, $payload);
@@ -62,11 +72,42 @@ class JWTService
                 return null;
             }
             
+            // Ensure required claims are present
+            if (!isset($payload['sub']) || !isset($payload['email'])) {
+                return null;
+            }
+            
             return $payload;
         } catch (\Exception $e) {
             // Log the error or handle specific JWT exceptions
-            // You could add a logger here to track token validation failures
+            error_log('JWT Token validation failed: ' . $e->getMessage());
             return null;
         }
+    }
+
+    public function getUserFromToken(string $token): ?User
+    {
+        $payload = $this->validateToken($token);
+        if (!$payload) {
+            throw new \Exception('Token has expired');
+        }
+
+        // Get user from database by email
+        $user = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $payload['email']]);
+        if (!$user) {
+            throw new \Exception('User not found');
+        }
+
+        return $user;
+    }
+
+    public function refreshToken(string $token): string
+    {
+        $user = $this->getUserFromToken($token);
+        if (!$user) {
+            throw new \Exception('Invalid token');
+        }
+
+        return $this->createToken($user);
     }
 }

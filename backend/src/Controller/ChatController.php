@@ -14,10 +14,12 @@ use Symfony\Component\Serializer\SerializerInterface;
 use App\Entity\Thread;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use App\Event\OpenRouterRequestCompletedEvent;
 use Psr\Log\LoggerInterface;
+use Ramsey\Uuid\Uuid;
 
 #[Route('/api')]
 class ChatController extends AbstractController
@@ -74,7 +76,7 @@ class ChatController extends AbstractController
             $thread = new Thread();
             $thread->setTitle(substr($prompt, 0, 100));
             $thread->setUser($user);
-            $thread->setThreadId(uniqid('thread_', true));
+            $thread->setThreadId(Uuid::uuid4()->toString());
             $em->persist($thread);
             $em->flush(); // Flush immediately to ensure thread is saved
             
@@ -369,12 +371,15 @@ class ChatController extends AbstractController
     #[Route('/chat/thread/{threadId}', methods: ['GET'])]
     public function getThread(string $threadId, EntityManagerInterface $em): JsonResponse
     {
-        $user = $this->getUser();
         $thread = $em->getRepository(Thread::class)
-            ->findOneBy(['threadId' => $threadId, 'user' => $user]);
+            ->findOneBy(['threadId' => $threadId]);
             
         if (!$thread) {
             throw $this->createNotFoundException('Thread not found');
+        }
+
+        if ($thread->getUser() !== $this->getUser()) {
+            throw $this->createAccessDeniedException('You do not have permission to access this thread');
         }
         
         $messages = [];
@@ -430,20 +435,23 @@ class ChatController extends AbstractController
     }
 
     #[Route('/chat/thread', methods: ['POST'])]
-    public function createThread(EntityManagerInterface $em): JsonResponse
+    public function createThread(Request $request, EntityManagerInterface $em): JsonResponse
     {
         $user = $this->getUser();
+        $data = json_decode($request->getContent(), true);
+        $title = $data['title'] ?? 'New Chat';
         
         $thread = new Thread();
-        $thread->setTitle('New Chat');
+        $thread->setTitle($title);
         $thread->setUser($user);
-        $thread->setThreadId(uniqid('thread_', true));
+        $thread->setThreadId(Uuid::uuid4()->toString());
         
         $em->persist($thread);
         $em->flush();
         
         return $this->json([
-            'threadId' => $thread->getThreadId()
+            'threadId' => $thread->getThreadId(),
+            'title' => $thread->getTitle()
         ]);
     }
 

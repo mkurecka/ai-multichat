@@ -17,7 +17,7 @@ class Thread
     #[ORM\Column(type: "string", length: 255)]
     private string $title;
 
-    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: "threads")]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: "threads", cascade: ["persist"])]
     #[ORM\JoinColumn(nullable: false)]
     private User $user;
 

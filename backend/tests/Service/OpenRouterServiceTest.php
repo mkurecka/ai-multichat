@@ -2,31 +2,29 @@
 
 namespace App\Tests\Service;
 
-use App\Entity\Thread;
 use App\Service\ContextService;
 use App\Service\OpenRouterService;
-use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\TestCase;
+use App\Tests\KernelApiTestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-class OpenRouterServiceTest extends TestCase
+class OpenRouterServiceTest extends KernelApiTestCase
 {
     private OpenRouterService $service;
     private MockHttpClient $httpClient;
     private ContextService $contextService;
-    private EntityManagerInterface $entityManager;
     private LoggerInterface $logger;
     private EventDispatcherInterface $eventDispatcher;
 
     protected function setUp(): void
     {
+        parent::setUp();
+        
         $this->httpClient = new MockHttpClient();
         $this->contextService = $this->createMock(ContextService::class);
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         
@@ -112,5 +110,231 @@ class OpenRouterServiceTest extends TestCase
         $this->expectExceptionMessage('Failed to fetch models: ');
         
         $this->service->getModels();
+    }
+
+    public function testSendMessage(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'choices' => [
+                [
+                    'message' => [
+                        'content' => 'Test response',
+                        'role' => 'assistant'
+                    ],
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 20,
+                        'total_tokens' => 30
+                    ]
+                ]
+            ]
+        ]));
+
+        $httpClient = new MockHttpClient($mockResponse);
+        $this->service->setHttpClient($httpClient);
+
+        $response = $this->service->sendMessage(
+            'Test message',
+            ['gpt-4']
+        );
+
+        $this->assertEquals('Test response', $response['content']);
+        $this->assertEquals('assistant', $response['role']);
+        $this->assertArrayHasKey('usage', $response);
+        $this->assertArrayHasKey('prompt_tokens', $response['usage']);
+        $this->assertArrayHasKey('completion_tokens', $response['usage']);
+        $this->assertArrayHasKey('total_tokens', $response['usage']);
+    }
+
+    public function testSendMessageWithContext(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'choices' => [
+                [
+                    'message' => [
+                        'content' => 'Test response with context',
+                        'role' => 'assistant'
+                    ],
+                    'usage' => [
+                        'prompt_tokens' => 15,
+                        'completion_tokens' => 25,
+                        'total_tokens' => 40
+                    ]
+                ]
+            ]
+        ]));
+
+        $httpClient = new MockHttpClient($mockResponse);
+        $this->service->setHttpClient($httpClient);
+
+        $context = [
+            ['role' => 'user', 'content' => 'Previous message'],
+            ['role' => 'assistant', 'content' => 'Previous response']
+        ];
+
+        $response = $this->service->sendMessage(
+            'Test message',
+            ['gpt-4'],
+            $context
+        );
+
+        $this->assertEquals('Test response with context', $response['content']);
+        $this->assertEquals('assistant', $response['role']);
+        $this->assertArrayHasKey('usage', $response);
+        $this->assertArrayHasKey('prompt_tokens', $response['usage']);
+        $this->assertArrayHasKey('completion_tokens', $response['usage']);
+        $this->assertArrayHasKey('total_tokens', $response['usage']);
+    }
+
+    public function testHandleError(): void
+    {
+        $mockResponse = new MockResponse('', ['http_code' => 500]);
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $this->expectException(\Exception::class);
+        $this->service->sendMessage('Test message', ['gpt-4']);
+    }
+
+    public function testHandleInvalidResponse(): void
+    {
+        $mockResponse = new MockResponse('invalid json');
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $this->expectException(\Exception::class);
+        $this->service->sendMessage('Test message', ['gpt-4']);
+    }
+
+    public function testHandleMissingChoices(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'data' => []
+        ]));
+
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $this->expectException(\Exception::class);
+        $this->service->sendMessage('Test message', ['gpt-4']);
+    }
+
+    public function testHandleMissingMessage(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'choices' => [
+                [
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 20,
+                        'total_tokens' => 30
+                    ]
+                ]
+            ]
+        ]));
+
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $this->expectException(\Exception::class);
+        $this->service->sendMessage('Test message', ['gpt-4']);
+    }
+
+    public function testRateLimiting(): void
+    {
+        $mockResponse = new MockResponse('', [
+            'http_code' => 429,
+            'response_headers' => [
+                'X-RateLimit-Limit' => '100',
+                'X-RateLimit-Remaining' => '0',
+                'X-RateLimit-Reset' => time() + 60
+            ]
+        ]);
+
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage('Rate limit exceeded');
+        
+        $this->service->sendMessage('Test message', ['gpt-4']);
+    }
+
+    public function testTokenUsageTracking(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'choices' => [
+                [
+                    'message' => [
+                        'content' => 'Test response',
+                        'role' => 'assistant'
+                    ],
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 20,
+                        'total_tokens' => 30
+                    ]
+                ]
+            ]
+        ]));
+
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $response = $this->service->sendMessage('Test message', ['gpt-4']);
+
+        $this->assertArrayHasKey('usage', $response);
+        $this->assertEquals(10, $response['usage']['prompt_tokens']);
+        $this->assertEquals(20, $response['usage']['completion_tokens']);
+        $this->assertEquals(30, $response['usage']['total_tokens']);
+    }
+
+    public function testModelSpecificParameters(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'choices' => [
+                [
+                    'message' => [
+                        'content' => 'Test response with parameters',
+                        'role' => 'assistant'
+                    ],
+                    'usage' => [
+                        'prompt_tokens' => 10,
+                        'completion_tokens' => 20,
+                        'total_tokens' => 30
+                    ]
+                ]
+            ]
+        ]));
+
+        $this->httpClient->setResponseFactory($mockResponse);
+
+        $parameters = [
+            'temperature' => 0.7,
+            'max_tokens' => 1000,
+            'top_p' => 0.9,
+            'frequency_penalty' => 0.5,
+            'presence_penalty' => 0.5
+        ];
+
+        $response = $this->service->sendMessage(
+            'Test message',
+            ['gpt-4'],
+            [],
+            $parameters
+        );
+
+        $this->assertArrayHasKey('message', $response);
+        $this->assertEquals('Test response with parameters', $response['message']['content']);
+    }
+
+    public function testInvalidModelParameters(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        
+        $parameters = [
+            'invalid_parameter' => 'value'
+        ];
+
+        $this->service->sendMessage(
+            'Test message',
+            ['gpt-4'],
+            [],
+            $parameters
+        );
     }
 } 
