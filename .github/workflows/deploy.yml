@@ -1,36 +1,53 @@
-name: Deploy Application
+name: Deploy to Hetzner Cloud
 
 on:
   push:
-    branches: [ master ]  # Trigger on push to main branch
-  pull_request:
-    branches: [ master ]  # Optional: Trigger on PRs to main
-  workflow_dispatch:    # Allow manual triggering
+    branches: [ master ]
+  workflow_dispatch:  # Allows manual triggering
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up SSH
+        uses: shimataro/ssh-key-action@v2
         with:
-          node-version: '18'
-          cache: 'npm'
+          key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.HETZNER_KNOWN_HOSTS }}
+          if_key_exists: replace
           
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: Run tests
-        run: npm test
-        
       - name: Build application
-        run: npm run build
-        
-      - name: Deploy to production
-        # Choose one of the deployment methods below based on your hosting provider
-        # This is where you'd add your deployment step
-        run: echo "Add your deployment commands here"
+        run: |
+          # Insert your build steps here
+          npm ci
+          npm run build
+          
+      - name: Deploy to Hetzner server
+        run: |
+          # Package the application
+          tar -czf app.tar.gz dist/ package.json package-lock.json
+          
+          # Transfer to server
+          scp -o StrictHostKeyChecking=accept-new app.tar.gz ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }}:/tmp/
+          
+          # Execute deployment commands on server
+          ssh ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'ENDSSH'
+            # Navigate to application directory
+            cd /var/www/my-application
+            
+            # Extract the uploaded archive
+            tar -xzf /tmp/app.tar.gz
+            
+            # Install production dependencies if needed
+            npm ci --production
+            
+            # Restart application (adjust based on your setup)
+            pm2 restart my-app || pm2 start npm --name "my-app" -- start
+            
+            # Clean up
+            rm /tmp/app.tar.gz
+          ENDSSH
