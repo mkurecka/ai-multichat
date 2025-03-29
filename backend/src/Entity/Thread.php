@@ -30,6 +30,9 @@ class Thread
     #[ORM\OneToMany(targetEntity: ChatHistory::class, mappedBy: "thread", cascade: ["persist", "remove"])]
     private Collection $chatHistories;
 
+    #[ORM\OneToMany(targetEntity: ThreadSummary::class, mappedBy: "thread", cascade: ["persist", "remove"])]
+    private Collection $summaries;
+
     public function __construct()
     {
         $this->chatHistories = new ArrayCollection();

@@ -1,0 +1,51 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Feature List for AI MultiChat
+
+## Core Features [cite: 21]
+
+* **Multi-Model Chat Interface** [cite: 21]
+    * Select multiple AI models (up to 16) [cite: 21]
+    * Send single prompt to all selected models [cite: 21]
+    * Visual distinction between model responses [cite: 21]
+    * Real-time response streaming [cite: 21]
+* **Thread-Based Conversations** [cite: 21]
+    * Maintain conversation context within threads [cite: 21, 22]
+    * Consistent thread ID across multiple models for the same prompt [cite: 22]
+    * Reference/search previous messages in a thread [cite: 22]
+    * Clean UI for conversation flow [cite: 22]
+* **Message History** [cite: 22]
+    * Save and revisit all conversations [cite: 22]
+    * Sidebar navigation for past conversations [cite: 22]
+    * Chronological ordering and preview [cite: 22]
+    * Resume past conversations [cite: 22]
+* **Authentication** [cite: 22]
+    * Secure Google OAuth login [cite: 22]
+    * JWT token management with auto-refresh [cite: 22]
+    * User profile display [cite: 23]
+* **Context Awareness** [cite: 23]
+    * Models are aware of full conversation history [cite: 23]
+    * Reference earlier parts of the conversation [cite: 23]
+
+## Future Enhancements [cite: 33]
+
+* **Advanced Features** [cite: 33]
+    * Model performance comparison metrics [cite: 33]
+    * Response rating/feedback system [cite: 33]
+    * Custom system prompts per model [cite: 33]
+    * Advanced context controls (customization, search) [cite: 23, 33]
+    * Usage analytics [cite: 34]
+* **Integration Opportunities** [cite: 33]
+    * Export conversations (different formats) [cite: 33]
+    * Integration with local LLM runners [cite: 33]
+    * Custom provider API integration [cite: 33]
+    * Team collaboration features [cite: 33]
+* **Experience Enhancements** [cite: 34]
+    * UI Refinements [cite: 34]
+    * Error handling improvements [cite: 34]
+    * Performance optimizations [cite: 34]
+    * Advanced history management [cite: 34]
+    * Extended model support [cite: 34]

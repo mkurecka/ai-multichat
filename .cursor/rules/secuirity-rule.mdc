@@ -5,73 +5,73 @@ alwaysApply: true
 ---
 # Security Checklist
 
-## Configuration Security
-- [ ] Store secrets in environment variables or dedicated secret management systems
-- [ ] Never commit secrets to version control
-- [ ] Implement secret rotation policies
-- [ ] Use different credentials for different environments
-- [ ] Encrypt sensitive configuration values
+## Configuration Security [cite: 35]
+- [ ] Store secrets in environment variables or dedicated secret management systems [cite: 35]
+- [ ] Never commit secrets to version control [cite: 35]
+- [ ] Implement secret rotation policies [cite: 35]
+- [ ] Use different credentials for different environments [cite: 35]
+- [ ] Encrypt sensitive configuration values [cite: 35]
 
-## Authentication & Authorization
-- [ ] Implement proper authentication mechanisms
-- [ ] Use OAuth 2.0 or OpenID Connect where appropriate
-- [ ] Implement role-based access control (RBAC)
-- [ ] Follow the principle of least privilege
-- [ ] Implement multi-factor authentication (MFA) for sensitive operations
+## Authentication & Authorization [cite: 35]
+- [ ] Implement proper authentication mechanisms [cite: 35]
+- [ ] Use OAuth 2.0 or OpenID Connect where appropriate [cite: 35]
+- [ ] Implement role-based access control (RBAC) [cite: 35]
+- [ ] Follow the principle of least privilege [cite: 35]
+- [ ] Implement multi-factor authentication (MFA) for sensitive operations [cite: 35]
 
-## Data Protection
-- [ ] Encrypt data at rest
-- [ ] Encrypt data in transit (TLS/HTTPS)
-- [ ] Implement proper key management
-- [ ] Sanitize and validate all inputs
-- [ ] Implement output encoding to prevent XSS attacks
-- [ ] Apply proper database security controls
+## Data Protection [cite: 35]
+- [ ] Encrypt data at rest [cite: 35]
+- [ ] Encrypt data in transit (TLS/HTTPS) [cite: 35, 36]
+- [ ] Implement proper key management [cite: 36]
+- [ ] Sanitize and validate all inputs [cite: 36]
+- [ ] Implement output encoding to prevent XSS attacks [cite: 36]
+- [ ] Apply proper database security controls [cite: 36]
 
-## API Security
-- [ ] Implement rate limiting
-- [ ] Set appropriate timeouts
-- [ ] Use API keys/tokens with proper scopes
-- [ ] Validate and sanitize all API inputs
-- [ ] Implement proper error handling that doesn't leak sensitive information
+## API Security [cite: 36]
+- [ ] Implement rate limiting [cite: 36]
+- [ ] Set appropriate timeouts [cite: 36]
+- [ ] Use API keys/tokens with proper scopes [cite: 36]
+- [ ] Validate and sanitize all API inputs [cite: 36]
+- [ ] Implement proper error handling that doesn't leak sensitive information [cite: 36]
 
-## Infrastructure Security
-- [ ] Use container security scanning
-- [ ] Implement network segmentation
-- [ ] Apply security hardening to containers and hosts
-- [ ] Use Web Application Firewalls (WAF) where appropriate
-- [ ] Implement proper egress filtering
+## Infrastructure Security [cite: 36]
+- [ ] Use container security scanning [cite: 36]
+- [ ] Implement network segmentation [cite: 36, 37]
+- [ ] Apply security hardening to containers and hosts [cite: 37]
+- [ ] Use Web Application Firewalls (WAF) where appropriate [cite: 37]
+- [ ] Implement proper egress filtering [cite: 37]
 
-## Logging & Monitoring
-- [ ] Implement security event logging
-- [ ] Use centralized log collection and analysis
-- [ ] Configure alerts for suspicious activities
-- [ ] Implement audit trails for sensitive operations
-- [ ] Ensure logs don't contain sensitive information
+## Logging & Monitoring [cite: 37]
+- [ ] Implement security event logging [cite: 37]
+- [ ] Use centralized log collection and analysis [cite: 37]
+- [ ] Configure alerts for suspicious activities [cite: 37]
+- [ ] Implement audit trails for sensitive operations [cite: 37]
+- [ ] Ensure logs don't contain sensitive information [cite: 37]
 
-## Dependency Management
-- [ ] Regularly scan dependencies for vulnerabilities
-- [ ] Implement a process for updating vulnerable dependencies
-- [ ] Use dependency lockfiles for deterministic builds
-- [ ] Vet third-party libraries before inclusion
-- [ ] Minimize dependency footprint
+## Dependency Management [cite: 37]
+- [ ] Regularly scan dependencies for vulnerabilities [cite: 37]
+- [ ] Implement a process for updating vulnerable dependencies [cite: 37]
+- [ ] Use dependency lockfiles for deterministic builds [cite: 37]
+- [ ] Vet third-party libraries before inclusion [cite: 37]
+- [ ] Minimize dependency footprint [cite: 37]
 
-## Resilience & Availability
-- [ ] Implement proper error handling
-- [ ] Design for graceful degradation
-- [ ] Protect against DoS attacks
-- [ ] Implement circuit breakers for external services
-- [ ] Have a tested disaster recovery plan
+## Resilience & Availability [cite: 37]
+- [ ] Implement proper error handling [cite: 37]
+- [ ] Design for graceful degradation [cite: 37, 38]
+- [ ] Protect against DoS attacks [cite: 38]
+- [ ] Implement circuit breakers for external services [cite: 38]
+- [ ] Have a tested disaster recovery plan [cite: 38]
 
-## SDLC Security
-- [ ] Perform regular security testing (SAST, DAST, IAST)
-- [ ] Implement secure code review processes
-- [ ] Conduct regular penetration testing
-- [ ] Maintain a vulnerability management program
-- [ ] Implement proper CI/CD security controls
+## SDLC Security [cite: 38]
+- [ ] Perform regular security testing (SAST, DAST, IAST) [cite: 38]
+- [ ] Implement secure code review processes [cite: 38]
+- [ ] Conduct regular penetration testing [cite: 38]
+- [ ] Maintain a vulnerability management program [cite: 38]
+- [ ] Implement proper CI/CD security controls [cite: 38]
 
-## Compliance & Governance
-- [ ] Document security controls
-- [ ] Implement proper data retention policies
-- [ ] Ensure compliance with relevant regulations (GDPR, HIPAA, etc.)
-- [ ] Conduct regular security awareness training
-- [ ] Establish incident response procedures
+## Compliance & Governance [cite: 38]
+- [ ] Document security controls [cite: 38]
+- [ ] Implement proper data retention policies [cite: 38]
+- [ ] Ensure compliance with relevant regulations (GDPR, HIPAA, etc.) [cite: 38]
+- [ ] Conduct regular security awareness training [cite: 38]
+- [ ] Establish incident response procedures [cite: 38]

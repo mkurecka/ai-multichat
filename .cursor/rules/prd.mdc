@@ -7,13 +7,13 @@ alwaysApply: true
 
 ## 1. Product Overview
 
-AI MultiChat is a web-based platform that enables users to interact with multiple AI language models simultaneously. The application allows users to compare responses from different LLMs (Language Learning Models) side by side, maintain conversation history, and continue conversations in a thread-based interface.
+AI MultiChat is a web-based platform that enables users to interact with multiple AI language models simultaneously[cite: 19]. The application allows users to compare responses from different LLMs (Language Learning Models) side by side, maintain conversation history, and continue conversations in a thread-based interface[cite: 19].
 
-### 1.1 Architecture
+### 1.1 Architecture [cite: 20]
 
-The project follows a modern client-server architecture:
+The project follows a modern client-server architecture[cite: 20]:
 
-**Frontend:**
+**Frontend:** [cite: 20]
 - Framework: React 18.3+ with TypeScript
 - State Management: React Hooks for local state
 - Routing: React Router v7
@@ -21,7 +21,7 @@ The project follows a modern client-server architecture:
 - Icons: Lucide React
 - HTTP Client: Axios
 
-**Backend:**
+**Backend:** [cite: 20]
 - Framework: Symfony 7 (PHP 8.2+)
 - Database: Doctrine ORM
 - Authentication: JWT-based authentication via Lexik JWT Bundle
@@ -31,110 +31,110 @@ The project follows a modern client-server architecture:
 ## 2. User Personas
 
 ### 2.1 Primary User: AI Enthusiast
-- Wants to compare different LLM responses to the same prompt
-- Interested in the nuances between models like Claude, GPT, Llama, etc.
-- Maintains conversation context across multiple interactions
+- Wants to compare different LLM responses to the same prompt [cite: 20]
+- Interested in the nuances between models like Claude, GPT, Llama, etc. [cite: 20]
+- Maintains conversation context across multiple interactions [cite: 20, 21]
 
 ### 2.2 Secondary User: Developer/Researcher
-- Needs to evaluate model performance for specific use cases
-- Requires conversation history for analysis
-- Wants consistent threading to evaluate context retention
+- Needs to evaluate model performance for specific use cases [cite: 21]
+- Requires conversation history for analysis [cite: 21]
+- Wants consistent threading to evaluate context retention [cite: 21]
 
 ## 3. Core Features
 
 ### 3.1 Multi-Model Chat Interface
-- **Description**: Users can select multiple AI models and send a single prompt to all selected models simultaneously
+- **Description**: Users can select multiple AI models and send a single prompt to all selected models simultaneously [cite: 21]
 - **Requirements**:
-  - Model selection interface with clear model information
-  - Support for up to 16 simultaneous models
-  - Visual distinction between model responses
-  - Response streaming for real-time feedback
+  - Model selection interface with clear model information [cite: 21]
+  - Support for up to 16 simultaneous models [cite: 21]
+  - Visual distinction between model responses [cite: 21]
+  - Response streaming for real-time feedback [cite: 21]
 
 ### 3.2 Thread-Based Conversations
-- **Description**: All interactions maintain conversation context within a thread
+- **Description**: All interactions maintain conversation context within a thread [cite: 21]
 - **Requirements**:
-  - Creation of a thread ID for each new conversation
-  - Consistent thread maintenance when sending to multiple models
-  - Ability to reference and search previous messages in a thread
-  - Clean UI presentation of conversation flow
+  - Creation of a thread ID for each new conversation [cite: 21, 22]
+  - Consistent thread maintenance when sending to multiple models [cite: 22]
+  - Ability to reference and search previous messages in a thread [cite: 22]
+  - Clean UI presentation of conversation flow [cite: 22]
 
 ### 3.3 Message History
-- **Description**: All conversations are saved and can be revisited
+- **Description**: All conversations are saved and can be revisited [cite: 22]
 - **Requirements**:
-  - Sidebar navigation for accessing past conversations
-  - Chronological ordering of conversations
-  - Preview of conversation content
-  - Ability to resume any past conversation
+  - Sidebar navigation for accessing past conversations [cite: 22]
+  - Chronological ordering of conversations [cite: 22]
+  - Preview of conversation content [cite: 22]
+  - Ability to resume any past conversation [cite: 22]
 
 ### 3.4 Authentication
-- **Description**: Secure user authentication with Google OAuth
+- **Description**: Secure user authentication with Google OAuth [cite: 22]
 - **Requirements**:
-  - Google login integration
-  - JWT token management with auto-refresh
-  - User profile information display
-  - Secure session handling
+  - Google login integration [cite: 22]
+  - JWT token management with auto-refresh [cite: 22]
+  - User profile information display [cite: 23]
+  - Secure session handling [cite: 23]
 
 ### 3.5 Context Awareness
-- **Description**: Models should be aware of the full conversation history
+- **Description**: Models should be aware of the full conversation history [cite: 23]
 - **Requirements**:
-  - Backend support for context inclusion
-  - Ability to reference earlier parts of the conversation
-  - Context customization (number of previous messages included)
-  - Context search functionality
+  - Backend support for context inclusion [cite: 23]
+  - Ability to reference earlier parts of the conversation [cite: 23]
+  - Context customization (number of previous messages included) [cite: 23]
+  - Context search functionality [cite: 23]
 
 ## 4. Technical Requirements
 
 ### 4.1 Frontend
 
-#### 4.1.1 Components
-- **Model Selector**: Allow users to select models from available providers
-- **Chat Window**: Display conversation history and model responses
-- **Chat History Sidebar**: Show past conversations with preview
-- **Message Input**: Text area with send functionality
-- **Context Controller**: Interface for managing conversation context
-- **User Profile**: Display user information and logout option
+#### 4.1.1 Components [cite: 23]
+- **Model Selector**: Allow users to select models from available providers [cite: 23]
+- **Chat Window**: Display conversation history and model responses [cite: 23]
+- **Chat History Sidebar**: Show past conversations with preview [cite: 23]
+- **Message Input**: Text area with send functionality [cite: 23]
+- **Context Controller**: Interface for managing conversation context [cite: 23, 24]
+- **User Profile**: Display user information and logout option [cite: 24]
 
-#### 4.1.2 State Management
-- Thread IDs must be maintained consistently
-- promptId must be generated and used consistently across all models
-- Response streaming must update UI in real-time
-- Model selection state must be synchronized with backend requests
+#### 4.1.2 State Management [cite: 24]
+- Thread IDs must be maintained consistently [cite: 24]
+- promptId must be generated and used consistently across all models [cite: 24]
+- Response streaming must update UI in real-time [cite: 24]
+- Model selection state must be synchronized with backend requests [cite: 24]
 
-#### 4.1.3 API Integration
-- JWT token management with automatic refresh
-- Proper error handling for API failures
-- Streaming response handling
-- Consistent use of threadId and promptId
+#### 4.1.3 API Integration [cite: 24]
+- JWT token management with automatic refresh [cite: 24]
+- Proper error handling for API failures [cite: 24]
+- Streaming response handling [cite: 24]
+- Consistent use of threadId and promptId [cite: 24]
 
 ### 4.2 Backend
 
-#### 4.2.1 Controllers
-- **ChatController**: Handle message sending, thread management, and history
-- **SecurityController**: Handle authentication and token refresh
-- **ModelController**: Provide model information and management
+#### 4.2.1 Controllers [cite: 24]
+- **ChatController**: Handle message sending, thread management, and history [cite: 24]
+- **SecurityController**: Handle authentication and token refresh [cite: 24]
+- **ModelController**: Provide model information and management [cite: 24]
 
-#### 4.2.2 Services
-- **OpenRouterService**: Interface with the OpenRouter API
-- **ModelService**: Manage model information and caching
-- **JWTService**: Handle token creation and validation
-- **ContextService**: Manage conversation context
+#### 4.2.2 Services [cite: 24]
+- **OpenRouterService**: Interface with the OpenRouter API [cite: 24, 25]
+- **ModelService**: Manage model information and caching [cite: 25]
+- **JWTService**: Handle token creation and validation [cite: 25]
+- **ContextService**: Manage conversation context [cite: 25]
 
-#### 4.2.3 Entities
-- **User**: Store user information
-- **Thread**: Maintain conversation threads
-- **ChatHistory**: Store individual messages with associations
-- **Organization**: Group users and track usage
+#### 4.2.3 Entities [cite: 25]
+- **User**: Store user information [cite: 25]
+- **Thread**: Maintain conversation threads [cite: 25]
+- **ChatHistory**: Store individual messages with associations [cite: 25]
+- **Organization**: Group users and track usage [cite: 25]
 
-#### 4.2.4 API Endpoints
-- `/api/models`: Get available models
-- `/api/models/refresh`: Refresh model cache
-- `/api/chat`: Send messages to models
-- `/api/chat/history`: Get conversation history
-- `/api/chat/thread/{threadId}`: Get specific thread
-- `/api/chat/thread`: Create a new thread
-- `/api/chat/context/{threadId}`: Get conversation context
-- `/api/chat/search`: Search within conversations
-- `/api/token/refresh`: Refresh JWT token
+#### 4.2.4 API Endpoints [cite: 25]
+- `/api/models`: Get available models [cite: 25]
+- `/api/models/refresh`: Refresh model cache [cite: 25]
+- `/api/chat`: Send messages to models [cite: 25]
+- `/api/chat/history`: Get conversation history [cite: 25]
+- `/api/chat/thread/{threadId}`: Get specific thread [cite: 25]
+- `/api/chat/thread`: Create a new thread [cite: 25]
+- `/api/chat/context/{threadId}`: Get conversation context [cite: 25]
+- `/api/chat/search`: Search within conversations [cite: 25]
+- `/api/token/refresh`: Refresh JWT token [cite: 25]
 
 ## 5. Data Models
 
@@ -142,167 +142,324 @@ The project follows a modern client-server architecture:
 ```typescript
 // Message object
 interface Message {
-  role: 'user' | 'assistant';
-  content: string | { content: string } | any;
-  modelId?: string;
-  id?: string;
-  threadId?: string | null;
-  promptId?: string;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
+  role: 'user' | 'assistant'; [cite: 25, 26]
+  content: string | { content: string } | any; [cite: 26]
+  modelId?: string; [cite: 26]
+  id?: string; [cite: 26]
+  threadId?: string | null; [cite: 26]
+  promptId?: string; [cite: 26]
+  usage?: { [cite: 27]
+    prompt_tokens: number; [cite: 27]
+    completion_tokens: number; [cite: 27]
+    total_tokens: number; [cite: 27]
   };
 }
 
 // Model information
 interface Model {
-  id: string;
-  name: string;
-  description?: string;
-  provider?: string;
-  selected?: boolean;
-  pricing?: {
-    prompt: number;
-    completion: number;
-    unit: string;
+  id: string; [cite: 27]
+  name: string; [cite: 28]
+  description?: string; [cite: 28]
+  provider?: string; [cite: 28]
+  selected?: boolean; [cite: 28]
+  pricing?: { [cite: 28]
+    prompt: number; [cite: 28]
+    completion: number; [cite: 28]
+    unit: string; [cite: 28]
   };
 }
 
 // Chat session
 interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  selectedModels: string[];
-  threadId?: string | null;
-  parentId?: string;
+  id: string; [cite: 29]
+  title: string; [cite: 29]
+  messages: Message[]; [cite: 29]
+  selectedModels: string[]; [cite: 29]
+  threadId?: string | null; [cite: 29]
+  parentId?: string; [cite: 29]
 }
-```
 
-### 5.2 Backend Entities
-- **Thread**: Contains threadId, title, user, and creation timestamp
-- **ChatHistory**: Contains promptId, thread reference, prompt text, response content, modelId, and timestamp
-- **User**: Contains user information, Google ID, and organization reference
 
-## 6. Critical Bug Fixes & Optimizations
 
-### 6.1 Thread Creation Issue
-- **Current Problem**: Multiple threads are created when using multiple models instead of sharing one thread
-- **Fix Required**: 
-  - Create a thread first if none exists, then use the same threadId for all model responses
-  - Ensure frontend properly tracks and reuses threadId
-  - Maintain consistent promptId across all responses to group them correctly
+Okay, here are the markdown files based on the content you provided.
 
-### 6.2 Context Handling
-- **Implementation Required**:
-  - Create a ContextService to retrieve and format conversation history
-  - Add context inclusion option to frontend UI
-  - Ensure context is properly formatted and sent with prompts
-  - Add context search functionality
+Product Requirements Document (PRD)
+Markdown
 
-### 6.3 Response Handling Optimization
-- **Implementation Required**:
-  - Optimize streaming response handling
-  - Ensure proper grouping of responses by promptId
-  - Handle error cases gracefully with user feedback
-  - Show loading states appropriately
+# AI MultiChat - Product Requirements Document (PRD)
 
-## 7. User Experience Requirements
+## 1. Product Overview
 
-### 7.1 Interface
-- Clean, minimalist design with focus on content
-- Clear visual distinction between different model responses
-- Responsive layout that works on desktop and tablet
-- Intuitive navigation between conversation threads
+AI MultiChat is a web-based platform that enables users to interact with multiple AI language models simultaneously[cite: 19]. The application allows users to compare responses from different LLMs (Language Learning Models) side by side, maintain conversation history, and continue conversations in a thread-based interface[cite: 19].
 
-### 7.2 Performance
-- Real-time streaming of responses
-- Fast thread switching
-- Responsive UI even with multiple model responses
-- Efficient token usage tracking
+### 1.1 Architecture [cite: 20]
 
-### 7.3 Accessibility
-- Clear contrast for readability
-- Keyboard navigation support
-- Responsive design principles
-- Error messages that are clear and actionable
+The project follows a modern client-server architecture[cite: 20]:
 
-## 8. Security Requirements
+**Frontend:** [cite: 20]
+- Framework: React 18.3+ with TypeScript
+- State Management: React Hooks for local state
+- Routing: React Router v7
+- UI Components: Custom components with Tailwind CSS
+- Icons: Lucide React
+- HTTP Client: Axios
 
-### 8.1 Authentication
-- JWT token expiration with automatic refresh
-- Secure Google OAuth integration
-- Protection against token forgery
-- Proper session handling
+**Backend:** [cite: 20]
+- Framework: Symfony 7 (PHP 8.2+)
+- Database: Doctrine ORM
+- Authentication: JWT-based authentication via Lexik JWT Bundle
+- OAuth: Google OAuth integration
+- API Integration: OpenRouter API for accessing multiple LLM providers
 
-### 8.2 Data Protection
-- HTTPS for all communications
-- API key protection
-- User data isolation
-- Access control at organization level
+## 2. User Personas
 
-## 9. Development Guidelines
+### 2.1 Primary User: AI Enthusiast
+- Wants to compare different LLM responses to the same prompt [cite: 20]
+- Interested in the nuances between models like Claude, GPT, Llama, etc. [cite: 20]
+- Maintains conversation context across multiple interactions [cite: 20, 21]
 
-### 9.1 Code Structure
-- Clean separation of concerns
-- Type safety throughout
-- Consistent naming conventions
-- Proper error handling at all levels
+### 2.2 Secondary User: Developer/Researcher
+- Needs to evaluate model performance for specific use cases [cite: 21]
+- Requires conversation history for analysis [cite: 21]
+- Wants consistent threading to evaluate context retention [cite: 21]
 
-### 9.2 API Integration Best Practices
-- Token refresh middleware for API calls
-- Consistent error handling
-- Rate limiting awareness
-- Proper response parsing
+## 3. Core Features
 
-### 9.3 State Management
-- Consistent state management patterns
-- Clear separation of local vs. global state
-- UseEffect dependencies properly managed
-- Loading states properly tracked
+### 3.1 Multi-Model Chat Interface
+- **Description**: Users can select multiple AI models and send a single prompt to all selected models simultaneously [cite: 21]
+- **Requirements**:
+  - Model selection interface with clear model information [cite: 21]
+  - Support for up to 16 simultaneous models [cite: 21]
+  - Visual distinction between model responses [cite: 21]
+  - Response streaming for real-time feedback [cite: 21]
 
-## 10. Future Enhancements
+### 3.2 Thread-Based Conversations
+- **Description**: All interactions maintain conversation context within a thread [cite: 21]
+- **Requirements**:
+  - Creation of a thread ID for each new conversation [cite: 21, 22]
+  - Consistent thread maintenance when sending to multiple models [cite: 22]
+  - Ability to reference and search previous messages in a thread [cite: 22]
+  - Clean UI presentation of conversation flow [cite: 22]
 
-### 10.1 Advanced Features
-- Model performance comparison metrics
-- Response rating/feedback system
-- Custom system prompts per model
-- Advanced context controls
+### 3.3 Message History
+- **Description**: All conversations are saved and can be revisited [cite: 22]
+- **Requirements**:
+  - Sidebar navigation for accessing past conversations [cite: 22]
+  - Chronological ordering of conversations [cite: 22]
+  - Preview of conversation content [cite: 22]
+  - Ability to resume any past conversation [cite: 22]
 
-### 10.2 Integration Opportunities
-- Export conversations to different formats
-- Integration with local LLM runners
-- Custom provider API integration
-- Team collaboration features
+### 3.4 Authentication
+- **Description**: Secure user authentication with Google OAuth [cite: 22]
+- **Requirements**:
+  - Google login integration [cite: 22]
+  - JWT token management with auto-refresh [cite: 22]
+  - User profile information display [cite: 23]
+  - Secure session handling [cite: 23]
 
-## 11. Implementation Timeline
+### 3.5 Context Awareness
+- **Description**: Models should be aware of the full conversation history [cite: 23]
+- **Requirements**:
+  - Backend support for context inclusion [cite: 23]
+  - Ability to reference earlier parts of the conversation [cite: 23]
+  - Context customization (number of previous messages included) [cite: 23]
+  - Context search functionality [cite: 23]
 
-### Phase 1: Core Functionality
-- Multi-model chat interface
-- Thread-based conversations
-- Basic history management
-- Authentication system
+## 4. Technical Requirements
 
-### Phase 2: Context & Experience Enhancement
-- Context awareness implementation
-- UI refinements
-- Error handling improvements
-- Performance optimizations
+### 4.1 Frontend
 
-### Phase 3: Advanced Features
-- Context search functionality
-- Advanced history management
-- Usage analytics
-- Extended model support
+#### 4.1.1 Components [cite: 23]
+- **Model Selector**: Allow users to select models from available providers [cite: 23]
+- **Chat Window**: Display conversation history and model responses [cite: 23]
+- **Chat History Sidebar**: Show past conversations with preview [cite: 23]
+- **Message Input**: Text area with send functionality [cite: 23]
+- **Context Controller**: Interface for managing conversation context [cite: 23, 24]
+- **User Profile**: Display user information and logout option [cite: 24]
 
-## 12. Development Recommendations
+#### 4.1.2 State Management [cite: 24]
+- Thread IDs must be maintained consistently [cite: 24]
+- promptId must be generated and used consistently across all models [cite: 24]
+- Response streaming must update UI in real-time [cite: 24]
+- Model selection state must be synchronized with backend requests [cite: 24]
 
-1. Fix the threading issue as the highest priority
-2. Implement proper context handling
-3. Optimize the streaming response system
-4. Enhance error handling to provide better user feedback
-5. Improve state management to prevent inconsistencies
-6. Add comprehensive token usage tracking
-7. Enhance the model selection interface with more details
-8. Implement response comparison tools
+#### 4.1.3 API Integration [cite: 24]
+- JWT token management with automatic refresh [cite: 24]
+- Proper error handling for API failures [cite: 24]
+- Streaming response handling [cite: 24]
+- Consistent use of threadId and promptId [cite: 24]
+
+### 4.2 Backend
+
+#### 4.2.1 Controllers [cite: 24]
+- **ChatController**: Handle message sending, thread management, and history [cite: 24]
+- **SecurityController**: Handle authentication and token refresh [cite: 24]
+- **ModelController**: Provide model information and management [cite: 24]
+
+#### 4.2.2 Services [cite: 24]
+- **OpenRouterService**: Interface with the OpenRouter API [cite: 24, 25]
+- **ModelService**: Manage model information and caching [cite: 25]
+- **JWTService**: Handle token creation and validation [cite: 25]
+- **ContextService**: Manage conversation context [cite: 25]
+
+#### 4.2.3 Entities [cite: 25]
+- **User**: Store user information [cite: 25]
+- **Thread**: Maintain conversation threads [cite: 25]
+- **ChatHistory**: Store individual messages with associations [cite: 25]
+- **Organization**: Group users and track usage [cite: 25]
+
+#### 4.2.4 API Endpoints [cite: 25]
+- `/api/models`: Get available models [cite: 25]
+- `/api/models/refresh`: Refresh model cache [cite: 25]
+- `/api/chat`: Send messages to models [cite: 25]
+- `/api/chat/history`: Get conversation history [cite: 25]
+- `/api/chat/thread/{threadId}`: Get specific thread [cite: 25]
+- `/api/chat/thread`: Create a new thread [cite: 25]
+- `/api/chat/context/{threadId}`: Get conversation context [cite: 25]
+- `/api/chat/search`: Search within conversations [cite: 25]
+- `/api/token/refresh`: Refresh JWT token [cite: 25]
+
+## 5. Data Models
+
+### 5.1 Frontend Types
+```typescript
+// Message object
+interface Message {
+  role: 'user' | 'assistant'; [cite: 25, 26]
+  content: string | { content: string } | any; [cite: 26]
+  modelId?: string; [cite: 26]
+  id?: string; [cite: 26]
+  threadId?: string | null; [cite: 26]
+  promptId?: string; [cite: 26]
+  usage?: { [cite: 27]
+    prompt_tokens: number; [cite: 27]
+    completion_tokens: number; [cite: 27]
+    total_tokens: number; [cite: 27]
+  };
+}
+
+// Model information
+interface Model {
+  id: string; [cite: 27]
+  name: string; [cite: 28]
+  description?: string; [cite: 28]
+  provider?: string; [cite: 28]
+  selected?: boolean; [cite: 28]
+  pricing?: { [cite: 28]
+    prompt: number; [cite: 28]
+    completion: number; [cite: 28]
+    unit: string; [cite: 28]
+  };
+}
+
+// Chat session
+interface ChatSession {
+  id: string; [cite: 29]
+  title: string; [cite: 29]
+  messages: Message[]; [cite: 29]
+  selectedModels: string[]; [cite: 29]
+  threadId?: string | null; [cite: 29]
+  parentId?: string; [cite: 29]
+}
+5.2 Backend Entities 
+Thread: Contains threadId, title, user, and creation timestamp    
+ChatHistory: Contains promptId, thread reference, prompt text, response content, modelId, and timestamp    
+User: Contains user information, Google ID, and organization reference    
+6. Critical Bug Fixes & Optimizations
+6.1 Thread Creation Issue
+Current Problem: Multiple threads are created when using multiple models instead of sharing one thread    
+Fix Required:
+Create a thread first if none exists, then use the same threadId for all model responses    
+Ensure frontend properly tracks and reuses threadId    
+Maintain consistent promptId across all responses to group them correctly    
+6.2 Context Handling 
+Implementation Required:
+Create a ContextService to retrieve and format conversation history    
+Add context inclusion option to frontend UI    
+Ensure context is properly formatted and sent with prompts    
+Add context search functionality    
+6.3 Response Handling Optimization 
+Implementation Required:
+Optimize streaming response handling    
+Ensure proper grouping of responses by promptId    
+Handle error cases gracefully with user feedback    
+Show loading states appropriately    
+7. User Experience Requirements
+7.1 Interface
+Clean, minimalist design with focus on content    
+Clear visual distinction between different model responses    
+Responsive layout that works on desktop and tablet    
+Intuitive navigation between conversation threads    
+7.2 Performance
+Real-time streaming of responses    
+Fast thread switching    
+Responsive UI even with multiple model responses    
+Efficient token usage tracking    
+7.3 Accessibility
+Clear contrast for readability    
+Keyboard navigation support    
+Responsive design principles    
+Error messages that are clear and actionable    
+8. Security Requirements
+8.1 Authentication
+JWT token expiration with automatic refresh    
+Secure Google OAuth integration    
+Protection against token forgery    
+Proper session handling    
+8.2 Data Protection
+HTTPS for all communications    
+API key protection    
+User data isolation    
+Access control at organization level    
+9. Development Guidelines
+9.1 Code Structure
+Clean separation of concerns    
+Type safety throughout    
+Consistent naming conventions    
+Proper error handling at all levels    
+9.2 API Integration Best Practices
+Token refresh middleware for API calls    
+Consistent error handling    
+Rate limiting awareness    
+Proper response parsing    
+9.3 State Management
+Consistent state management patterns    
+Clear separation of local vs. global state    
+UseEffect dependencies properly managed    
+Loading states properly tracked    
+10. Future Enhancements
+10.1 Advanced Features
+Model performance comparison metrics    
+Response rating/feedback system    
+Custom system prompts per model    
+Advanced context controls    
+10.2 Integration Opportunities
+Export conversations to different formats    
+Integration with local LLM runners    
+Custom provider API integration    
+Team collaboration features    
+11. Implementation Timeline
+Phase 1: Core Functionality 
+Multi-model chat interface    
+Thread-based conversations    
+Basic history management    
+Authentication system    
+Phase 2: Context & Experience Enhancement 
+Context awareness implementation    
+UI refinements    
+Error handling improvements    
+Performance optimizations    
+Phase 3: Advanced Features 
+Context search functionality    
+Advanced history management    
+Usage analytics    
+Extended model support    
+12. Development Recommendations 
+Fix the threading issue as the highest priority    
+Implement proper context handling    
+Optimize the streaming response system    
+Enhance error handling to provide better user feedback    
+Improve state management to prevent inconsistencies    
+Add comprehensive token usage tracking    
+Enhance the model selection interface with more details    
+Implement response comparison tools    

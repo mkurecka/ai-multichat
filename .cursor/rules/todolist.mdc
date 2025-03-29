@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Todo List / Implementation Plan for AI MultiChat
+
+## High Priority / Critical Fixes [cite: 30, 31, 34]
+
+1.  **Fix Thread Creation Issue:** Ensure a single thread is created and used when sending a prompt to multiple models. Maintain consistent `threadId` and `promptId`[cite: 30, 34].
+2.  **Implement Context Handling:** [cite: 31, 34]
+    * Create `ContextService` for history retrieval/formatting[cite: 31].
+    * Add context inclusion option to frontend[cite: 31].
+    * Ensure context is correctly formatted and sent with prompts[cite: 31].
+3.  **Optimize Streaming Response System:** [cite: 31, 34]
+    * Improve streaming handling[cite: 31].
+    * Ensure proper grouping by `promptId`[cite: 31].
+    * Handle errors gracefully with user feedback[cite: 31].
+    * Implement appropriate loading states[cite: 31].
+4.  **Enhance Error Handling:** Provide better, clearer user feedback for errors[cite: 34].
+5.  **Improve State Management:** Prevent inconsistencies in frontend state[cite: 34].
+
+## Implementation Phases
+
+### Phase 1: Core Functionality [cite: 34]
+* [ ] Build multi-model chat interface [cite: 34]
+* [ ] Implement thread-based conversations (including the fix for thread creation) [cite: 34]
+* [ ] Implement basic message history management [cite: 34]
+* [ ] Set up authentication system (Google OAuth, JWT) [cite: 34]
+
+### Phase 2: Context & Experience Enhancement [cite: 34]
+* [ ] Implement context awareness (ContextService, frontend options) [cite: 34]
+* [ ] Refine UI based on user feedback and testing [cite: 34]
+* [ ] Improve error handling mechanisms [cite: 34]
+* [ ] Implement performance optimizations (streaming, UI responsiveness) [cite: 34]
+
+### Phase 3: Advanced Features [cite: 34]
+* [ ] Implement context search functionality [cite: 34]
+* [ ] Develop advanced history management features (search, organization) [cite: 34]
+* [ ] Build usage analytics and cost tracking features [cite: 34]
+* [ ] Add support for more models or custom providers [cite: 34]
+
+## Ongoing / General Tasks
+
+* [ ] Add comprehensive token usage tracking [cite: 34]
+* [ ] Enhance the model selection interface with more details (pricing, provider info) [cite: 34]
+* [ ] Implement response comparison tools (e.g., side-by-side diff) [cite: 34]
+* [ ] Ensure adherence to Security Checklist
+* [ ] Follow Development Guidelines (code structure, API practices, state management) [cite: 32, 33]
+* [ ] Address User Experience requirements (Interface, Performance, Accessibility) [cite: 31, 32]

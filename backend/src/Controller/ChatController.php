@@ -75,7 +75,7 @@ class ChatController extends AbstractController
         if ($stream) {
             // For streaming, we'll handle one model at a time
             $modelId = $models[0]; // Get first model for streaming
-            $modelResponses = $openRouter->streamResponse($prompt, [$modelId]);
+            $modelResponses = $openRouter->streamResponse($prompt, [$modelId], $thread);
             
             if (!isset($modelResponses[$modelId])) {
                 throw new HttpException(500, 'Failed to generate streaming response');
@@ -210,7 +210,7 @@ class ChatController extends AbstractController
             
             // Save initial user prompt only once
             $userPromptHistory = new ChatHistory();
-            $userPromptHistory->setThread($thread) // Using the same thread for all
+            $userPromptHistory->setThread($thread)
                 ->setPrompt($prompt)
                 ->setPromptId($promptId)
                 ->setResponse([
@@ -227,7 +227,7 @@ class ChatController extends AbstractController
             
             // Process all models but use the same thread
             foreach ($models as $modelId) {
-                $modelResponses = $openRouter->generateResponse($prompt, [$modelId]);
+                $modelResponses = $openRouter->generateResponse($prompt, [$modelId], $thread);
                 
                 if (!isset($modelResponses[$modelId])) {
                     continue;
