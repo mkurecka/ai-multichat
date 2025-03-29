@@ -23,8 +23,9 @@ class JWTService
         try {
             // Set custom payload claims
             $payload = [
-                'sub' => $user->getId(),
+                'sub' => $user->getEmail(),
                 'email' => $user->getEmail(),
+                'id' => $user->getId(),
                 'googleId' => $user->getGoogleId(),
                 'exp' => time() + $this->tokenLifetime // Add expiration time
             ];
@@ -46,7 +47,7 @@ class JWTService
         } catch (\Exception $e) {
             // Log the error for debugging
             error_log('JWT Token creation failed: ' . $e->getMessage());
-            throw $e; // Re-throw to be handled by the caller
+            throw new \RuntimeException('Failed to create JWT token: ' . $e->getMessage());
         }
     }
 

@@ -2,40 +2,31 @@
 
 namespace App\Entity;
 
+use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Serializer\Annotation\Groups;
+use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
 
-#[ORM\Entity]
-class User implements UserInterface, PasswordAuthenticatedUserInterface
+#[ORM\Entity(repositoryClass: UserRepository::class)]
+class User implements UserInterface, JWTUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255, unique: true)]
-    #[Groups(['user:read'])]
-    private string $googleId;
-
-    #[ORM\Column]
-    #[Groups(['user:read'])]
-    private array $roles = [];
-
-    #[ORM\Column(length: 255)]
-    #[Groups(['user:read'])]
+    #[ORM\Column(length: 180, unique: true)]
     private ?string $email = null;
 
-    #[ORM\ManyToOne(targetEntity: Organization::class)]
-    #[ORM\JoinColumn(nullable: true)]
-    #[Groups(['user:read'])]
-    private ?Organization $organization = null;
+    #[ORM\Column]
+    private array $roles = [];
 
-    #[ORM\OneToMany(targetEntity: Thread::class, mappedBy: "user", cascade: ["persist", "remove"])]
+    #[ORM\Column(length: 255, unique: true)]
+    private ?string $googleId = null;
+
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: Thread::class, orphanRemoval: true)]
     private Collection $threads;
 
     public function __construct()
@@ -48,26 +39,50 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->id;
     }
 
-    public function getGoogleId(): string
+    public function getEmail(): ?string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
+    }
+
+    public function getUserIdentifier(): string
+    {
+        return (string) $this->email;
+    }
+
+    public function getRoles(): array
+    {
+        $roles = $this->roles;
+        $roles[] = 'ROLE_USER';
+
+        return array_unique($roles);
+    }
+
+    public function setRoles(array $roles): static
+    {
+        $this->roles = $roles;
+
+        return $this;
+    }
+
+    public function eraseCredentials(): void
+    {
+    }
+
+    public function getGoogleId(): ?string
     {
         return $this->googleId;
     }
 
-    public function setGoogleId(string $googleId): self
+    public function setGoogleId(string $googleId): static
     {
         $this->googleId = $googleId;
-
-        return $this;
-    }
-    
-    public function getOrganization(): ?Organization
-    {
-        return $this->organization;
-    }
-
-    public function setOrganization(?Organization $organization): self
-    {
-        $this->organization = $organization;
 
         return $this;
     }
@@ -77,7 +92,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->threads;
     }
 
-    public function addThread(Thread $thread): self
+    public function addThread(Thread $thread): static
     {
         if (!$this->threads->contains($thread)) {
             $this->threads->add($thread);
@@ -87,10 +102,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function removeThread(Thread $thread): self
+    public function removeThread(Thread $thread): static
     {
         if ($this->threads->removeElement($thread)) {
-            // set the owning side to null (unless already changed)
             if ($thread->getUser() === $this) {
                 $thread->setUser(null);
             }
@@ -99,57 +113,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getRoles(): array
-    {
-        return ['ROLE_USER'];
-    }
-
-    public function getPassword(): ?string
-    {
-        return null;
-    }
-
-    public function getSalt(): ?string
-    {
-        return null;
-    }
-
-    public function eraseCredentials(): void
-    {
-        // If you store any temporary, sensitive data on the user, clear it here
-        // $this->plainPassword = null;
-    }
-
-     /**
-     * Returns the identifier for this user (e.g. its email address).
-     *
-     * @return string
-     */
-    public function getUserIdentifier(): string
-    {
-        return $this->googleId;
-    }
-    
-     /**
-     * @see UserInterface
-     */
     public function getUsername(): string
-    {
-        return $this->getUserIdentifier();
-    }
-
-    public function getEmail(): ?string
     {
         return $this->email;
     }
 
-    public function setEmail(?string $email): void
+    public static function createFromPayload($username, array $payload): self
     {
-        $this->email = $email;
-    }
-
-    public function setRoles(array $roles): void
-    {
-        $this->roles = $roles;
+        $user = new self();
+        $user->setEmail($username);
+        $user->setRoles($payload['roles'] ?? ['ROLE_USER']);
+        return $user;
     }
 }
