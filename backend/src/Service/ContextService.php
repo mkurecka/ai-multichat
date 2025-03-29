@@ -36,27 +36,22 @@ class ContextService
         // Get all chat histories for the thread
         $chatHistories = $thread->getChatHistories();
         
-        // If we have more messages than our limit, implement a better selection strategy
-        if (count($chatHistories) > $maxMessages - 1) { // -1 because we already added user context
-            $messages = array_merge($messages, $this->getOptimizedChatHistory($chatHistories, $maxTokens - $estimatedTokenCount));
-        } else {
-            // For small conversations, just include all messages
-            foreach ($chatHistories as $chatHistory) {
-                $userMessage = $this->formatUserMessage($chatHistory, $user);
-                $assistantMessage = $this->formatAssistantMessage($chatHistory);
-                
-                // Check if adding these messages would exceed our token limit
-                $userTokens = $this->estimateTokenCount($userMessage['content']);
-                $assistantTokens = $this->estimateTokenCount($assistantMessage['content']);
-                
-                if ($estimatedTokenCount + $userTokens + $assistantTokens > $maxTokens) {
-                    break; // Stop adding messages if we exceed the token limit
-                }
-                
-                $messages[] = $userMessage;
-                $messages[] = $assistantMessage;
-                $estimatedTokenCount += $userTokens + $assistantTokens;
+        // For small conversations, just include all messages
+        foreach ($chatHistories as $chatHistory) {
+            $userMessage = $this->formatUserMessage($chatHistory, $user);
+            $assistantMessage = $this->formatAssistantMessage($chatHistory);
+            
+            // Check if adding these messages would exceed our token limit
+            $userTokens = $this->estimateTokenCount($userMessage['content']);
+            $assistantTokens = $this->estimateTokenCount($assistantMessage['content']);
+            
+            if ($estimatedTokenCount + $userTokens + $assistantTokens > $maxTokens) {
+                break; // Stop adding messages if we exceed the token limit
             }
+            
+            $messages[] = $userMessage;
+            $messages[] = $assistantMessage;
+            $estimatedTokenCount += $userTokens + $assistantTokens;
         }
 
         return $messages;

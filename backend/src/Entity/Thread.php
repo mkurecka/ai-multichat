@@ -36,6 +36,7 @@ class Thread
     public function __construct()
     {
         $this->chatHistories = new ArrayCollection();
+        $this->summaries = new ArrayCollection();
         $this->createdAt = new \DateTime();
     }
 
@@ -110,5 +111,43 @@ class Thread
             }
         }
         return $this;
+    }
+
+    public function getSummaries(): Collection
+    {
+        return $this->summaries;
+    }
+
+    public function addSummary(ThreadSummary $summary): self
+    {
+        if (!$this->summaries->contains($summary)) {
+            $this->summaries->add($summary);
+            $summary->setThread($this);
+        }
+        return $this;
+    }
+
+    public function removeSummary(ThreadSummary $summary): self
+    {
+        if ($this->summaries->removeElement($summary)) {
+            if ($summary->getThread() === $this) {
+                $summary->setThread(null);
+            }
+        }
+        return $this;
+    }
+
+    public function getLatestSummary(): ?ThreadSummary
+    {
+        $summaries = $this->summaries->toArray();
+        if (empty($summaries)) {
+            return null;
+        }
+        
+        usort($summaries, function($a, $b) {
+            return $b->getCreatedAt() <=> $a->getCreatedAt();
+        });
+        
+        return $summaries[0];
     }
 } 

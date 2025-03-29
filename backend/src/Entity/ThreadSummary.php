@@ -4,28 +4,26 @@ namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass="App\Repository\ThreadSummaryRepository")
- */
+#[ORM\Entity(repositoryClass: "App\Repository\ThreadSummaryRepository")]
 class ThreadSummary
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: "integer")]
-    private $id;
+    private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: "App\Entity\Thread", inversedBy: "summaries")]
+    #[ORM\ManyToOne(targetEntity: Thread::class, inversedBy: "summaries")]
     #[ORM\JoinColumn(nullable: false)]
-    private $thread;
+    private ?Thread $thread = null;
 
     #[ORM\Column(type: "text")]
-    private $summary;
+    private ?string $summary = null;
 
     #[ORM\Column(type: "integer")]
-    private $messageCount;
+    private ?int $messageCount = null;
 
     #[ORM\Column(type: "datetime")]
-    private $createdAt;
+    private ?\DateTimeInterface $createdAt = null;
 
     public function __construct()
     {
