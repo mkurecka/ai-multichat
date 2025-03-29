@@ -80,66 +80,69 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onM
         </div>
       )}
 
-      {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-8">
-        {!messages?.length ? (
-          <div className="h-full flex items-center justify-center text-gray-400 text-center p-8">
-            <div>
-              <p className="mb-2 text-lg">No messages yet</p>
-              <p className="text-sm">Select models and start chatting to see responses</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {groupedMessages.map((group, groupIndex) => (
-              <div key={groupIndex} className="space-y-4">
-                {/* User message */}
-                <ChatMessage
-                  message={group.userMessage}
-                  modelName={undefined}
-                />
-
-                {/* Model responses in a grid layout */}
-                {group.responses.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Model Responses:</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {group.responses.map((response, responseIndex) => {
-                        if (!response) return null;
-                        const model = models.find(m => m?.id === response.modelId);
-                        return (
-                          <div
-                            key={responseIndex}
-                            className="border border-gray-200 rounded-lg overflow-hidden bg-white"
-                          >
-                            <div className="bg-gray-50 p-2 border-b border-gray-200">
-                              <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
-                            </div>
-                            <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
-                              {typeof response.content === 'string' 
-                                ? response.content 
-                                : typeof response.content === 'object' && response.content !== null
-                                  ? response.content.content || JSON.stringify(response.content)
-                                  : JSON.stringify(response.content)}
-                              {isLoading && responseIndex === group.responses.length - 1 && (
-                                <span className="inline-block ml-1 animate-pulse">▊</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+      {/* Chat messages container */}
+      <div className="flex-1 overflow-hidden flex flex-col bg-gray-50 min-h-0">
+        {/* Chat messages */}
+        <div className="h-full overflow-y-scroll p-4 space-y-8">
+          {!messages?.length ? (
+            <div className="h-full flex items-center justify-center text-gray-400 text-center p-8">
+              <div>
+                <p className="mb-2 text-lg">No messages yet</p>
+                <p className="text-sm">Select models and start chatting to see responses</p>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              {groupedMessages.map((group, groupIndex) => (
+                <div key={groupIndex} className="space-y-4">
+                  {/* User message */}
+                  <ChatMessage
+                    message={group.userMessage}
+                    modelName={undefined}
+                  />
+
+                  {/* Model responses in a grid layout */}
+                  {group.responses.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Model Responses:</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {group.responses.map((response, responseIndex) => {
+                          if (!response) return null;
+                          const model = models.find(m => m?.id === response.modelId);
+                          return (
+                            <div
+                              key={responseIndex}
+                              className="border border-gray-200 rounded-lg overflow-hidden bg-white"
+                            >
+                              <div className="bg-gray-50 p-2 border-b border-gray-200">
+                                <h4 className="font-medium text-sm text-gray-800">{model?.name || 'Unknown Model'}</h4>
+                              </div>
+                              <div className="p-3 text-sm whitespace-pre-wrap text-gray-800">
+                                {typeof response.content === 'string' 
+                                  ? response.content 
+                                  : typeof response.content === 'object' && response.content !== null
+                                    ? response.content.content || JSON.stringify(response.content)
+                                    : JSON.stringify(response.content)}
+                                {isLoading && responseIndex === group.responses.length - 1 && (
+                                  <span className="inline-block ml-1 animate-pulse">▊</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
       </div>
 
       {/* Chat Input */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t bg-white">
         <ChatInput
           selectedModels={selectedModels.map(model => model.id)}
           onSendMessage={(message) => onSendMessage(messages, message)}
