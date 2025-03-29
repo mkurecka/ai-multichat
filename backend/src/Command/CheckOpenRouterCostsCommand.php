@@ -2,7 +2,7 @@
 
 namespace App\Command;
 
-use App\Entity\ChatCost;
+use App\Entity\ApiRequestCost;
 use App\Entity\ChatHistory;
 use App\Service\OpenRouterService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,16 +45,17 @@ class CheckOpenRouterCostsCommand extends Command
                 $data = $this->openRouterService->getGenerationData($chatHistory->getOpenRouterId());
                 
                 // Find existing cost or create new one
-                $chatCost = $this->entityManager->getRepository(ChatCost::class)
-                    ->findOneBy(['openRouterId' => $chatHistory->getOpenRouterId()]);
+                $apiRequestCost = $this->entityManager->getRepository(ApiRequestCost::class)
+                    ->findOneBy(['requestId' => $chatHistory->getOpenRouterId()]);
                 
-                if (!$chatCost) {
-                    $chatCost = new ChatCost();
+                if (!$apiRequestCost) {
+                    $apiRequestCost = new ApiRequestCost();
                 }
                 
-                $chatCost->setChatHistory($chatHistory)
+                $apiRequestCost->setUser($chatHistory->getThread()->getUser())
+                    ->setRequestId($chatHistory->getOpenRouterId())
+                    ->setApiProviderId('openrouter')
                     ->setTotalCost($data['total_cost'] ?? 0.0)
-                    ->setOpenRouterId($chatHistory->getOpenRouterId())
                     ->setModel($data['model'] ?? '')
                     ->setOrigin($data['origin'] ?? null)
                     ->setTotalUsage($data['usage'] ?? null)
@@ -77,9 +78,11 @@ class CheckOpenRouterCostsCommand extends Command
                     ->setNativeTokensReasoning($data['native_tokens_reasoning'] ?? null)
                     ->setNumMediaPrompt($data['num_media_prompt'] ?? null)
                     ->setNumMediaCompletion($data['num_media_completion'] ?? null)
-                    ->setNumSearchResults($data['num_search_results'] ?? null);
+                    ->setNumSearchResults($data['num_search_results'] ?? null)
+                    ->setRequestType('chat')
+                    ->setRequestReference($chatHistory->getId());
                 
-                $this->entityManager->persist($chatCost);
+                $this->entityManager->persist($apiRequestCost);
                 $totalCost += $data['total_cost'] ?? 0.0;
 
                 // Show detailed info for each generation

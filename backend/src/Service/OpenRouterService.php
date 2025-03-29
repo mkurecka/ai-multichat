@@ -6,8 +6,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use App\Entity\Thread;
 use App\Entity\ThreadSummary;
+use App\Entity\ApiRequestCost;
 use Psr\Log\LoggerInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use App\Event\OpenRouterRequestCompletedEvent;
 
 class OpenRouterService
 {
@@ -47,7 +50,8 @@ class OpenRouterService
         string $apiKey,
         private readonly ContextService $contextService,
         private readonly EntityManagerInterface $entityManager,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly EventDispatcherInterface $eventDispatcher
     ) {
         $this->client = $client;
         $this->apiKey = $apiKey;
@@ -104,6 +108,38 @@ class OpenRouterService
         }
     }
     
+    private function processResponse(array $data, string $model, ?Thread $thread, bool $stream): array
+    {
+        $content = '';
+        if (isset($data['choices'][0]['message']['content'])) {
+            $content = $data['choices'][0]['message']['content'];
+        } elseif (isset($data['choices'][0]['delta']['content'])) {
+            $content = $data['choices'][0]['delta']['content'];
+        }
+
+        if (empty($content)) {
+            $this->log('No content found in OpenRouter response. Full response: ' . json_encode($data));
+            throw new HttpException(500, 'No content in response from OpenRouter');
+        }
+
+        $this->log('Extracted content: ' . $content);
+
+        // Extract usage data
+        $usage = [
+            'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
+            'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
+            'total_tokens' => $data['usage']['total_tokens'] ?? 0
+        ];
+
+        return [
+            'content' => $content,
+            'id' => $data['id'] ?? null,
+            'usage' => $usage,
+            'model' => $model,
+            'data' => $data
+        ];
+    }
+    
     /**
      * Generate response with context handling
      */
@@ -113,149 +149,49 @@ class OpenRouterService
         
         foreach ($models as $model) {
             try {
+                $this->log('Starting request for model: ' . $model);
+                
+                // Get context if thread exists
                 $messages = [];
-                
-                // Calculate token limit for this model
-                $tokenLimit = $this->getModelTokenLimit($model);
-                
-                // Add context if thread is provided
                 if ($thread) {
-                    // Check if we need to compress the thread
-                    $this->compressThreadIfNeeded($thread);
-                    
-                    // Get context with token limit
-                    $maxTokens = (int)($tokenLimit * 0.75); // Use 75% of tokens for context
-                    $messages = $this->getCompressedContext($thread, $maxTokens);
-                    
-                    // Apply model-specific formatting
-                    $messages = $this->contextService->formatContextForModel($messages, $model);
-                    $this->log('Context messages for model ' . $model . ': ' . json_encode($messages));
+                    $messages = $this->getCompressedContext($thread, self::MODEL_TOKEN_LIMITS[$model] ?? self::DEFAULT_TOKEN_LIMIT);
                 }
                 
-                // Add current prompt
+                // Add the current prompt
                 $messages[] = [
                     'role' => 'user',
                     'content' => $prompt
                 ];
-
-                // Prepare request data
-                $requestData = [
-                    'model' => $model,
-                    'messages' => $messages,
-                    'stream' => $stream
-                ];
                 
-                // Add model-specific parameters
-                if (strpos($model, 'anthropic') !== false) {
-                    $requestData['temperature'] = 0.7;
-                    $requestData['top_p'] = 0.9;
-                    $requestData['max_tokens'] = 4096;
-                } elseif (strpos($model, 'openai') !== false) {
-                    $requestData['temperature'] = 0.7;
-                    $requestData['max_tokens'] = 1024;
-                } elseif (strpos($model, 'google') !== false) {
-                    $requestData['temperature'] = 0.7;
-                    $requestData['top_k'] = 40;
-                    $requestData['max_tokens'] = 2048;
-                } elseif (strpos($model, 'mistral') !== false) {
-                    $requestData['temperature'] = 0.7;
-                    $requestData['top_p'] = 0.9;
-                    $requestData['max_tokens'] = 2048;
-                }
+                $this->log('Final messages array: ' . json_encode($messages));
                 
-                $this->log('OpenRouter request for model ' . $model . ': ' . json_encode($requestData, JSON_PRETTY_PRINT));
-
-                // Send the request
-                $headers = [
-                    'Authorization' => "Bearer {$this->apiKey}",
-                    'Referer' => 'https://github.com/michalkurecka/ai-multichat',
-                    'X-Title' => 'AI MultiChat',
-                    'Content-Type' => 'application/json'
-                ];
+                $response = $this->client->request('POST', self::API_URL . '/chat/completions', [
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $this->apiKey,
+                        'Content-Type' => 'application/json',
+                        'HTTP-Referer' => 'https://github.com/michalkurecka/ai-multichat',
+                        'X-Title' => 'AI MultiChat'
+                    ],
+                    'json' => [
+                        'model' => $model,
+                        'messages' => $messages,
+                        'stream' => $stream
+                    ]
+                ]);
                 
-                $this->log('Request headers: ' . json_encode($headers));
-                
-                try {
-                    $response = $this->client->request('POST', self::API_URL . '/chat/completions', [
-                        'headers' => $headers,
-                        'json' => $requestData
-                    ]);
-                    
-                    $this->log('Response status code: ' . $response->getStatusCode());
-                    $this->log('Response headers: ' . json_encode($response->getHeaders()));
-                    
-                    if ($response->getStatusCode() !== 200) {
-                        $errorData = $response->toArray();
-                        $this->log('OpenRouter error response: ' . json_encode($errorData));
-                        throw new HttpException(
-                            $response->getStatusCode(),
-                            $errorData['error']['message'] ?? 'Failed to generate response from OpenRouter'
-                        );
-                    }
-                    
-                    if ($stream) {
-                        $responses[$model] = [
-                            'stream' => $response->toStream(),
-                            'id' => null,
-                            'usage' => [
-                                'prompt_tokens' => 0,
-                                'completion_tokens' => 0,
-                                'total_tokens' => 0
-                            ]
-                        ];
-                    } else {
-                        $data = $response->toArray();
-                        $this->log('OpenRouter raw response for model ' . $model . ': ' . json_encode($data));
-                        
-                        // Extract content from the response
-                        $content = '';
-                        if (isset($data['choices'][0]['message']['content'])) {
-                            $content = is_array($data['choices'][0]['message']['content']) 
-                                ? ($data['choices'][0]['message']['content']['content'] ?? '')
-                                : $data['choices'][0]['message']['content'];
-                            $this->log('Found content in choices[0][message][content]');
-                        } elseif (isset($data['choices'][0]['delta']['content'])) {
-                            $content = is_array($data['choices'][0]['delta']['content'])
-                                ? ($data['choices'][0]['delta']['content']['content'] ?? '')
-                                : $data['choices'][0]['delta']['content'];
-                            $this->log('Found content in choices[0][delta][content]');
-                        } elseif (isset($data['choices'][0]['text'])) {
-                            $content = is_array($data['choices'][0]['text'])
-                                ? ($data['choices'][0]['text']['content'] ?? '')
-                                : $data['choices'][0]['text'];
-                            $this->log('Found content in choices[0][text]');
-                        } elseif (isset($data['content'])) {
-                            $content = is_array($data['content'])
-                                ? ($data['content']['content'] ?? '')
-                                : $data['content'];
-                            $this->log('Found content in root content field');
-                        }
-                        
-                        if (empty($content)) {
-                            $this->log('No content found in OpenRouter response. Full response: ' . json_encode($data));
-                            throw new HttpException(500, 'No content in response from OpenRouter');
-                        }
-                        
-                        $this->log('Extracted content: ' . $content);
-                        
-                        // Extract usage data
-                        $usage = [
-                            'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
-                            'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
-                            'total_tokens' => $data['usage']['total_tokens'] ?? 0
-                        ];
-                        
-                        $responses[$model] = [
-                            'content' => $content,
-                            'id' => $data['id'] ?? null,
-                            'usage' => $usage
-                        ];
-                        
-                        $this->log('Final processed response for model ' . $model . ': ' . json_encode($responses[$model]));
-                    }
-                } catch (\Exception $e) {
-                    $this->log('Request failed: ' . $e->getMessage());
-                    throw $e;
+                if ($stream) {
+                    $responses[$model] = [
+                        'stream' => $response->toStream(),
+                        'id' => null,
+                        'usage' => [
+                            'prompt_tokens' => 0,
+                            'completion_tokens' => 0,
+                            'total_tokens' => 0
+                        ]
+                    ];
+                } else {
+                    $data = $response->toArray();
+                    $responses[$model] = $this->processResponse($data, $model, $thread, $stream);
                 }
             } catch (\Exception $e) {
                 $this->log('Error in generateResponse for model ' . $model . ': ' . $e->getMessage());

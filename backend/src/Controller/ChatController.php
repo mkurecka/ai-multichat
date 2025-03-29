@@ -15,10 +15,20 @@ use App\Entity\Thread;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use App\Event\OpenRouterRequestCompletedEvent;
+use Psr\Log\LoggerInterface;
 
 #[Route('/api')]
 class ChatController extends AbstractController
 {
+    public function __construct(
+        private readonly OpenRouterService $openRouterService,
+        private readonly EntityManagerInterface $em,
+        private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly LoggerInterface $logger
+    ) {}
+
     #[Route('/models', methods: ['GET'])]
     public function getModels(ModelService $modelService): JsonResponse
     {
@@ -108,9 +118,9 @@ class ChatController extends AbstractController
                                     ->setResponse([
                                         'content' => $content,
                                         'usage' => [
-                                            'prompt_tokens' => 0,
-                                            'completion_tokens' => 0,
-                                            'total_tokens' => 0
+                                            'prompt_tokens' => $modelResponse['usage']['prompt_tokens'] ?? 0,
+                                            'completion_tokens' => $modelResponse['usage']['completion_tokens'] ?? 0,
+                                            'total_tokens' => $modelResponse['usage']['total_tokens'] ?? 0
                                         ]
                                     ])
                                     ->setModelId($modelId)
@@ -119,20 +129,6 @@ class ChatController extends AbstractController
                                 $em->persist($chatHistory);
                                 $em->flush();
                                 $historySaved = true;
-                                
-                                echo "data: " . json_encode([
-                                    'done' => true, 
-                                    'modelId' => $modelId, 
-                                    'threadId' => $thread->getThreadId(),
-                                    'promptId' => $promptId,
-                                    'content' => $content,
-                                    'usage' => [
-                                        'prompt_tokens' => 0,
-                                        'completion_tokens' => 0,
-                                        'total_tokens' => 0
-                                    ]
-                                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
-                                flush();
                                 continue;
                             }
                             
@@ -174,7 +170,7 @@ class ChatController extends AbstractController
                             }
                         }
                     }
-                }
+                }   
     
                 // If we get here without a [DONE] message, save what we have
                 if (!$historySaved && !empty($content)) {
@@ -185,9 +181,9 @@ class ChatController extends AbstractController
                         ->setResponse([
                             'content' => $content,
                             'usage' => [
-                                'prompt_tokens' => 0,
-                                'completion_tokens' => 0,
-                                'total_tokens' => 0
+                                'prompt_tokens' => $modelResponse['usage']['prompt_tokens'] ?? 0,
+                                'completion_tokens' => $modelResponse['usage']['completion_tokens'] ?? 0,
+                                'total_tokens' => $modelResponse['usage']['total_tokens'] ?? 0
                             ]
                         ])
                         ->setModelId($modelId)
@@ -196,8 +192,14 @@ class ChatController extends AbstractController
                     $em->persist($chatHistory);
                     $em->flush();
                 }
+
+                // Dispatch event for cost tracking with just the requestId
+                if ($openRouterId) {
+                    $event = new OpenRouterRequestCompletedEvent($openRouterId, $chatHistory->getId(), 'chat');
+                    $this->eventDispatcher->dispatch($event, OpenRouterRequestCompletedEvent::NAME);
+                }
             });
-            
+
             $response->headers->set('Content-Type', 'text/event-stream');
             $response->headers->set('Cache-Control', 'no-cache');
             $response->headers->set('Connection', 'keep-alive');
@@ -252,6 +254,18 @@ class ChatController extends AbstractController
                     ->setOpenRouterId($modelResponse['id']);
                 
                 $em->persist($modelHistory);
+                
+                // Log before event dispatch
+                $this->logger->info('Dispatching OpenRouterRequestCompletedEvent', [
+                    'openRouterId' => $modelResponse['id']
+                ]);
+                
+                // Dispatch event for cost tracking with just the requestId
+                $event = new OpenRouterRequestCompletedEvent($modelResponse['id'], $modelHistory->getId(), 'chat');
+                $this->eventDispatcher->dispatch($event, OpenRouterRequestCompletedEvent::NAME);
+                
+                // Log after event dispatch
+                $this->logger->info('OpenRouterRequestCompletedEvent dispatched successfully');
                 
                 $responses[$modelId] = [
                     'content' => $modelResponse['content'],
@@ -454,14 +468,14 @@ class ChatController extends AbstractController
         foreach ($threads as $thread) {
             // Get total costs and tokens for this thread
             $stats = $em->createQueryBuilder()
-                ->select('COALESCE(SUM(cc.totalCost), 0) as totalCost')
-                ->addSelect('COALESCE(SUM(cc.tokensPrompt), 0) as totalPromptTokens')
-                ->addSelect('COALESCE(SUM(cc.tokensCompletion), 0) as totalCompletionTokens')
-                ->from('App\Entity\ChatCost', 'cc')
-                ->join('cc.chatHistory', 'ch')
-                ->join('ch.thread', 't')
-                ->where('t.threadId = :threadId')
+                ->select('COALESCE(SUM(arc.totalCost), 0) as totalCost')
+                ->addSelect('COALESCE(SUM(arc.tokensPrompt), 0) as totalPromptTokens')
+                ->addSelect('COALESCE(SUM(arc.tokensCompletion), 0) as totalCompletionTokens')
+                ->from('App\Entity\ApiRequestCost', 'arc')
+                ->where('arc.requestReference = :threadId')
+                ->andWhere('arc.requestType = :requestType')
                 ->setParameter('threadId', $thread['threadId'])
+                ->setParameter('requestType', 'chat')
                 ->getQuery()
                 ->getSingleResult();
                 
