@@ -69,6 +69,7 @@ class OpenRouterCostTrackingSubscriber implements EventSubscriberInterface
                 $cost->setUser($chatHistory->getThread()->getUser())
                     ->setRequestId($event->getRequestId())
                     ->setApiProviderId('openrouter')
+                    ->setAppId($generationData['app_id'] ?? '')
                     ->setModel($chatHistory->getModelId())
                     ->setTotalCost($generationData['total_cost'] ?? 0)
                     ->setCreatedAt(new \DateTime())
