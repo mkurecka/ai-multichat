@@ -25,6 +25,9 @@ class Model
     #[ORM\Column(length: 255)]
     private ?string $provider = null;
 
+    #[ORM\Column(length: 255)]
+    private ?string $apiService = 'openrouter';
+
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $pricing = null;
 
@@ -86,6 +89,17 @@ class Model
     public function setProvider(string $provider): static
     {
         $this->provider = $provider;
+        return $this;
+    }
+
+    public function getApiService(): ?string
+    {
+        return $this->apiService;
+    }
+
+    public function setApiService(string $apiService): static
+    {
+        $this->apiService = $apiService;
         return $this;
     }
 

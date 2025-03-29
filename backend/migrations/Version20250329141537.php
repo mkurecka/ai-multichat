@@ -23,6 +23,7 @@ final class Version20250329141537 extends AbstractMigration
             id INT AUTO_INCREMENT NOT NULL,
             name VARCHAR(255) NOT NULL,
             model_id VARCHAR(255) NOT NULL,
+            api_service VARCHAR(255) NOT NULL DEFAULT "openrouter",
             description LONGTEXT DEFAULT NULL,
             provider VARCHAR(255) NOT NULL,
             pricing JSON DEFAULT NULL,
