@@ -11,30 +11,27 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:cache:models',
-    description: 'Refresh the OpenRouter models cache',
+    description: 'Cache available models from OpenRouter',
 )]
 class CacheModelsCommand extends Command
 {
-    private ModelService $modelService;
-
-    public function __construct(ModelService $modelService)
-    {
+    public function __construct(
+        private readonly ModelService $modelService,
+    ) {
         parent::__construct();
-        $this->modelService = $modelService;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
 
-        $io->info('Refreshing OpenRouter models cache...');
-        
         try {
             $models = $this->modelService->refreshModels();
             $io->success(sprintf('Successfully cached %d models', count($models)));
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            $io->error('Failed to refresh models cache: ' . $e->getMessage());
+            $io->error($e->getMessage());
             return Command::FAILURE;
         }
     }

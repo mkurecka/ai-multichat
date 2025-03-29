@@ -39,5 +39,8 @@ services:
             
     App\Service\ModelService:
         arguments:
+            $openRouterService: '@App\Service\OpenRouterService'
             $cache: '@models.cache'
             $cacheTtl: '%openrouter_cache_ttl%'
+            $entityManager: '@doctrine.orm.entity_manager'
+            $modelRepository: '@App\Repository\ModelRepository'
