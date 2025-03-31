@@ -4,9 +4,7 @@ namespace App\Tests;
 
 use App\Entity\User;
 use App\Entity\Thread;
-use App\Service\JWTService;
 use Doctrine\ORM\EntityManagerInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -18,7 +16,6 @@ class ApiTestCase extends WebTestCase
     protected ?KernelBrowser $client = null;
     protected ?EntityManagerInterface $entityManager = null;
     protected ?User $testUser = null;
-    protected ?JWTService $jwtService = null;
 
     protected static function bootKernel(array $options = []): KernelInterface
     {
@@ -35,7 +32,6 @@ class ApiTestCase extends WebTestCase
         $container = $this->client->getContainer();
         
         $this->entityManager = $container->get('doctrine')->getManager();
-        $this->jwtService = $container->get(JWTService::class);
 
         // Create test user with unique email
         $this->testUser = new User();
@@ -65,15 +61,9 @@ class ApiTestCase extends WebTestCase
 
         $this->entityManager = null;
         $this->testUser = null;
-        $this->jwtService = null;
         $this->client = null;
 
         parent::tearDown();
-    }
-
-    protected function getTestToken(): string
-    {
-        return $this->jwtService->createToken($this->testUser);
     }
 
     protected function createTestThread(): string
@@ -83,7 +73,8 @@ class ApiTestCase extends WebTestCase
             '/api/chat/thread',
             [],
             [],
-            ['HTTP_Authorization' => 'Bearer ' . $this->getTestToken()]
+            // Use the test header instead of JWT for authentication
+            ['HTTP_X_TEST_USER_EMAIL' => $this->testUser->getEmail()] 
         );
 
         $this->assertResponseIsSuccessful();

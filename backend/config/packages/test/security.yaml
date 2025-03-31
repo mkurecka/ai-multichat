@@ -1,0 +1,21 @@
+# config/packages/test/security.yaml
+security:
+    firewalls:
+        api:
+            # Disable stateless for easier testing if needed, but keep it for now
+            # stateless: false 
+            # Remove the default JWT authenticator for tests
+            # custom_authenticators: [] # This would remove all, maybe not needed if we override below
+            
+            # Explicitly set the MockAuthenticator for the API firewall in the test environment
+            custom_authenticators:
+                - App\Security\MockAuthenticator
+            
+            # Ensure entry_point is removed or set appropriately if MockAuthenticator doesn't implement it
+            # entry_point: null # Or keep JWTAuthenticator if needed for entry point logic only? Let's remove for now.
+            entry_point: App\Security\MockAuthenticator # MockAuthenticator implements AuthenticationEntryPointInterface
+
+        # You might want to mock the 'main' firewall too if tests interact with it
+        # main:
+        #    custom_authenticators:
+        #        - App\Security\MockAuthenticator # Or a different mock if needed

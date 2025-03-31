@@ -69,7 +69,7 @@ services:
       - ./backend:/app
     environment:
       - APP_ENV=test
-      - DATABASE_URL=mysql://test:test@db-test:3306/test?serverVersion=8.0.32&charset=utf8mb4
+      - DATABASE_URL=mysql://test:test@db-test:3307/test?serverVersion=8.0.32&charset=utf8mb4
       - JWT_SECRET=test_secret
       - OPENROUTER_API_KEY=test_key
       - JWT_PASSPHRASE=test
@@ -100,7 +100,7 @@ services:
       - MYSQL_USER=test
       - MYSQL_PASSWORD=test
     ports:
-      - "3307:3306"
+      - "3307:3307"
     volumes:
       - mysql-test-data:/var/lib/mysql
     healthcheck:

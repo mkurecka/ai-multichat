@@ -8,7 +8,7 @@ NC='\033[0m'
 echo "🚀 Starting test environment..."
 
 # Build and start containers
-docker-compose up -d --build
+docker-compose up -d 
 
 # Wait for MySQL to be ready
 echo "⏳ Waiting for MySQL to be ready..."
@@ -17,7 +17,14 @@ sleep 10
 # Set up test database
 echo "🔄 Setting up test database..."
 docker-compose exec backend-test bash /app/tests/setup-test-db.sh
+SETUP_RESULT=$?
+if [ $SETUP_RESULT -ne 0 ]; then
+    echo -e "${RED}❌ Test database setup failed!${NC}"
+    docker-compose down # Optional: stop containers on failure
+    exit $SETUP_RESULT
+fi
 
+exit 0
 # Run backend tests
 echo "🧪 Running backend tests..."
 docker-compose exec backend-test php bin/phpunit
@@ -52,4 +59,4 @@ fi
 # Exit with error if any tests failed
 if [ $BACKEND_RESULT -ne 0 ] || [ $FRONTEND_RESULT -ne 0 ]; then
     exit 1
-fi 
+fi

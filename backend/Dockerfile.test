@@ -29,6 +29,9 @@ COPY . .
 # Install dependencies
 RUN composer install --no-interaction --no-scripts
 
+# Ensure var directory exists before setting permissions
+RUN mkdir -p /app/var
+
 # Set proper permissions
 RUN chown -R www-data:www-data /app
 RUN chmod -R 777 /app/var
@@ -37,4 +40,4 @@ RUN chmod -R 777 /app/var
 USER www-data
 
 # Start PHP-FPM
-CMD ["php-fpm"] 
+CMD ["php-fpm"]
