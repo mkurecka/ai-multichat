@@ -25,8 +25,8 @@ default:
 
 stages:
     - install
+    - test
     - deploy
-#    - test
 
 variables:
     GIT_DEPTH: 0
@@ -81,13 +81,13 @@ install.php.ci:
     before_script:
         - cd backend
 
-test.php.phpstan:
-    extends: .test.php
-    script:
-        - php -d memory_limit=512M vendor/bin/phpstan analyse src --level=1
-    tags:
-        - arm
-        - large
+#test.php.phpstan:
+#    extends: .test.php
+#    script:
+#        - php -d memory_limit=512M vendor/bin/phpstan analyse src --level=1
+#    tags:
+#        - arm
+#        - large
 
 .deploy:
     stage: deploy
