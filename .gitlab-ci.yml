@@ -53,6 +53,9 @@ workflow:
     tags:
         - arm
         - large
+    artifacts:
+        paths:
+            - backend/vendor
 
 install.php.ci:
     extends: .install.php
