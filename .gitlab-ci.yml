@@ -83,7 +83,9 @@ install.php.ci:
 
 test.php.phpstan:
     extends: .test.php
-    script: php -d memory_limit=512M vendor/bin/phpstan analyse src --level=1
+    script:
+        - cd backend
+        - php -d memory_limit=512M vendor/bin/phpstan analyse src --level=1
     tags:
         - arm
         - large
@@ -115,6 +117,7 @@ deploy.stage:
         name: stage
         url: https://chat-stage.www6.superkoderi.cz
     script:
+        - cd backend
         #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
         - dep -f .deploy.php deploy
 
