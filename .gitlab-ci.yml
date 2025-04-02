@@ -1,260 +1,126 @@
-# GitLab CI/CD configuration for MultiChat App (Symfony Backend + React Frontend)
-# Adapted based on user-provided example
-
-# YAML Anchors for Caching
 .php-cache: &php-cache
-  key:
-    prefix: php-${CI_COMMIT_REF_SLUG} # Prefix with branch/tag name
-    files:
-      - backend/composer.lock
-  paths:
-    - backend/vendor/
-  policy: pull-push # Pull cache, run job, push updated cache
+    key:
+        prefix: php
+        files:
+            - backend/composer.lock
+    paths:
+        - backend/vendor/
+    policy: pull
 
-.node-cache: &node-cache
-  key:
-    prefix: node-${CI_COMMIT_REF_SLUG} # Prefix with branch/tag name
-    files:
-      - frontend/package-lock.json
-  paths:
-    - frontend/node_modules/
-    - .npm-cache/ # Cache npm's internal cache too
-  policy: pull-push
-
-variables:
-  # Define PHP version to use
-  PHP_VERSION: '8.3'
-  # Define Node.js version to use
-  NODE_VERSION: '20'
-  # Default database URL for tests (override with GitLab CI/CD variable if needed)
-  DATABASE_URL_TEST: "sqlite:///%CI_PROJECT_DIR%/backend/var/data.db"
-  # Cache settings from example
-  FF_USE_FASTZIP: "true" # Enable faster zip utility for caching/artifacts
-  CACHE_COMPRESSION_LEVEL: 'fastest' # Prioritize speed over compression ratio
+.php-prod-cache: &php-prod-cache
+    key:
+        prefix: php-prod
+        files:
+            - composer.lock
+    paths:
+        - vendor/
+    policy: pull
 
 default:
-  image: php:${PHP_VERSION}-cli # Default to PHP image
-  interruptible: true # Allow jobs to be cancelled if a newer pipeline starts
+    image: $CI_REGISTRY/sk/docker-php:8.4
+    interruptible: true
+    tags:
+        - arm
+        - small
 
 stages:
-  - install # Renamed from install_deps
-  - test
-  - build
-  - deploy
+    - install
+    - test
+    - deploy
+
+variables:
+    GIT_DEPTH: 0
+    FF_USE_FASTZIP: 1
+    CACHE_COMPRESSION_LEVEL: 'fastest'
 
 workflow:
-  rules:
-    # Run for merge requests
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    # Run for pushes to the master branch
-    - if: $CI_COMMIT_BRANCH == 'master'
+    rules:
+        -   if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+        -   if: $CI_COMMIT_BRANCH == 'master'
+        -   if: $CI_COMMIT_TAG =~ /^prod-/
 
-# --- INSTALL DEPENDENCIES ---
+###
+.install.php:
+    stage: install
+    rules:
+        -   changes:
+                - composer.lock
+        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
+    before_script:
+        - php composer.phar config -g cache-dir "$(pwd)/.composer"
+    tags:
+        - arm
+        - large
 
-install_backend:
-  stage: install
-  cache:
-    <<: *php-cache
-  script:
-    - cd backend
-    # Use COMPOSER_CACHE_DIR for composer's internal cache
-    - composer config -g cache-dir "$CI_PROJECT_DIR/.composer-cache"
-    - composer install --prefer-dist --no-progress --no-interaction --no-scripts
-  artifacts:
-    paths:
-      - backend/vendor/
-    expire_in: 1 hour # Keep artifacts for subsequent stages
+install.php.ci:
+    extends: .install.php
+    cache:
+        <<: *php-cache
+        policy: push
+    script:
+        - cd backend
+        - php composer.phar install --no-interaction --ansi
 
-install_frontend:
-  stage: install
-  image: node:${NODE_VERSION} # Override default image
-  cache:
-    <<: *node-cache
-  script:
-    - cd frontend
-    # Use NPM_CONFIG_CACHE for npm's internal cache
-    - npm config set cache "$CI_PROJECT_DIR/.npm-cache" --global
-    - npm ci --prefer-offline # Use ci for cleaner installs in CI
-  artifacts:
-    paths:
-      - frontend/node_modules/
-    expire_in: 1 hour # Keep artifacts for subsequent stages
+install.php.prod:
+    extends: .install.php
+    cache:
+        <<: *php-prod-cache
+        policy: push
+    script:
+        - cd backend
+        - php composer.phar install --no-interaction --ansi --prefer-dist --optimize-autoloader
 
-# --- RUN TESTS ---
+.test.php:
+    stage: test
+    cache:
+        <<: *php-cache
+    needs:
+        -   job: install.php.ci
+            optional: true
 
-backend_test:
-  stage: test
-  cache:
-    <<: *php-cache
-    policy: pull # Only pull cache for tests
-  needs:
-    - job: install_backend
-      optional: true # Allow running even if install failed (e.g., cache miss)
-  # If tests require a database, uncomment and configure the service:
-  # services:
-  #   - name: mysql:8.0 # Or postgres:15
-  #     alias: database_host # Use this alias in DATABASE_URL_TEST
-  #     variables:
-  #       MYSQL_ROOT_PASSWORD: root_password # Set required env vars for the DB image
-  #       MYSQL_DATABASE: test_db
-  variables:
-    # Example for MySQL service above:
-    # DATABASE_URL_TEST: "mysql://root:root_password@database_host:3306/test_db?serverVersion=8.0&charset=utf8mb4"
-    # Example for PostgreSQL service:
-    # DATABASE_URL_TEST: "postgresql://postgres:root_password@database_host:5432/test_db?serverVersion=15&charset=utf8"
-    APP_ENV: test # Set Symfony environment to test
-  script:
-    - cd backend
-    # Setup test database if needed (adjust script path/content as necessary)
-    # - cp .env.test .env # Or use GitLab variables to populate .env.test
-    # - php bin/console doctrine:database:drop --force --if-exists --env=test || true # Handle potential non-existence
-    # - php bin/console doctrine:database:create --env=test
-    # - php bin/console doctrine:schema:create --env=test
-    # - php bin/console doctrine:fixtures:load --no-interaction --env=test # If you use fixtures
-    - php bin/phpunit
+test.php.phpstan:
+    extends: .test.php
+    script: php -d memory_limit=512M vendor/bin/phpstan analyse src --level=1
+    tags:
+        - arm
+        - large
 
-frontend_lint:
-  stage: test
-  image: node:${NODE_VERSION} # Override default image
-  cache:
-    <<: *node-cache
-    policy: pull # Only pull cache for tests
-  needs:
-    - job: install_frontend
-      optional: true
-  script:
-    - cd frontend
-    - npm run lint # Assumes a 'lint' script in package.json
+.deploy:
+    stage: deploy
+    image: $CI_REGISTRY/sk/docker-php-deployer:v7.3.3
+    interruptible: false
+    resource_group: deploy
+    cache:
+        <<: *php-prod-cache
+    dependencies:
+        #- build.admin
+        #- build.frontend
+    before_script:
+        - mkdir -p ~/.ssh
+        - chmod 700 ~/.ssh
+        - cp "$SSH_KNOWN_HOSTS" ~/.ssh/known_hosts
+        - chmod 644 ~/.ssh/known_hosts
+        - cp "$DEPLOYMENT_KEY" ~/.ssh/id_ed25519
+        - chmod 400 ~/.ssh/id_ed25519
 
-# frontend_test: # Uncomment if you have frontend tests
-#   stage: test
-#   image: node:${NODE_VERSION}
-#   cache:
-#     <<: *node-cache
-#     policy: pull
-#   needs:
-#     - job: install_frontend
-#       optional: true
-#   script:
-#     - cd frontend
-#     - npm test # Assumes a 'test' script in package.json
+deploy.stage:
+    extends: .deploy
+    rules:
+        - if: $CI_COMMIT_BRANCH == 'master'
+    environment:
+        name: stage
+        url: https://chat-stage.www6.superkoderi.cz
+    script:
+        #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
+        - dep -f .deploy.php deploy
 
-# --- BUILD ARTIFACTS ---
-
-build_frontend:
-  stage: build
-  image: node:${NODE_VERSION} # Override default image
-  cache:
-    <<: *node-cache
-    policy: pull # Only pull cache for build
-  needs:
-    - job: install_frontend
-      optional: true
-  script:
-    - cd frontend
-    - npm run build # Assumes a 'build' script in package.json
-  artifacts:
-    paths:
-      - frontend/dist/ # Adjust if your build output is different
-    expire_in: 1 hour
-
-build_backend_artifact:
-  stage: build
-  cache:
-    # Use a separate cache key for production dependencies if desired,
-    # otherwise reuse the main PHP cache. For simplicity, reusing main cache here.
-    <<: *php-cache
-    policy: pull # Only pull cache for build
-  needs:
-    - job: install_backend
-      optional: true
-  script:
-    - cd backend
-    # Install only production dependencies and optimize autoloader
-    - composer install --no-dev --optimize-autoloader --prefer-dist --no-progress --no-interaction
-    # Remove unnecessary files for deployment artifact
-    - rm -rf tests/ var/cache/* var/log/* .git*
-  artifacts:
-    paths:
-      - backend/ # Package the prepared backend directory
-    expire_in: 1 hour
-
-# --- DEPLOY TO PRODUCTION ---
-
-deploy_production:
-  stage: deploy
-  image: alpine:latest # Minimal image, install tools needed
-  needs: # Explicitly define job dependencies for this stage
-    - build_frontend
-    - build_backend_artifact
-  before_script:
-    # Install SSH client and rsync
-    - apk update && apk add --no-cache openssh-client rsync
-    # Setup SSH agent (using variable SSH_PRIVATE_KEY from GitLab CI/CD)
-    - echo "Setting up SSH..."
-    - eval $(ssh-agent -s)
-    # Ensure SSH_PRIVATE_KEY is set in GitLab CI/CD variables (type 'File' recommended)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    # Option 1: Disable strict host key checking (less secure, easier setup)
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    # Option 2: Use known_hosts file (more secure)
-    # Ensure SSH_KNOWN_HOSTS variable is set in GitLab CI/CD variables
-    # - echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-    # - chmod 644 ~/.ssh/known_hosts
-  script:
-    # Define deployment target path from variables (ensure set in GitLab CI/CD)
-    - DEPLOY_TARGET="$DEPLOY_USER@$DEPLOY_SERVER:$DEPLOY_PATH"
-    - echo "Deploying to $DEPLOY_TARGET..."
-
-    # Sync Backend (excluding .env which should be managed on the server or via PROD_ENV_VARS)
-    - echo "Syncing backend files..."
-    - rsync -avz --delete --exclude '.env' backend/ "$DEPLOY_TARGET/backend/"
-
-    # Sync Frontend build output
-    # Adjust target path as needed (e.g., inside backend/public/ or a separate web root)
-    - echo "Syncing frontend build..."
-    - rsync -avz --delete frontend/dist/ "$DEPLOY_TARGET/backend/public/frontend_assets/" # Example path
-
-    # Execute post-deploy commands on the server
-    - echo "Running post-deploy commands on server..."
-    - >
-      ssh $DEPLOY_USER@$DEPLOY_SERVER "
-        set -e;
-        echo 'Changing to deployment directory...';
-        cd $DEPLOY_PATH/backend || exit 1;
-
-        echo 'Setting up production environment file...';
-        # Option 1: Copy .env from GitLab File variable (Recommended)
-        # Ensure PROD_ENV_VARS is a GitLab CI/CD 'File' type variable containing your .env content
-        if [ -n \"\${PROD_ENV_VARS:-}\" ]; then
-          echo \"\$PROD_ENV_VARS\" > .env;
-          echo '.env file created from CI/CD variable.';
-        elif [ ! -f .env ]; then
-          echo 'WARNING: Production .env file not found and PROD_ENV_VARS not set!';
-          # Option 2: Copy from an example file if it exists (Less Secure)
-          # cp .env.prod.example .env;
-        else
-          echo 'Existing .env file found. Skipping creation.';
-        fi;
-
-        echo 'Running database migrations...';
-        php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=prod;
-
-        echo 'Clearing and warming up cache...';
-        php bin/console cache:clear --env=prod;
-        php bin/console cache:warmup --env=prod;
-
-        # Add any other necessary commands:
-        # echo 'Restarting PHP-FPM...';
-        # sudo systemctl restart php${PHP_VERSION}-fpm; # Example for systemd
-
-        echo 'Deployment finished successfully!';
-      "
-  environment:
-    name: production
-    url: http://$DEPLOY_SERVER # Optional: Set your production URL
-  rules:
-    # Only run for pushes to the master branch
-    - if: '$CI_COMMIT_BRANCH == "master"'
+# deploy.production:
+#     extends: .deploy
+#     rules:
+#         -   if: $CI_COMMIT_TAG =~ /^prod-/
+#     environment:
+#         name: production
+#         url: https://chat-prod.www6.superkoderi.cz
+#     script:
+#         #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
+#         - dep -f .deploy.php deploy
