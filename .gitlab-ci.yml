@@ -116,6 +116,7 @@ deploy.stage:
         #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
         - dep -f .deploy.php deploy
 
+
 # deploy.production:
 #     extends: .deploy
 #     rules:
