@@ -54,14 +54,14 @@ workflow:
         - arm
         - large
 
-#install.php.ci:
-#    extends: .install.php
-#    cache:
-#        <<: *php-cache
-#        policy: push
-#    script:
-#        - composer install --no-interaction --ansi
-#
+install.php.ci:
+    extends: .install.php
+    cache:
+        <<: *php-cache
+        policy: push
+    script:
+        - composer install --no-interaction --ansi
+
 #install.php.prod:
 #    extends: .install.php
 #    cache:
