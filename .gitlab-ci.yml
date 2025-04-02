@@ -60,6 +60,7 @@ install.php.ci:
         <<: *php-cache
         policy: push
     script:
+        - cd backend
         - php composer.phar install --no-interaction --ansi
 
 #install.php.prod:
