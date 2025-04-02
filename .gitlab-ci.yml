@@ -48,8 +48,8 @@ workflow:
         -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
     script:
         - cd backend
-        - composer config -g cache-dir "$CI_PROJECT_DIR/.composer-cache"
-        - composer install --prefer-dist --no-progress --no-interaction --no-scripts
+        - php composer.phar config -g cache-dir "$CI_PROJECT_DIR/.composer-cache"
+        - php composer.phar install --prefer-dist --no-progress --no-interaction --no-scripts
     tags:
         - arm
         - large
@@ -60,7 +60,7 @@ install.php.ci:
         <<: *php-cache
         policy: push
     script:
-        - composer install --no-interaction --ansi
+        - php composer.phar install --no-interaction --ansi
 
 #install.php.prod:
 #    extends: .install.php
