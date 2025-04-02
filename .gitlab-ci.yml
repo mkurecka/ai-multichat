@@ -42,10 +42,10 @@ workflow:
 ###
 .install.php:
     stage: install
-#    rules:
-#        -   changes:
-#                - backend/composer.lock
-#        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
+    rules:
+        -   changes:
+                - backend/composer.lock
+        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
     script:
         - cd backend
         - composer config -g cache-dir "$CI_PROJECT_DIR/.composer-cache"
