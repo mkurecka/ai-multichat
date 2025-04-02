@@ -11,9 +11,9 @@
     key:
         prefix: php-prod
         files:
-            - composer.lock
+            - backend/composer.lock
     paths:
-        - vendor/
+        - backend/vendor/
     policy: pull
 
 default:
@@ -44,9 +44,10 @@ workflow:
     stage: install
     rules:
         -   changes:
-                - composer.lock
+                - backend/composer.lock
         -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
     before_script:
+        - cd backend
         - php composer.phar config -g cache-dir "$(pwd)/.composer"
     tags:
         - arm
@@ -58,7 +59,6 @@ install.php.ci:
         <<: *php-cache
         policy: push
     script:
-        - cd backend
         - php composer.phar install --no-interaction --ansi
 
 install.php.prod:
@@ -67,7 +67,6 @@ install.php.prod:
         <<: *php-prod-cache
         policy: push
     script:
-        - cd backend
         - php composer.phar install --no-interaction --ansi --prefer-dist --optimize-autoloader
 
 .test.php:
@@ -77,6 +76,8 @@ install.php.prod:
     needs:
         -   job: install.php.ci
             optional: true
+    before_script:
+        - cd backend
 
 test.php.phpstan:
     extends: .test.php
@@ -102,6 +103,7 @@ test.php.phpstan:
         - chmod 644 ~/.ssh/known_hosts
         - cp "$DEPLOYMENT_KEY" ~/.ssh/id_ed25519
         - chmod 400 ~/.ssh/id_ed25519
+        - cd backend
 
 deploy.stage:
     extends: .deploy
