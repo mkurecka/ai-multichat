@@ -42,32 +42,33 @@ workflow:
 ###
 .install.php:
     stage: install
-    rules:
-        -   changes:
-                - backend/composer.lock
-        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
-    before_script:
+#    rules:
+#        -   changes:
+#                - backend/composer.lock
+#        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
+    script:
         - cd backend
-        - php composer.phar config -g cache-dir "$(pwd)/.composer"
+        - composer config -g cache-dir "$CI_PROJECT_DIR/.composer-cache"
+        - composer install --prefer-dist --no-progress --no-interaction --no-scripts
     tags:
         - arm
         - large
 
-install.php.ci:
-    extends: .install.php
-    cache:
-        <<: *php-cache
-        policy: push
-    script:
-        - php composer.phar install --no-interaction --ansi
-
-install.php.prod:
-    extends: .install.php
-    cache:
-        <<: *php-prod-cache
-        policy: push
-    script:
-        - php composer.phar install --no-interaction --ansi --prefer-dist --optimize-autoloader
+#install.php.ci:
+#    extends: .install.php
+#    cache:
+#        <<: *php-cache
+#        policy: push
+#    script:
+#        - composer install --no-interaction --ansi
+#
+#install.php.prod:
+#    extends: .install.php
+#    cache:
+#        <<: *php-prod-cache
+#        policy: push
+#    script:
+#        - composer install --no-interaction --ansi --prefer-dist --optimize-autoloader
 
 .test.php:
     stage: test
