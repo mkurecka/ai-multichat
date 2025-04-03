@@ -5,30 +5,30 @@ use function Deployer\{after, get, host, import, run, set, task, upload, writeln
 require 'recipe/common.php';
 require 'contrib/cachetool.php';
 
+$projectPath = 'backend';
+
 set('shared_dirs', [
-    'var/log',
-    'config/jwt',
-    'data',
+    "$projectPath/var/log",
+    "$projectPath/config/jwt",
+    "$projectPath/data",
 ]);
 
 set('shared_files', [
-    '.env.local',
+    "$projectPath/.env.local",
 ]);
 
 set('writable_dirs', [
-    'var',
-    'var/cache',
-    'var/log',
-    'var/sessions',
+    "$projectPath/var",
+    "$projectPath/var/cache",
+    "$projectPath/var/log",
+    "$projectPath/var/sessions",
 ]);
 
-set('log_files', 'var/log/*.log');
+set('log_files', "$projectPath/var/log/*.log");
 
 set('console_options', function () {
     return '--no-interaction';
 });
-
-$projectPath = 'backend';
 
 $env = getenv();
 host('host')

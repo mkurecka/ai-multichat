@@ -22,3 +22,6 @@ logs/
 *.bak
 *.swp
 *~.nib
+
+
+.cursor
