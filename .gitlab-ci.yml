@@ -121,7 +121,6 @@ deploy.stage:
         - cd backend
         #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
         - dep --version
-        - dep list
         - dep -f .deploy.php deploy -vvv
 
 

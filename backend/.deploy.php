@@ -34,20 +34,14 @@ $env = getenv();
 host('host')
     ->set('hostname', $env['DEPLOYMENT_HOSTNAME'])
     ->set('remote_user', $env['DEPLOYMENT_USER'])
-    ->set('deploy_path', $env['DEPLOYMENT_PATH'] . '/' . $projectPath)
-    ->set('cachetool_args', sprintf(
-        '--web=SymfonyHttpClient --web-path=%s --web-url=%s',
-        escapeshellarg(sprintf('%s/current/www', rtrim($env['DEPLOYMENT_PATH'], '/'))),
-        escapeshellarg($env['DEPLOYMENT_URL']),
-    ))
+    ->set('deploy_path', $env['DEPLOYMENT_PATH'])
     ->set('php_version', $env['DEPLOYMENT_PHP_VERSION']);
 
 const TASK_COPY_APPLICATION = 'copy-application';
 task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
     $config = ['options' => ["--exclude-from=excludeFromDeploy"]];
-    // Upload to a 'backend' subdirectory within the release path
-    run("mkdir -p {{release_path}}/$projectPath");
-    upload('.', "{{release_path}}/$projectPath", $config);
+    // Go up one directory to get the root of the repository
+    upload('..', '{{release_path}}', $config);
 });
 
 const TASK_CLEAR_CACHE = 'clear-cache';
@@ -83,6 +77,11 @@ task(TASK_ASSET_MAP_COMPILE, function () use ($projectPath): void {
     run("{{bin/php}} {{release_path}}/$projectPath/bin/console asset-map:compile");
 });
 
+const TASK_INSTALL_DEPENDENCIES = 'install-dependencies';
+task(TASK_INSTALL_DEPENDENCIES, function () use ($projectPath): void {
+    run("cd {{release_path}}/$projectPath && composer install --no-dev --optimize-autoloader");
+});
+
 set('cachetool_url', 'https://github.com/gordalina/cachetool/releases/download/9.2.1/cachetool.phar');
 
 task('deploy', [
@@ -99,6 +98,7 @@ task('deploy', [
     // set up files and directories
     'deploy:shared',
     'deploy:writable',
+    TASK_INSTALL_DEPENDENCIES,
     //TASK_VALIDATE_MAPPING,
     TASK_SCHEMA_UPDATE,
     TASK_WARM_UP_CACHE,
