@@ -2,8 +2,8 @@
 
 use function Deployer\{after, get, host, import, run, set, task, upload, writeln};
 
-import('recipe/common.php');
-import('contrib/cachetool.php');
+require 'recipe/common.php';
+require 'contrib/cachetool.php';
 
 set('shared_dirs', [
     'var/log',
