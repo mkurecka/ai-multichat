@@ -125,7 +125,7 @@ install.php.ci:
         - small
 
 build.frontend:
-    stage: .build
+    extends: .build
     image: node:20
     cache:
         <<: *node-cache
