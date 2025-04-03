@@ -79,7 +79,7 @@ task(TASK_ASSET_MAP_COMPILE, function () use ($projectPath): void {
 
 const TASK_INSTALL_DEPENDENCIES = 'install-dependencies';
 task(TASK_INSTALL_DEPENDENCIES, function () use ($projectPath): void {
-    run("cd {{release_path}}/$projectPath && composer install --no-dev --optimize-autoloader");
+    run("cd {{release_path}}/$projectPath && php composer.phar install --no-dev --optimize-autoloader");
 });
 
 set('cachetool_url', 'https://github.com/gordalina/cachetool/releases/download/9.2.1/cachetool.phar');
