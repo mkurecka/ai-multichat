@@ -46,7 +46,8 @@ task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
 
 const TASK_CLEAR_CACHE = 'clear-cache';
 task(TASK_CLEAR_CACHE, function () use ($projectPath): void {
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console cache:clear");
+    // Explicitly set environment to prod when clearing cache
+    run("cd {{release_path}}/$projectPath && APP_ENV=prod {{bin/php}} bin/console cache:clear --env=prod");
 });
 
 const TASK_RUN_MIGRATIONS = 'run-migrations';
@@ -79,7 +80,11 @@ task(TASK_ASSET_MAP_COMPILE, function () use ($projectPath): void {
 
 const TASK_INSTALL_DEPENDENCIES = 'install-dependencies';
 task(TASK_INSTALL_DEPENDENCIES, function () use ($projectPath): void {
-    run("cd {{release_path}}/$projectPath && php composer.phar install --no-dev --optimize-autoloader");
+    // Make sure APP_ENV is set to prod during deployment
+    run("cd {{release_path}}/$projectPath && APP_ENV=prod composer install --no-dev --optimize-autoloader");
+    
+    // Ensure .env.local has APP_ENV=prod
+    run("if [ -f {{release_path}}/$projectPath/.env.local ]; then grep -q 'APP_ENV=' {{release_path}}/$projectPath/.env.local && sed -i 's/APP_ENV=.*/APP_ENV=prod/' {{release_path}}/$projectPath/.env.local || echo 'APP_ENV=prod' >> {{release_path}}/$projectPath/.env.local; fi");
 });
 
 set('cachetool_url', 'https://github.com/gordalina/cachetool/releases/download/9.2.1/cachetool.phar');
