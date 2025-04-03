@@ -21,6 +21,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
 
 class GoogleAuthenticator extends OAuth2Authenticator
 {
+    private string $frontendUrl;
 
     public function __construct(
         private ClientRegistry $clientRegistry,
@@ -29,6 +30,7 @@ class GoogleAuthenticator extends OAuth2Authenticator
         private OrganizationRepository $organizationRepository,
         private EntityManagerInterface $entityManager,
     ) {
+        $this->frontendUrl = $_ENV['VITE_BASE_URL'] ?? 'http://localhost:5173';
     }
 
     public function supports(Request $request): ?bool
@@ -103,7 +105,7 @@ class GoogleAuthenticator extends OAuth2Authenticator
     {
         // Redirect to frontend with error
         return new RedirectResponse(
-            ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=' . urlencode($exception->getMessage())
+            $this->frontendUrl . '/callback?error=' . urlencode($exception->getMessage())
         );
     }
 }
