@@ -16,7 +16,7 @@
         - backend/vendor/
     policy: pull
 
-.frontend-cache: &frontend-cache
+.node-cache: &node-cache
     key:
         prefix: frontend
         files:
@@ -26,7 +26,7 @@
     policy: pull
 
 default:
-    image: $CI_REGISTRY/sk/docker-php:8.4
+    image: $CI_REGISTRY/sk/docker-php:8.3
     interruptible: true
     tags:
         - arm
@@ -52,13 +52,6 @@ workflow:
 ###
 .install.node:
     stage: install
-    rules:
-        -   changes:
-                paths:
-                    - frontend/package-lock.json
-                compare_to: master
-        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
-    image: node:20
     script:
         - cd frontend
         - npm ci --cache .npm --prefer-offline --no-audit --fund=false
@@ -68,12 +61,16 @@ workflow:
 
 install.node.frontend:
     extends: .install.node
+    rules:
+        - changes:
+              paths:
+                  - frontend/package-lock.json
+              compare_to: master
+        - if: $CI_COMMIT_MESSAGE =~ /\[install\]/
+    image: node:20
     cache:
-        <<: *frontend-cache
+        <<: *node-cache
         policy: push
-    artifacts:
-        paths:
-            - frontend/node_modules
 
 .install.php:
     stage: install
@@ -128,10 +125,10 @@ install.php.ci:
         - small
 
 build.frontend:
-    stage: build
+    stage: .build
     image: node:20
     cache:
-        <<: *frontend-cache
+        <<: *node-cache
     needs:
         - job: install.node.frontend
           optional: true
