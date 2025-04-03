@@ -50,6 +50,23 @@ workflow:
         -   if: $CI_COMMIT_TAG =~ /^prod-/
 
 ###
+.install.frontend:
+    stage: install
+    rules:
+        -   changes:
+                - frontend/package-lock.json
+        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
+    image: node:20
+    script:
+        - cd frontend
+        - npm ci
+    cache:
+        <<: *frontend-cache
+        policy: push
+    artifacts:
+        paths:
+            - frontend/node_modules
+
 .install.php:
     stage: install
     rules:
@@ -75,23 +92,6 @@ install.php.ci:
     script:
         - cd backend
         - php composer.phar install --no-interaction --ansi
-
-.install.frontend:
-    stage: install
-    rules:
-        -   changes:
-                - frontend/package-lock.json
-        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
-    image: node:20
-    script:
-        - cd frontend
-        - npm ci
-    cache:
-        <<: *frontend-cache
-        policy: push
-    artifacts:
-        paths:
-            - frontend/node_modules
 
 .test.php:
     stage: test
