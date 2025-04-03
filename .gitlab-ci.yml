@@ -153,7 +153,11 @@ build.frontend:
         - chmod 644 ~/.ssh/known_hosts
         - cp "$DEPLOYMENT_KEY" ~/.ssh/id_ed25519
         - chmod 400 ~/.ssh/id_ed25519
-        # Copy frontend build to backend public
+        # Make sure frontend/dist exists in the backend directory
+        - mkdir -p backend/frontend
+        - cp -r frontend/dist backend/frontend/
+        # Also copy to the expected location for the deployment script
+        - mkdir -p backend/public
         - cp -r frontend/dist/* backend/public/
 
 deploy.stage:

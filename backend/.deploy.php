@@ -46,8 +46,23 @@ task(TASK_COPY_APPLICATION, function (): void {
 
 const TASK_COPY_FRONTEND = 'copy-frontend';
 task(TASK_COPY_FRONTEND, function (): void {
+    // Create the public directory
+    run("mkdir -p {{release_path}}/public");
+    
     // Copy frontend assets to the public directory
-    upload('frontend/dist', '{{release_path}}/public');
+    // Use absolute path since we're in the backend directory
+    $frontendDistPath = dirname(__DIR__) . '/frontend/dist';
+    if (is_dir($frontendDistPath)) {
+        upload($frontendDistPath . '/', '{{release_path}}/public/');
+    } else {
+        writeln("<comment>Warning: Frontend dist directory not found at $frontendDistPath</comment>");
+        // Try relative path from current directory
+        if (is_dir('../frontend/dist')) {
+            upload('../frontend/dist/', '{{release_path}}/public/');
+        } else {
+            writeln("<error>Error: Could not find frontend/dist directory</error>");
+        }
+    }
 });
 
 const TASK_CLEAR_CACHE = 'clear-cache';
