@@ -118,12 +118,11 @@ deploy.stage:
         name: stage
         url: https://chat-stage.www6.superkoderi.cz
     script:
-        #- cd backend
+        - cd backend
         #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
         - dep --version
-        - dep -f backend/.deploy.php list
         - dep list
-        - dep -f backend/.deploy.php deploy -vvv
+        - dep deploy -vvv
 
 
 # deploy.production:
