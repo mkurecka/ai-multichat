@@ -41,7 +41,7 @@ host('host')
 const TASK_COPY_APPLICATION = 'copy-application';
 task(TASK_COPY_APPLICATION, function (): void {
     // Only upload the backend directory as the root
-    upload('backend', '{{release_path}}');
+    upload('.', '{{release_path}}');
 });
 
 const TASK_COPY_FRONTEND = 'copy-frontend';
