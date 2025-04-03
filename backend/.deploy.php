@@ -47,7 +47,6 @@ task(TASK_COPY_APPLICATION, function (): void {
 const TASK_COPY_FRONTEND = 'copy-frontend';
 task(TASK_COPY_FRONTEND, function (): void {
     // Copy frontend assets to the public directory
-    run("mkdir -p {{release_path}}/public");
     upload('frontend/dist', '{{release_path}}/public');
 });
 
