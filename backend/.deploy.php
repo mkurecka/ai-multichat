@@ -50,35 +50,35 @@ task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
 
 const TASK_CLEAR_CACHE = 'clear-cache';
 task(TASK_CLEAR_CACHE, function () use ($projectPath): void {
-    run('{{bin/php}} {{release_path}}/bin/console cache:clear');
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console cache:clear");
 });
 
 const TASK_RUN_MIGRATIONS = 'run-migrations';
 task(TASK_RUN_MIGRATIONS, function () use ($env, $projectPath): void {
     $options = '--allow-no-migration';
-    run("{{bin/php}} {{release_path}}/bin/console doctrine:migrations:migrate $options {{console_options}}");
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console doctrine:migrations:migrate $options {{console_options}}");
 });
 
 const TASK_SCHEMA_UPDATE = 'schema-update';
 task(TASK_SCHEMA_UPDATE, function () use ($env, $projectPath): void {
     $options = '--force';
-    run("{{bin/php}} {{release_path}}/bin/console doctrine:schema:update $options {{console_options}}");
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console doctrine:schema:update $options {{console_options}}");
 });
 
 const TASK_VALIDATE_MAPPING = 'validate-mapping';
 task(TASK_VALIDATE_MAPPING, function () use ($env, $projectPath): void {
-    run("{{bin/php}} {{release_path}}/bin/console doctrine:schema:validate {{console_options}}");
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console doctrine:schema:validate {{console_options}}");
 });
 
 const TASK_WARM_UP_CACHE = 'warm-up-cache';
 task(TASK_WARM_UP_CACHE, function () use ($projectPath): void {
-    run('{{bin/php}} {{release_path}}/bin/console cache:warmup');
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console cache:warmup");
 });
 
 const TASK_ASSET_MAP_COMPILE = 'asset-map-compile';
 task(TASK_ASSET_MAP_COMPILE, function () use ($projectPath): void {
-    run('{{bin/php}} {{release_path}}/bin/console importmap:install');
-    run('{{bin/php}} {{release_path}}/bin/console asset-map:compile');
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console importmap:install");
+    run("{{bin/php}} {{release_path}}/$projectPath/bin/console asset-map:compile");
 });
 
 set('cachetool_url', 'https://github.com/gordalina/cachetool/releases/download/9.2.1/cachetool.phar');
