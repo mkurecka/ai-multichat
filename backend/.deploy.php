@@ -47,7 +47,7 @@ task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
 const TASK_CLEAR_CACHE = 'clear-cache';
 task(TASK_CLEAR_CACHE, function () use ($projectPath): void {
     // Explicitly set environment to prod when clearing cache
-    run("cd {{release_path}}/$projectPath && APP_ENV=prod {{bin/php}} bin/console cache:clear --env=prod");
+    run("cd {{release_path}}/$projectPath && {{bin/php}} bin/console cache:clear --env=prod");
 });
 
 const TASK_RUN_MIGRATIONS = 'run-migrations';
