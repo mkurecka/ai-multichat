@@ -11,7 +11,7 @@ class HomeController extends AbstractController
     #[Route('/', name: 'app_home')]
     public function index(): Response
     {
-        // Redirect to frontend instead of rendering a template
-        return $this->redirect($this->getParameter('frontend_url'));
+        // Serve the frontend's index.html
+        return new Response(file_get_contents($this->getParameter('kernel.project_dir') . '/public/index.html'));
     }
 }
