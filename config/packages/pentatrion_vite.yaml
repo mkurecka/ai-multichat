@@ -1,0 +1,24 @@
+pentatrion_vite:
+    # Path to the build directory, relative to the project root
+    build_directory: 'public/build'
+    # Public directory (defaults to 'public')
+    public_directory: 'public'
+    # Default configuration for the script tags
+    script_attributes:
+        defer: true
+    # Default configuration for the style tags
+    link_attributes: {}
+    # If you use TypeScript and need to check your bundles
+    throw_on_missing_entry: true
+    # If you want to throw an exception when an asset is missing
+    throw_on_missing_asset: true
+    # Cache the manifest in production
+    cache: '%kernel.debug%'
+    # Preload assets
+    preload: 'link-tag'
+    # Set crossorigin attribute for preload tags
+    crossorigin: 'anonymous'
+    # Use absolute URLs
+    absolute_url: false
+    # Proxy origin for development server
+    proxy_origin: null

@@ -3,11 +3,8 @@
 {% block title %}Home{% endblock %}
 
 {% block body %}
-    <h1>Welcome</h1>
-    {% if app.user %}
-        <p>Hello {{ app.user.email }}!</p>
-        <a href="{{ path('app_logout') }}">Logout</a>
-    {% else %}
-        <a href="{{ path('app_login') }}">Login with Google</a>
-    {% endif %}
+    <div class="container">
+        <h1>Welcome to the Homepage</h1>
+        <p>This page is now using Vite for asset management!</p>
+    </div>
 {% endblock %}

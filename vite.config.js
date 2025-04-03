@@ -1,14 +1,16 @@
 import { defineConfig } from "vite";
 import symfonyPlugin from "vite-plugin-symfony";
-
-/* if you're using React */
-// import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
     plugins: [
-        /* react(), // if you're using React */
         symfonyPlugin(),
     ],
+    resolve: {
+        alias: {
+            '@symfony/stimulus-bundle': path.resolve(__dirname, 'vendor/symfony/stimulus-bundle/assets/dist/loader.js'),
+        }
+    },
     build: {
         rollupOptions: {
             input: {
@@ -16,4 +18,14 @@ export default defineConfig({
             },
         }
     },
+    server: {
+        port: 5173,
+        https: false,
+        hmr: {
+            host: 'localhost',
+        },
+        watch: {
+            usePolling: true
+        }
+    }
 });
