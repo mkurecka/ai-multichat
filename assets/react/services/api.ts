@@ -4,7 +4,7 @@ import { Message, Model, UsageData } from '../types';
 
 // Create an Axios instance with the base URL of your Symfony backend
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  baseURL: '/api', // Changed to relative path
   headers: {
     'Content-Type': 'application/json',
   },
@@ -124,7 +124,7 @@ export const refreshToken = async (): Promise<boolean> => {
     
     // Create a new axios instance to avoid interceptors that might cause infinite loops
     const refreshApi = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+      baseURL: '/api', // Changed to relative path
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${currentToken}`

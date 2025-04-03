@@ -9,11 +9,13 @@
             {{ vite_entry_link_tags('app') }}
         {% endblock %}
 
-        {% block javascripts %}
-            {{ vite_entry_script_tags('app') }}
-        {% endblock %}
+        {# Javascripts block moved below #}
     </head>
     <body>
-        {% block body %}{% endblock %}
+        <div id="root">{% block body %}{% endblock %}</div> {# Added root div and wrapped body block #}
+
+        {% block javascripts %}
+            {{ vite_entry_script_tags('app') }} {# Updated entry point name #}
+        {% endblock %}
     </body>
 </html>

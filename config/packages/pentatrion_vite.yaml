@@ -1,11 +1,15 @@
 pentatrion_vite:
-    # Path to the build directory, relative to the project root
-    build_directory: 'public/build'
+    # Default build name (can be omitted if you only have one build)
+    default_build: default
+    builds:
+        default:
+            # Optional: Output configuration
+            build_directory: 'build'
     # Public directory (defaults to 'public')
     public_directory: 'public'
     # Default configuration for the script tags
     script_attributes:
-        defer: true
+        type: 'module'
     # Default configuration for the style tags
     link_attributes: {}
     # If you use TypeScript and need to check your bundles
@@ -19,6 +23,6 @@ pentatrion_vite:
     # Set crossorigin attribute for preload tags
     crossorigin: 'anonymous'
     # Use absolute URLs
-    absolute_url: false
+    absolute_url: '%kernel.debug%'
     # Proxy origin for development server
-    proxy_origin: null
+    proxy_origin: '%env(VITE_BASE_URL)%'

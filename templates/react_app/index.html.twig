@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}React App{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {{ vite_entry_link_tags('react_app') }}
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('react_app') }}
+{% endblock %}
+
+{% block body %}
+    <div id="root"></div>
+{% endblock %}

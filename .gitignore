@@ -28,7 +28,7 @@ logs/
 vendor
 var
 
-frontend/node_modules
+/frontend/node_modules
 ###> pentatrion/vite-bundle ###
 /node_modules/
 /public/build/

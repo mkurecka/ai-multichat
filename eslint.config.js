@@ -5,10 +5,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'public/build', 'vendor'] }, // Added public/build and vendor to ignores
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
+    files: ['assets/react/**/*.{ts,tsx}'], // Updated path
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

@@ -477,4 +477,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; // Reverted to default export

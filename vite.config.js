@@ -1,21 +1,32 @@
 import { defineConfig } from "vite";
 import symfonyPlugin from "vite-plugin-symfony";
+import react from '@vitejs/plugin-react';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [
-        symfonyPlugin(),
+        react(),
+        symfonyPlugin({
+            buildDirectory: 'build',
+            publicDirectory: 'public',
+            refresh: true,
+        }),
     ],
+    optimizeDeps: {
+        exclude: ['lucide-react'],
+    },
     resolve: {
         alias: {
-            '@symfony/stimulus-bundle': path.resolve(__dirname, 'vendor/symfony/stimulus-bundle/assets/dist/loader.js'),
-        }
+            '@': path.resolve(__dirname, './assets/react'),
+        },
+        extensions: ['.tsx', '.ts', '.jsx', '.js', '.json']
     },
     build: {
+        manifest: true,
         rollupOptions: {
             input: {
-                app: "./assets/app.js"
-            },
+                app: path.resolve(__dirname, 'assets/react/index.tsx')
+            }
         }
     },
     server: {
@@ -27,5 +38,6 @@ export default defineConfig({
         watch: {
             usePolling: true
         }
-    }
-});
+    },
+    base: mode === 'production' ? '/build/' : '/'
+}));

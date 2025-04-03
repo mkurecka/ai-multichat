@@ -2,7 +2,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import App from './App';
+import App from './App'; // Reverted to default import
 import Login from './components/Login';
 import Callback from './components/Callback';
 import CostsPage from './components/CostsPage';
