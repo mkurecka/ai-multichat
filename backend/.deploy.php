@@ -46,7 +46,8 @@ task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
 
 const TASK_COPY_FRONTEND = 'copy-frontend';
 task(TASK_COPY_FRONTEND, function () use ($projectPath): void {
-    run("cp -r {{release_path}}/frontend/dist/* {{release_path}}/$projectPath/public/");
+    run("mkdir -p {{release_path}}/$projectPath/public/frontend");
+    run("cp -r {{release_path}}/frontend/dist/* {{release_path}}/$projectPath/public/frontend/");
 });
 
 const TASK_CLEAR_CACHE = 'clear-cache';
@@ -110,7 +111,6 @@ task('deploy', [
     'deploy:shared',
     'deploy:writable',
     TASK_INSTALL_DEPENDENCIES,
-    //TASK_VALIDATE_MAPPING,
     TASK_SCHEMA_UPDATE,
     TASK_WARM_UP_CACHE,
 
