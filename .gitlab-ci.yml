@@ -16,6 +16,15 @@
         - backend/vendor/
     policy: pull
 
+.frontend-cache: &frontend-cache
+    key:
+        prefix: frontend
+        files:
+            - frontend/package-lock.json
+    paths:
+        - frontend/node_modules/
+    policy: pull
+
 default:
     image: $CI_REGISTRY/sk/docker-php:8.4
     interruptible: true
@@ -26,6 +35,7 @@ default:
 stages:
     - install
     - test
+    - build
     - deploy
 
 variables:
@@ -66,13 +76,22 @@ install.php.ci:
         - cd backend
         - php composer.phar install --no-interaction --ansi
 
-#install.php.prod:
-#    extends: .install.php
-#    cache:
-#        <<: *php-prod-cache
-#        policy: push
-#    script:
-#        - composer install --no-interaction --ansi --prefer-dist --optimize-autoloader
+.install.frontend:
+    stage: install
+    rules:
+        -   changes:
+                - frontend/package-lock.json
+        -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
+    image: node:20
+    script:
+        - cd frontend
+        - npm ci
+    cache:
+        <<: *frontend-cache
+        policy: push
+    artifacts:
+        paths:
+            - frontend/node_modules
 
 .test.php:
     stage: test
@@ -92,6 +111,21 @@ install.php.ci:
 #        - arm
 #        - large
 
+.build.frontend:
+    stage: build
+    image: node:20
+    cache:
+        <<: *frontend-cache
+    needs:
+        - job: .install.frontend
+    script:
+        - cd frontend
+        - npm run build
+    artifacts:
+        paths:
+            - frontend/dist
+        expire_in: 1 week
+
 .deploy:
     stage: deploy
     image: $CI_REGISTRY/sk/docker-php-deployer:v7.3.3
@@ -100,8 +134,7 @@ install.php.ci:
     cache:
         <<: *php-prod-cache
     dependencies:
-        #- build.admin
-        #- build.frontend
+        - build.frontend
     before_script:
         - mkdir -p ~/.ssh
         - chmod 700 ~/.ssh
