@@ -103,7 +103,7 @@ const TASK_INSTALL_DEPENDENCIES = 'install-dependencies';
 task(TASK_INSTALL_DEPENDENCIES, function (): void {
     // Make sure APP_ENV is set to prod during deployment
     run("cd {{release_path}} && APP_ENV=prod php composer.phar install --no-dev --optimize-autoloader");
-    
+
     // Ensure .env.local has APP_ENV=prod
     run("if [ -f {{release_path}}/.env.local ]; then grep -q 'APP_ENV=' {{release_path}}/.env.local && sed -i 's/APP_ENV=.*/APP_ENV=prod/' {{release_path}}/.env.local || echo 'APP_ENV=prod' >> {{release_path}}/.env.local; fi");
 });
@@ -138,8 +138,8 @@ task('deploy', [
     'deploy:success',
 ]);
 
-after('deploy:symlink', 'cachetool:clear:opcache');
-after('deploy:symlink', 'cachetool:clear:stat');
+//after('deploy:symlink', 'cachetool:clear:opcache');
+//after('deploy:symlink', 'cachetool:clear:stat');
 after('deploy:symlink', TASK_CLEAR_CACHE);
 
 after('deploy:failed', 'deploy:unlock');
