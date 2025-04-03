@@ -111,7 +111,7 @@ install.php.ci:
 #        - arm
 #        - large
 
-.build.frontend:
+build.frontend:
     stage: build
     image: node:20
     cache:
