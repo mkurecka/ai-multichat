@@ -54,12 +54,20 @@ workflow:
     stage: install
     rules:
         -   changes:
-                - frontend/package-lock.json
+                paths:
+                    - frontend/package-lock.json
+                compare_to: master
         -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
     image: node:20
     script:
         - cd frontend
         - npm ci
+    tags:
+        - x86
+        - large
+
+install.frontend:
+    extends: .install.frontend
     cache:
         <<: *frontend-cache
         policy: push
@@ -117,7 +125,8 @@ build.frontend:
     cache:
         <<: *frontend-cache
     needs:
-        - job: .install.frontend
+        - job: install.frontend
+          optional: true
     script:
         - cd frontend
         - npm run build
