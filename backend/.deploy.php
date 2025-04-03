@@ -44,6 +44,11 @@ task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
     upload('..', '{{release_path}}', $config);
 });
 
+const TASK_COPY_FRONTEND = 'copy-frontend';
+task(TASK_COPY_FRONTEND, function () use ($projectPath): void {
+    run("cp -r {{release_path}}/frontend/dist/* {{release_path}}/$projectPath/public/");
+});
+
 const TASK_CLEAR_CACHE = 'clear-cache';
 task(TASK_CLEAR_CACHE, function () use ($projectPath): void {
     // Explicitly set environment to prod when clearing cache
@@ -99,6 +104,7 @@ task('deploy', [
     // copy
     'deploy:copy_dirs',
     TASK_COPY_APPLICATION,
+    TASK_COPY_FRONTEND,
 
     // set up files and directories
     'deploy:shared',
