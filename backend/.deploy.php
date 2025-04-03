@@ -34,7 +34,7 @@ $env = getenv();
 host('host')
     ->set('hostname', $env['DEPLOYMENT_HOSTNAME'])
     ->set('remote_user', $env['DEPLOYMENT_USER'])
-    ->set('deploy_path', $env['DEPLOYMENT_PATH'])
+    ->set('deploy_path', $env['DEPLOYMENT_PATH'] . '/' . $projectPath)
     ->set('cachetool_args', sprintf(
         '--web=SymfonyHttpClient --web-path=%s --web-url=%s',
         escapeshellarg(sprintf('%s/current/www', rtrim($env['DEPLOYMENT_PATH'], '/'))),
@@ -45,7 +45,9 @@ host('host')
 const TASK_COPY_APPLICATION = 'copy-application';
 task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
     $config = ['options' => ["--exclude-from=excludeFromDeploy"]];
-    upload('.', '{{release_path}}', $config);
+    // Upload to a 'backend' subdirectory within the release path
+    run("mkdir -p {{release_path}}/$projectPath");
+    upload('.', "{{release_path}}/$projectPath", $config);
 });
 
 const TASK_CLEAR_CACHE = 'clear-cache';
