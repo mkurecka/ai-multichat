@@ -5,26 +5,27 @@ use function Deployer\{after, get, host, import, run, set, task, upload, writeln
 require 'recipe/common.php';
 require 'contrib/cachetool.php';
 
-$projectPath = 'backend';
+// No project path prefix since we want the backend to be the root
+$projectPath = '';
 
 set('shared_dirs', [
-    "$projectPath/var/log",
-    "$projectPath/config/jwt",
-    "$projectPath/data",
+    "var/log",
+    "config/jwt",
+    "data",
 ]);
 
 set('shared_files', [
-    "$projectPath/.env.local",
+    ".env.local",
 ]);
 
 set('writable_dirs', [
-    "$projectPath/var",
-    "$projectPath/var/cache",
-    "$projectPath/var/log",
-    "$projectPath/var/sessions",
+    "var",
+    "var/cache",
+    "var/log",
+    "var/sessions",
 ]);
 
-set('log_files', "$projectPath/var/log/*.log");
+set('log_files', "var/log/*.log");
 
 set('console_options', function () {
     return '--no-interaction';
@@ -38,59 +39,59 @@ host('host')
     ->set('php_version', $env['DEPLOYMENT_PHP_VERSION']);
 
 const TASK_COPY_APPLICATION = 'copy-application';
-task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
-    $config = ['options' => ["--exclude-from=excludeFromDeploy"]];
-    // Go up one directory to get the root of the repository
-    upload('..', '{{release_path}}', $config);
+task(TASK_COPY_APPLICATION, function (): void {
+    // Only upload the backend directory as the root
+    upload('backend', '{{release_path}}');
 });
 
 const TASK_COPY_FRONTEND = 'copy-frontend';
-task(TASK_COPY_FRONTEND, function () use ($projectPath): void {
-    run("mkdir -p {{release_path}}/$projectPath/public/frontend");
-    run("cp -r {{release_path}}/frontend/dist/* {{release_path}}/$projectPath/public/frontend/");
+task(TASK_COPY_FRONTEND, function (): void {
+    // Copy frontend assets to the public directory
+    run("mkdir -p {{release_path}}/public");
+    upload('frontend/dist', '{{release_path}}/public');
 });
 
 const TASK_CLEAR_CACHE = 'clear-cache';
-task(TASK_CLEAR_CACHE, function () use ($projectPath): void {
+task(TASK_CLEAR_CACHE, function (): void {
     // Explicitly set environment to prod when clearing cache
-    run("cd {{release_path}}/$projectPath && {{bin/php}} bin/console cache:clear --env=prod");
+    run("cd {{release_path}} && APP_ENV=prod {{bin/php}} bin/console cache:clear --env=prod");
 });
 
 const TASK_RUN_MIGRATIONS = 'run-migrations';
-task(TASK_RUN_MIGRATIONS, function () use ($env, $projectPath): void {
+task(TASK_RUN_MIGRATIONS, function () use ($env): void {
     $options = '--allow-no-migration';
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console doctrine:migrations:migrate $options {{console_options}}");
+    run("{{bin/php}} {{release_path}}/bin/console doctrine:migrations:migrate $options {{console_options}}");
 });
 
 const TASK_SCHEMA_UPDATE = 'schema-update';
-task(TASK_SCHEMA_UPDATE, function () use ($env, $projectPath): void {
+task(TASK_SCHEMA_UPDATE, function () use ($env): void {
     $options = '--force';
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console doctrine:schema:update $options {{console_options}}");
+    run("{{bin/php}} {{release_path}}/bin/console doctrine:schema:update $options {{console_options}}");
 });
 
 const TASK_VALIDATE_MAPPING = 'validate-mapping';
-task(TASK_VALIDATE_MAPPING, function () use ($env, $projectPath): void {
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console doctrine:schema:validate {{console_options}}");
+task(TASK_VALIDATE_MAPPING, function () use ($env): void {
+    run("{{bin/php}} {{release_path}}/bin/console doctrine:schema:validate {{console_options}}");
 });
 
 const TASK_WARM_UP_CACHE = 'warm-up-cache';
-task(TASK_WARM_UP_CACHE, function () use ($projectPath): void {
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console cache:warmup");
+task(TASK_WARM_UP_CACHE, function (): void {
+    run("{{bin/php}} {{release_path}}/bin/console cache:warmup");
 });
 
 const TASK_ASSET_MAP_COMPILE = 'asset-map-compile';
-task(TASK_ASSET_MAP_COMPILE, function () use ($projectPath): void {
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console importmap:install");
-    run("{{bin/php}} {{release_path}}/$projectPath/bin/console asset-map:compile");
+task(TASK_ASSET_MAP_COMPILE, function (): void {
+    run("{{bin/php}} {{release_path}}/bin/console importmap:install");
+    run("{{bin/php}} {{release_path}}/bin/console asset-map:compile");
 });
 
 const TASK_INSTALL_DEPENDENCIES = 'install-dependencies';
-task(TASK_INSTALL_DEPENDENCIES, function () use ($projectPath): void {
+task(TASK_INSTALL_DEPENDENCIES, function (): void {
     // Make sure APP_ENV is set to prod during deployment
-    run("cd {{release_path}}/$projectPath && APP_ENV=prod php composer.phar install --no-dev --optimize-autoloader");
+    run("cd {{release_path}} && APP_ENV=prod composer install --no-dev --optimize-autoloader");
     
     // Ensure .env.local has APP_ENV=prod
-    run("if [ -f {{release_path}}/$projectPath/.env.local ]; then grep -q 'APP_ENV=' {{release_path}}/$projectPath/.env.local && sed -i 's/APP_ENV=.*/APP_ENV=prod/' {{release_path}}/$projectPath/.env.local || echo 'APP_ENV=prod' >> {{release_path}}/$projectPath/.env.local; fi");
+    run("if [ -f {{release_path}}/.env.local ]; then grep -q 'APP_ENV=' {{release_path}}/.env.local && sed -i 's/APP_ENV=.*/APP_ENV=prod/' {{release_path}}/.env.local || echo 'APP_ENV=prod' >> {{release_path}}/.env.local; fi");
 });
 
 set('cachetool_url', 'https://github.com/gordalina/cachetool/releases/download/9.2.1/cachetool.phar');
@@ -123,8 +124,8 @@ task('deploy', [
     'deploy:success',
 ]);
 
-//after('deploy:symlink', 'cachetool:clear:opcache');
-//after('deploy:symlink', 'cachetool:clear:stat');
+after('deploy:symlink', 'cachetool:clear:opcache');
+after('deploy:symlink', 'cachetool:clear:stat');
 after('deploy:symlink', TASK_CLEAR_CACHE);
 
 after('deploy:failed', 'deploy:unlock');
