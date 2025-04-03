@@ -28,7 +28,7 @@ set('console_options', function () {
     return '--no-interaction';
 });
 
-$projectPath = 'backend/';
+$projectPath = 'backend';
 
 $env = getenv();
 host('host')
