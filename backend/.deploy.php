@@ -117,8 +117,8 @@ task('deploy', [
     'deploy:success',
 ]);
 
-after('deploy:symlink', 'cachetool:clear:opcache');
-after('deploy:symlink', 'cachetool:clear:stat');
+//after('deploy:symlink', 'cachetool:clear:opcache');
+//after('deploy:symlink', 'cachetool:clear:stat');
 after('deploy:symlink', TASK_CLEAR_CACHE);
 
 after('deploy:failed', 'deploy:unlock');
