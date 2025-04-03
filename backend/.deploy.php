@@ -28,6 +28,8 @@ set('console_options', function () {
     return '--no-interaction';
 });
 
+$projectPath = 'backend/';
+
 $env = getenv();
 host('host')
     ->set('hostname', $env['DEPLOYMENT_HOSTNAME'])
@@ -41,40 +43,40 @@ host('host')
     ->set('php_version', $env['DEPLOYMENT_PHP_VERSION']);
 
 const TASK_COPY_APPLICATION = 'copy-application';
-task(TASK_COPY_APPLICATION, function (): void {
+task(TASK_COPY_APPLICATION, function () use ($projectPath): void {
     $config = ['options' => ["--exclude-from=excludeFromDeploy"]];
     upload('.', '{{release_path}}', $config);
 });
 
 const TASK_CLEAR_CACHE = 'clear-cache';
-task(TASK_CLEAR_CACHE, function (): void {
+task(TASK_CLEAR_CACHE, function () use ($projectPath): void {
     run('{{bin/php}} {{release_path}}/bin/console cache:clear');
 });
 
 const TASK_RUN_MIGRATIONS = 'run-migrations';
-task(TASK_RUN_MIGRATIONS, function () use ($env): void {
+task(TASK_RUN_MIGRATIONS, function () use ($env, $projectPath): void {
     $options = '--allow-no-migration';
     run("{{bin/php}} {{release_path}}/bin/console doctrine:migrations:migrate $options {{console_options}}");
 });
 
 const TASK_SCHEMA_UPDATE = 'schema-update';
-task(TASK_SCHEMA_UPDATE, function () use ($env): void {
+task(TASK_SCHEMA_UPDATE, function () use ($env, $projectPath): void {
     $options = '--force';
     run("{{bin/php}} {{release_path}}/bin/console doctrine:schema:update $options {{console_options}}");
 });
 
 const TASK_VALIDATE_MAPPING = 'validate-mapping';
-task(TASK_VALIDATE_MAPPING, function () use ($env): void {
+task(TASK_VALIDATE_MAPPING, function () use ($env, $projectPath): void {
     run("{{bin/php}} {{release_path}}/bin/console doctrine:schema:validate {{console_options}}");
 });
 
 const TASK_WARM_UP_CACHE = 'warm-up-cache';
-task(TASK_WARM_UP_CACHE, function (): void {
+task(TASK_WARM_UP_CACHE, function () use ($projectPath): void {
     run('{{bin/php}} {{release_path}}/bin/console cache:warmup');
 });
 
 const TASK_ASSET_MAP_COMPILE = 'asset-map-compile';
-task(TASK_ASSET_MAP_COMPILE, function (): void {
+task(TASK_ASSET_MAP_COMPILE, function () use ($projectPath): void {
     run('{{bin/php}} {{release_path}}/bin/console importmap:install');
     run('{{bin/php}} {{release_path}}/bin/console asset-map:compile');
 });
