@@ -2,27 +2,27 @@
     key:
         prefix: php
         files:
-            - backend/composer.lock
+            - composer.lock
     paths:
-        - backend/vendor/
+        - vendor/
     policy: pull
 
 .php-prod-cache: &php-prod-cache
     key:
         prefix: php-prod
         files:
-            - backend/composer.lock
+            - composer.lock
     paths:
-        - backend/vendor/
+        - vendor/
     policy: pull
 
 .node-cache: &node-cache
     key:
-        prefix: frontend
+        prefix: node
         files:
-            - frontend/package-lock.json
+            - package-lock.json
     paths:
-        - frontend/node_modules/
+        - node_modules/
     policy: pull
 
 default:
@@ -53,18 +53,17 @@ workflow:
 .install.node:
     stage: install
     script:
-        - cd frontend
         - npm ci --cache .npm --prefer-offline --no-audit --fund=false
     tags:
         - x86
         - large
 
-install.node.frontend:
+install.node:
     extends: .install.node
     rules:
         - changes:
               paths:
-                  - frontend/package-lock.json
+                  - package-lock.json
               compare_to: master
         - if: $CI_COMMIT_MESSAGE =~ /\[install\]/
     image: node:20
@@ -76,10 +75,9 @@ install.node.frontend:
     stage: install
     rules:
         -   changes:
-                - backend/composer.lock
+                - composer.lock
         -   if: $CI_COMMIT_MESSAGE =~ /\[install\]/
     script:
-        - cd backend
         - php composer.phar config -g cache-dir "$CI_PROJECT_DIR/.composer-cache"
         - php composer.phar install --prefer-dist --no-progress --no-interaction --no-scripts
     tags:
@@ -87,7 +85,7 @@ install.node.frontend:
         - large
     artifacts:
         paths:
-            - backend/vendor
+            - vendor
 
 install.php.ci:
     extends: .install.php
@@ -95,7 +93,6 @@ install.php.ci:
         <<: *php-cache
         policy: push
     script:
-        - cd backend
         - php composer.phar install --no-interaction --ansi
 
 .test.php:
@@ -106,7 +103,7 @@ install.php.ci:
         -   job: install.php.ci
             optional: true
     before_script:
-        - cd backend
+        - php -v
 
 #test.php.phpstan:
 #    extends: .test.php
@@ -115,10 +112,10 @@ install.php.ci:
 #    tags:
 #        - arm
 #        - large
+
 .build:
     stage: build
     script:
-        - cd frontend
         - npm run build
     tags:
         - x86
@@ -130,11 +127,11 @@ build.frontend:
     cache:
         <<: *node-cache
     needs:
-        - job: install.node.frontend
+        - job: install.node
           optional: true
     artifacts:
         paths:
-            - frontend/dist
+            - public/build
         expire_in: 1 week
 
 .deploy:
@@ -153,12 +150,6 @@ build.frontend:
         - chmod 644 ~/.ssh/known_hosts
         - cp "$DEPLOYMENT_KEY" ~/.ssh/id_ed25519
         - chmod 400 ~/.ssh/id_ed25519
-        # Make sure frontend/dist exists in the backend directory
-        - mkdir -p backend/frontend
-        - cp -r frontend/dist backend/frontend/
-        # Also copy to the expected location for the deployment script
-        - mkdir -p backend/public
-        - cp -r frontend/dist/* backend/public/
 
 deploy.stage:
     extends: .deploy
@@ -168,7 +159,6 @@ deploy.stage:
         name: stage
         url: https://chat-stage.www6.superkoderi.cz
     script:
-        - cd backend
         - dep --version
         - dep -f .deploy.php deploy -vvv
 
@@ -181,5 +171,4 @@ deploy.stage:
 #         name: production
 #         url: https://chat-prod.www6.superkoderi.cz
 #     script:
-#         #- 'printf "parameters:\n\tconfig:\n\t\twebVersion: \"%s\"" $CI_COMMIT_SHORT_SHA > app/config/webVersion.neon'
 #         - dep -f .deploy.php deploy

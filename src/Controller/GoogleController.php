@@ -13,10 +13,12 @@ use Psr\Log\LoggerInterface;
 class GoogleController extends AbstractController
 {
     private LoggerInterface $logger;
+    private string $frontendUrl;
     
     public function __construct(LoggerInterface $logger)
     {
         $this->logger = $logger;
+        $this->frontendUrl = $_ENV['VITE_BASE_URL'] ?? 'http://localhost:5173';
     }
     
     #[Route('/connect/google', name: 'connect_google')]
@@ -40,7 +42,7 @@ class GoogleController extends AbstractController
         if (!$user) {
             // Redirect to frontend with error
             return $this->redirect(
-                ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=authentication_failed'
+                $this->frontendUrl . '/callback?error=authentication_failed'
             );
         }
         
@@ -50,7 +52,7 @@ class GoogleController extends AbstractController
             
             // Redirect to frontend with token
             return $this->redirect(
-                ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?token=' . $token
+                $this->frontendUrl . '/callback?token=' . $token
             );
         } catch (\Exception $e) {
             // Log the error
@@ -58,7 +60,7 @@ class GoogleController extends AbstractController
             
             // Redirect to login with error
             return $this->redirect(
-                ($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173') . '/callback?error=token_creation_failed'
+                $this->frontendUrl . '/callback?error=token_creation_failed'
             );
         }
     }

@@ -5,7 +5,7 @@ use function Deployer\{after, get, host, import, run, set, task, upload, writeln
 require 'recipe/common.php';
 require 'contrib/cachetool.php';
 
-// No project path prefix since we want the backend to be the root
+// Project path is now the root directory
 $projectPath = '';
 
 set('shared_dirs', [
@@ -40,27 +40,27 @@ host('host')
 
 const TASK_COPY_APPLICATION = 'copy-application';
 task(TASK_COPY_APPLICATION, function (): void {
-    // Only upload the backend directory as the root
+    // Upload the entire project as the root
     upload('.', '{{release_path}}');
 });
 
 const TASK_COPY_FRONTEND = 'copy-frontend';
 task(TASK_COPY_FRONTEND, function (): void {
-    // Create the public directory
-    run("mkdir -p {{release_path}}/public");
+    // Create the public/build directory
+    run("mkdir -p {{release_path}}/public/build");
     
-    // Copy frontend assets to the public directory
-    // Use absolute path since we're in the backend directory
-    $frontendDistPath = dirname(__DIR__) . '/frontend/dist';
-    if (is_dir($frontendDistPath)) {
-        upload($frontendDistPath . '/', '{{release_path}}/public/');
+    // Copy frontend assets to the public/build directory
+    // Use absolute path since we're in the project root
+    $frontendBuildPath = dirname(__DIR__) . '/public/build';
+    if (is_dir($frontendBuildPath)) {
+        upload($frontendBuildPath . '/', '{{release_path}}/public/build/');
     } else {
-        writeln("<comment>Warning: Frontend dist directory not found at $frontendDistPath</comment>");
+        writeln("<comment>Warning: Frontend build directory not found at $frontendBuildPath</comment>");
         // Try relative path from current directory
-        if (is_dir('../frontend/dist')) {
-            upload('../frontend/dist/', '{{release_path}}/public/');
+        if (is_dir('public/build')) {
+            upload('public/build/', '{{release_path}}/public/build/');
         } else {
-            writeln("<error>Error: Could not find frontend/dist directory</error>");
+            writeln("<error>Error: Could not find public/build directory</error>");
         }
     }
 });
@@ -91,12 +91,6 @@ task(TASK_VALIDATE_MAPPING, function () use ($env): void {
 const TASK_WARM_UP_CACHE = 'warm-up-cache';
 task(TASK_WARM_UP_CACHE, function (): void {
     run("{{bin/php}} {{release_path}}/bin/console cache:warmup");
-});
-
-const TASK_ASSET_MAP_COMPILE = 'asset-map-compile';
-task(TASK_ASSET_MAP_COMPILE, function (): void {
-    run("{{bin/php}} {{release_path}}/bin/console importmap:install");
-    run("{{bin/php}} {{release_path}}/bin/console asset-map:compile");
 });
 
 const TASK_INSTALL_DEPENDENCIES = 'install-dependencies';
@@ -138,8 +132,6 @@ task('deploy', [
     'deploy:success',
 ]);
 
-//after('deploy:symlink', 'cachetool:clear:opcache');
-//after('deploy:symlink', 'cachetool:clear:stat');
 after('deploy:symlink', TASK_CLEAR_CACHE);
 
 after('deploy:failed', 'deploy:unlock');

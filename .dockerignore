@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+node_modules
+vendor
+public/build
+var
+*.log
+docker-compose.yml
+docker
+README.md 
