@@ -33,9 +33,9 @@ api.interceptors.response.use(
     // Don't retry if the error is from the token refresh endpoint itself
     if (error.config.url?.includes('/token/refresh')) {
       localStorage.removeItem('token');
-      if (!window.location.pathname.includes('/login') && 
-          !window.location.pathname.includes('/callback')) {
-        window.location.href = '/login';
+      if (!window.location.pathname.includes('/app/login') && 
+          !window.location.pathname.includes('/app/callback')) {
+        window.location.href = '/app/login';
       }
       return Promise.reject(error);
     }
@@ -49,26 +49,26 @@ api.interceptors.response.use(
         const refreshed = await refreshToken();
         
         if (refreshed) {
-          // If token refresh was successful, retry the original request
-          const token = localStorage.getItem('token');
-          error.config.headers.Authorization = `Bearer ${token}`;
-          return axios(error.config);
+          // Retry the original request
+          const originalRequest = error.config;
+          return api(originalRequest);
         } else {
-          // If token refresh failed, redirect to login
-          if (!window.location.pathname.includes('/login') && 
-              !window.location.pathname.includes('/callback')) {
-            localStorage.removeItem('token');
-            window.location.href = '/login';
+          // If refresh failed, redirect to login
+          localStorage.removeItem('token');
+          if (!window.location.pathname.includes('/app/login') && 
+              !window.location.pathname.includes('/app/callback')) {
+            window.location.href = '/app/login';
           }
+          return Promise.reject(error);
         }
       } catch (refreshError) {
-        console.error('Error during token refresh:', refreshError);
-        // If there was an error refreshing the token, redirect to login
-        if (!window.location.pathname.includes('/login') && 
-            !window.location.pathname.includes('/callback')) {
-          localStorage.removeItem('token');
-          window.location.href = '/login';
+        // If refresh failed, redirect to login
+        localStorage.removeItem('token');
+        if (!window.location.pathname.includes('/app/login') && 
+            !window.location.pathname.includes('/app/callback')) {
+          window.location.href = '/app/login';
         }
+        return Promise.reject(refreshError);
       }
     }
     

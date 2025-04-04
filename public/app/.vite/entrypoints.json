@@ -1,9 +1,9 @@
 {
-  "base": "/",
+  "base": "/app/",
   "entryPoints": {
     "app": {
       "js": [
-        "http://[::1]:5173/assets/react/index.tsx"
+        "http://[::1]:5173/app/assets/react/index.tsx"
       ]
     }
   },

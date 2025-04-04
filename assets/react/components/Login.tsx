@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquare, Zap, Shield, Users } from 'lucide-react';
 
 const Login: React.FC = () => {
-    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     
@@ -10,6 +10,7 @@ const Login: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
+            // Redirect to the backend Google OAuth endpoint
             window.location.href = `${backendUrl}/connect/google`;
         } catch (err) {
             setError('Failed to initiate login. Please try again.');

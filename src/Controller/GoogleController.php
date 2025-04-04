@@ -18,7 +18,7 @@ class GoogleController extends AbstractController
     public function __construct(LoggerInterface $logger)
     {
         $this->logger = $logger;
-        $this->frontendUrl = $_ENV['VITE_BASE_URL'] ?? 'http://localhost:5173';
+        $this->frontendUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173';
     }
     
     #[Route('/connect/google', name: 'connect_google')]

@@ -11,17 +11,17 @@ import './index.css';
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const token = localStorage.getItem('token');
-    return token ? <>{children}</> : <Navigate to="/login" />;
+    return token ? <>{children}</> : <Navigate to="/app/login" />;
 };
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <Router>
             <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/callback" element={<Callback />} />
+                <Route path="/app/login" element={<Login />} />
+                <Route path="/app/callback" element={<Callback />} />
                 <Route
-                    path="/"
+                    path="/app"
                     element={
                         <ProtectedRoute>
                             <App />
@@ -29,13 +29,15 @@ createRoot(document.getElementById('root')!).render(
                     }
                 />
                 <Route
-                    path="/costs"
+                    path="/app/costs"
                     element={
                         <ProtectedRoute>
                             <CostsPage />
                         </ProtectedRoute>
                     }
                 />
+                {/* Redirect root to /app */}
+                <Route path="/" element={<Navigate to="/app" />} />
             </Routes>
         </Router>
     </StrictMode>

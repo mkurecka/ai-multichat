@@ -30,7 +30,7 @@ class GoogleAuthenticator extends OAuth2Authenticator
         private OrganizationRepository $organizationRepository,
         private EntityManagerInterface $entityManager,
     ) {
-        $this->frontendUrl = $_ENV['VITE_BASE_URL'] ?? 'http://localhost:5173';
+        $this->frontendUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173';
     }
 
     public function supports(Request $request): ?bool

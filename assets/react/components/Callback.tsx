@@ -12,7 +12,7 @@ const Callback: React.FC = () => {
 
         if (errorParam) {
             setError(errorParam);
-            setTimeout(() => navigate('/login'), 3000);
+            setTimeout(() => navigate('/app/login'), 3000);
             return;
         }
 
@@ -21,10 +21,10 @@ const Callback: React.FC = () => {
             localStorage.setItem('token', token);
             
             // Redirect to the main app
-            navigate('/');
+            navigate('/app');
         } else {
             setError('No token found in callback');
-            setTimeout(() => navigate('/login'), 3000);
+            setTimeout(() => navigate('/app/login'), 3000);
         }
     }, [navigate]);
 

@@ -29,15 +29,5 @@ export default defineConfig(({ mode }) => ({
             }
         }
     },
-    server: {
-        port: 5173,
-        https: false,
-        hmr: {
-            host: 'localhost',
-        },
-        watch: {
-            usePolling: true
-        }
-    },
-    base: mode === 'production' ? '/build/' : '/'
+    base: mode === 'production' ? '/build/' : '/app/'
 }));
