@@ -5,13 +5,8 @@
 
     RewriteEngine On
 
-    # Nastavení HTTPS pro Cloudflare
-    # Pokud Cloudflare posílá X-Forwarded-Proto: https, nastavíme HTTPS=on
+    # Jednoduché nastavení HTTPS pro Cloudflare
     RewriteCond %{HTTP:X-Forwarded-Proto} =https
-    RewriteRule .* - [E=HTTPS:on]
-
-    # Pokud Cloudflare posílá CF-Visitor obsahující https, nastavíme HTTPS=on
-    RewriteCond %{HTTP:CF-Visitor} "{\"scheme\":\"https\"}"
     RewriteRule .* - [E=HTTPS:on]
 
     # If the requested filename exists, simply serve it.
