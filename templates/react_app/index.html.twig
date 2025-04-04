@@ -4,12 +4,12 @@
 
 {% block stylesheets %}
     {{ parent() }}
-    {{ vite_entry_link_tags('react_app') }}
+    {{ vite_entry_link_tags('app') }}
 {% endblock %}
 
 {% block javascripts %}
     {{ parent() }}
-    {{ vite_entry_script_tags('react_app') }}
+    {{ vite_entry_script_tags('app') }}
 {% endblock %}
 
 {% block body %}
