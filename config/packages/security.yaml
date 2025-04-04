@@ -6,7 +6,7 @@ security:
             entity:
                 class: App\Entity\User
                 property: googleId
-    
+
     firewalls:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
@@ -24,12 +24,14 @@ security:
             logout:
                 path: app_logout
                 target: connect_google
-    
+
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google, roles: PUBLIC_ACCESS }
         - { path: ^/api/public, roles: PUBLIC_ACCESS }
         - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
+        - { path: ^/diagnostics, roles: PUBLIC_ACCESS }
+        - { path: ^/debug, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: ROLE_USER }
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/profile, roles: ROLE_USER }

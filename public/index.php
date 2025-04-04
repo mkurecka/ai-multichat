@@ -42,6 +42,17 @@ if (isset($_SERVER['APP_ENV']) && $_SERVER['APP_ENV'] === 'prod') {
         $trustedProxies,
         Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO
     );
+
+    // Přímé nastavení HTTPS pro Cloudflare
+    // Pokud Cloudflare posílá X-Forwarded-Proto: https, nastavíme $_SERVER['HTTPS'] = 'on'
+    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        $_SERVER['HTTPS'] = 'on';
+    }
+
+    // Pokud Cloudflare posílá CF-Visitor obsahující https, nastavíme $_SERVER['HTTPS'] = 'on'
+    if (isset($_SERVER['HTTP_CF_VISITOR']) && strpos($_SERVER['HTTP_CF_VISITOR'], '"scheme":"https"') !== false) {
+        $_SERVER['HTTPS'] = 'on';
+    }
 }
 
 return function (array $context) {
