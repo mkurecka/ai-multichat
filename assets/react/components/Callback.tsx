@@ -6,25 +6,42 @@ const Callback: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
-        const errorParam = urlParams.get('error');
+        console.log('Callback component mounted');
+        console.log('Full URL:', window.location.href);
+        
+        // Get the full URL and extract the token
+        const fullUrl = window.location.href;
+        const tokenMatch = fullUrl.match(/token=([^&]+)/);
+        const token = tokenMatch ? tokenMatch[1] : null;
+        
+        console.log('Extracted token:', token);
+        
+        // Check for error parameter
+        const errorParam = new URLSearchParams(window.location.search).get('error');
+        console.log('Error parameter:', errorParam);
 
         if (errorParam) {
             setError(errorParam);
-            setTimeout(() => navigate('/app/login'), 3000);
+            setTimeout(() => navigate('/login'), 3000);
             return;
         }
 
         if (token) {
+            console.log('Token found, storing in localStorage');
             // Store the token in localStorage
             localStorage.setItem('token', token);
             
+            // Verify token was stored
+            const storedToken = localStorage.getItem('token');
+            console.log('Verifying token storage:', storedToken ? 'Token stored successfully' : 'Token storage failed');
+            
+            console.log('Redirecting to /');
             // Redirect to the main app
-            navigate('/app');
+            navigate('/');
         } else {
+            console.log('No token found in callback');
             setError('No token found in callback');
-            setTimeout(() => navigate('/app/login'), 3000);
+            setTimeout(() => navigate('/login'), 3000);
         }
     }, [navigate]);
 

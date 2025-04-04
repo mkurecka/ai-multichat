@@ -29,5 +29,5 @@ export default defineConfig(({ mode }) => ({
             }
         }
     },
-    base: mode === 'production' ? '/build/' : '/app/'
+    base: mode === 'production' ? '/build/' : '/'
 }));

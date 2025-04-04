@@ -7,21 +7,31 @@ import Login from './components/Login';
 import Callback from './components/Callback';
 import CostsPage from './components/CostsPage';
 import './index.css';
+import { isAuthenticated } from './services/api';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const token = localStorage.getItem('token');
-    return token ? <>{children}</> : <Navigate to="/app/login" />;
+    console.log('ProtectedRoute: Checking authentication');
+    const isAuth = isAuthenticated();
+    console.log('ProtectedRoute: isAuthenticated =', isAuth);
+    
+    if (isAuth) {
+        console.log('ProtectedRoute: User is authenticated, rendering children');
+        return <>{children}</>;
+    } else {
+        console.log('ProtectedRoute: User is not authenticated, redirecting to login');
+        return <Navigate to="/login" />;
+    }
 };
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <Router>
             <Routes>
-                <Route path="/app/login" element={<Login />} />
+                <Route path="/login" element={<Login />} />
                 <Route path="/app/callback" element={<Callback />} />
                 <Route
-                    path="/app"
+                    path="/"
                     element={
                         <ProtectedRoute>
                             <App />
@@ -29,15 +39,15 @@ createRoot(document.getElementById('root')!).render(
                     }
                 />
                 <Route
-                    path="/app/costs"
+                    path="/costs"
                     element={
                         <ProtectedRoute>
                             <CostsPage />
                         </ProtectedRoute>
                     }
                 />
-                {/* Redirect root to /app */}
-                <Route path="/" element={<Navigate to="/app" />} />
+                {/* Redirect root to / */}
+                <Route path="*" element={<Navigate to="/" />} />
             </Routes>
         </Router>
     </StrictMode>

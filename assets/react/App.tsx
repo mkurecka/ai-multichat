@@ -44,7 +44,7 @@ function App() {
       // Check if user is authenticated
       if (!isAuthenticated()) {
         // Redirect to login if not authenticated
-        navigate('/app/login');
+        navigate('/login');
         return;
       }
       
@@ -60,7 +60,7 @@ function App() {
       } catch (error) {
         console.error('Error checking token:', error);
         // If token refresh fails, redirect to login
-        navigate('/app/login');
+        navigate('/login');
         return;
       }
       
@@ -402,49 +402,33 @@ function App() {
   };
 
   return (
-    <Routes>
-      <Route path="/app/costs" element={<CostsPage />} />
-      <Route path="/app" element={
-        <div className="flex h-screen bg-gray-100">
-          {/* Sidebar */}
-          <div className={`${showChatHistory ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-white shadow-md`}>
-            <ChatHistory 
-              sessions={chatHistory} 
-              onSelectSession={handleSelectChat}
-              onStartNewChat={handleStartNewChat}
-            />
-          </div>
-          
-          {/* Main content */}
-          <div className="flex-1 flex flex-col">
-            {/* Header */}
-            <Header 
-              userEmail={userEmail}
-              onLogout={() => {
-                logout();
-                navigate('/app/login');
-              }}
-              onToggleChatHistory={toggleChatHistory}
-              onToggleModelSelector={() => setShowModelSelector(!showModelSelector)}
-              showChatHistory={showChatHistory}
-              showModelSelector={showModelSelector}
-            />
-            
-            {/* Chat area */}
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <ChatWindow 
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                selectedModels={selectedModels}
-                showModelSelector={showModelSelector}
-                onToggleModelSelector={() => setShowModelSelector(!showModelSelector)}
-              />
-            </div>
-          </div>
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar */}
+      <div className={`${showChatHistory ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-white shadow-md`}>
+        <ChatHistory 
+          chatSessions={chatHistory} 
+          onSelectChat={handleSelectChat}
+          onStartNewChat={handleStartNewChat}
+        />
+      </div>
+      
+      {/* Main content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <Header />
+        
+        {/* Chat area */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <ChatWindow 
+            messages={messages}
+            models={models}
+            onModelToggle={handleModelToggle}
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+          />
         </div>
-      } />
-    </Routes>
+      </div>
+    </div>
   );
 }
 

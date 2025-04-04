@@ -33,9 +33,9 @@ api.interceptors.response.use(
     // Don't retry if the error is from the token refresh endpoint itself
     if (error.config.url?.includes('/token/refresh')) {
       localStorage.removeItem('token');
-      if (!window.location.pathname.includes('/app/login') && 
-          !window.location.pathname.includes('/app/callback')) {
-        window.location.href = '/app/login';
+      if (!window.location.pathname.includes('/login') && 
+          !window.location.pathname.includes('/callback')) {
+        window.location.href = '/login';
       }
       return Promise.reject(error);
     }
@@ -55,18 +55,18 @@ api.interceptors.response.use(
         } else {
           // If refresh failed, redirect to login
           localStorage.removeItem('token');
-          if (!window.location.pathname.includes('/app/login') && 
-              !window.location.pathname.includes('/app/callback')) {
-            window.location.href = '/app/login';
+          if (!window.location.pathname.includes('/login') && 
+              !window.location.pathname.includes('/callback')) {
+            window.location.href = '/login';
           }
           return Promise.reject(error);
         }
       } catch (refreshError) {
         // If refresh failed, redirect to login
         localStorage.removeItem('token');
-        if (!window.location.pathname.includes('/app/login') && 
-            !window.location.pathname.includes('/app/callback')) {
-          window.location.href = '/app/login';
+        if (!window.location.pathname.includes('/login') && 
+            !window.location.pathname.includes('/callback')) {
+          window.location.href = '/login';
         }
         return Promise.reject(refreshError);
       }
@@ -76,17 +76,25 @@ api.interceptors.response.use(
   }
 );
 
-// Function to decode JWT token without verification
-const decodeToken = (token: string): any => {
+// Function to decode a JWT token
+export const decodeToken = (token: string): any => {
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
+    console.log('Decoding token:', token.substring(0, 20) + '...');
+    // Split the token into its parts
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.log('Invalid token format: not 3 parts');
+      return null;
+    }
+    
+    // Get the payload (second part)
+    const payload = parts[1];
+    console.log('Token payload:', payload);
+    
+    // Decode the base64 payload
+    const jsonPayload = atob(payload);
+    console.log('Decoded payload:', jsonPayload);
+    
     return JSON.parse(jsonPayload);
   } catch (error) {
     console.error('Error decoding token:', error);
@@ -96,20 +104,33 @@ const decodeToken = (token: string): any => {
 
 // Add a function to check if token exists and is valid
 export const isAuthenticated = (): boolean => {
+  console.log('Checking authentication...');
   const token = localStorage.getItem('token');
-  if (!token) return false;
+  console.log('Token from localStorage:', token ? `exists (${token.substring(0, 20)}...)` : 'not found');
+  
+  if (!token) {
+    console.log('No token found in localStorage');
+    return false;
+  }
   
   // Decode the token and check if it's expired
   const decodedToken = decodeToken(token);
-  if (!decodedToken) return false;
+  console.log('Decoded token:', decodedToken);
+  
+  if (!decodedToken) {
+    console.log('Failed to decode token');
+    return false;
+  }
   
   // Check if token has exp claim and is not expired
   if (decodedToken.exp && decodedToken.exp < Date.now() / 1000) {
     // Token is expired
+    console.log('Token is expired. Exp:', new Date(decodedToken.exp * 1000).toISOString(), 'Current time:', new Date().toISOString());
     localStorage.removeItem('token');
     return false;
   }
   
+  console.log('User is authenticated with valid token');
   return true;
 };
 
@@ -409,7 +430,7 @@ export const getThreadHistory = async (threadId: string): Promise<any> => {
 // Function to handle user logout
 export const logout = () => {
   localStorage.removeItem('token');
-  window.location.href = '/login';
+  window.location.href = '/app/login';
 };
 
 export const createThread = async (): Promise<{ threadId: string }> => {

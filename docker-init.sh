@@ -40,6 +40,12 @@ fi
 echo "Caching models..."
 docker-compose exec -T php bin/console app:cache:models
 
+echo "Installing frontend dependencies..."
+docker-compose exec -T node npm ci
+
+echo "Building frontend..."
+docker-compose exec -T node npm run build
+
 echo ""
 echo "Initialization complete! You can access the application at:"
 echo "- Frontend: http://localhost:5173"
