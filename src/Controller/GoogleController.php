@@ -42,7 +42,7 @@ class GoogleController extends AbstractController
         if (!$user) {
             // Redirect to frontend with error
             return $this->redirect(
-                $this->frontendUrl . '/callback?error=authentication_failed'
+                $this->frontendUrl . '/app/callback?error=authentication_failed'
             );
         }
         
@@ -52,7 +52,7 @@ class GoogleController extends AbstractController
             
             // Redirect to frontend with token
             return $this->redirect(
-                $this->frontendUrl . '/callback?token=' . $token
+                $this->frontendUrl . '/app/callback?token=' . $token
             );
         } catch (\Exception $e) {
             // Log the error
@@ -60,7 +60,7 @@ class GoogleController extends AbstractController
             
             // Redirect to login with error
             return $this->redirect(
-                $this->frontendUrl . '/callback?error=token_creation_failed'
+                $this->frontendUrl . '/app/callback?error=token_creation_failed'
             );
         }
     }
