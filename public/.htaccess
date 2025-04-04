@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+    # This Option needs to be enabled for RewriteRule, otherwise it will show an error like
+    # 'Options FollowSymLinks or SymLinksIfOwnerMatch is off which implies that RewriteRule directive is forbidden'
+    Options +FollowSymlinks
+
+    RewriteEngine On
+
+    # If the requested filename exists, simply serve it.
+    # We only want to let Apache serve files and not directories.
+    # Rewrite all other queries to the front controller.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ %{ENV:BASE}/index.php [L]
+</IfModule>
+
