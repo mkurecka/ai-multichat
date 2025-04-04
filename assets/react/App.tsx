@@ -428,14 +428,12 @@ function App() {
       </div>
       
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-white border-b shadow-sm z-20">
-          <Header />
-        </div>
+        <Header />
         
         {/* Chat area */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           <ChatWindow 
             messages={messages}
             models={models}
