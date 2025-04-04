@@ -48,7 +48,6 @@ docker-compose exec -T node npm run build
 
 echo ""
 echo "Initialization complete! You can access the application at:"
-echo "- Frontend: http://localhost:5173"
 echo "- Backend: http://localhost:8000"
 echo ""
 echo "To view logs, run: docker-compose logs -f"

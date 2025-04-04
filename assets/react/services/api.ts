@@ -183,17 +183,25 @@ export const checkTokenRefresh = async (): Promise<void> => {
 
 // Fetch available models
 export const getModels = async (): Promise<Model[]> => {
+  console.log('API: Fetching models...');
   try {
     const response = await api.get('/models');
-    // Return the data directly if it's already an array of models
-    if (Array.isArray(response.data)) {
+    console.log('API: Raw response:', response);
+    
+    if (response.data && Array.isArray(response.data)) {
+      console.log('API: Models fetched successfully:', response.data);
       return response.data;
     }
-    // Otherwise, return an empty array
+    
+    console.error('API: Invalid response format:', response.data);
     return [];
   } catch (error) {
-    console.error('Error fetching models:', error);
-    throw error;
+    console.error('API: Error fetching models:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('API: Status:', error.response?.status);
+      console.error('API: Response data:', error.response?.data);
+    }
+    return [];
   }
 };
 

@@ -3,6 +3,7 @@ import { Message, Model } from '../types';
 import ChatMessage from './ChatMessage';
 import ModelCheckbox from './ModelCheckbox';
 import ChatInput from './ChatInput';
+import ModelSelector from './ModelSelector';
 
 interface ChatWindowProps {
   messages: Message[];
@@ -10,6 +11,7 @@ interface ChatWindowProps {
   onModelToggle: (modelId: string) => void;
   onSendMessage: (messages: Message[], prompt: string) => void;
   isLoading?: boolean;
+  maxModels?: number;
 }
 
 interface GroupedMessage {
@@ -18,7 +20,7 @@ interface GroupedMessage {
   timestamp: string;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onModelToggle, onSendMessage, isLoading }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onModelToggle, onSendMessage, isLoading, maxModels = 16 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedModels = models.filter(model => model?.selected);
 
@@ -63,8 +65,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onM
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Model selection bar */}
+    <div className="h-full flex flex-col">
+      {/* Debug info */}
+      <div className="bg-yellow-100 p-2 text-xs text-yellow-800">
+        Debug: {models.length} models available, {selectedModels.length} selected
+      </div>
+      
+      {/* Model selector - always visible with prominent styling */}
+      <div className="bg-white border-b p-4 shadow-sm">
+        <h2 className="text-lg font-medium text-gray-800 mb-2">Select AI Models</h2>
+        <div className="border border-blue-300 rounded-lg p-3 bg-blue-50">
+          <ModelSelector 
+            models={models} 
+            onModelToggle={onModelToggle} 
+            maxModels={maxModels} 
+          />
+        </div>
+      </div>
+
+      {/* Model selection bar - only show when models are selected */}
       {selectedModels.length > 0 && (
         <div className="bg-white border-b p-2 flex items-center overflow-x-auto">
           <div className="text-sm font-medium text-gray-500 mr-3">Active models:</div>
@@ -81,7 +100,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onM
       )}
 
       {/* Chat messages container */}
-      <div className="flex-1 overflow-hidden flex flex-col bg-gray-50 min-h-0">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
         {/* Chat messages */}
         <div className="h-full overflow-y-scroll p-4 space-y-8">
           {!messages?.length ? (
@@ -146,7 +165,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onM
         <ChatInput
           selectedModels={selectedModels.map(model => model.id)}
           onSendMessage={(message) => onSendMessage(messages, message)}
-          disabled={selectedModels.length === 0 || isLoading}
+          disabled={selectedModels.length === 0 || isLoading === true}
         />
       </div>
 

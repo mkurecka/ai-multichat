@@ -35,6 +35,31 @@ class ModelService
         return $this->cache->get('openrouter_models', function ($item) {
             $item->expiresAfter($this->cacheTtl);
             
+            // First try to get models from the database
+            $dbModels = $this->modelRepository->findAllOrdered();
+            
+            if (!empty($dbModels)) {
+                // Format database models
+                $formattedModels = [];
+                foreach ($dbModels as $model) {
+                    $formattedModels[] = [
+                        'id' => $model->getModelId(),
+                        'name' => $model->getName(),
+                        'description' => $model->getDescription(),
+                        'provider' => $model->getProvider(),
+                        'selected' => false,
+                        'pricing' => $model->getPricing() ?? [
+                            'prompt' => null,
+                            'completion' => null,
+                            'unit' => 'tokens'
+                        ]
+                    ];
+                }
+                
+                return $formattedModels;
+            }
+            
+            // If no models in database, fetch from API
             $rawModels = $this->openRouterService->getModels();
             $formattedModels = $this->formatModels($rawModels);
             
@@ -47,8 +72,17 @@ class ModelService
     
     public function refreshModels(): array
     {
+        // Clear the cache
         $this->cache->delete('openrouter_models');
-        return $this->getModels();
+        
+        // Fetch fresh models from API
+        $rawModels = $this->openRouterService->getModels();
+        
+        // Save to database
+        $this->saveModelsToDatabase($rawModels);
+        
+        // Format and return
+        return $this->formatModels($rawModels);
     }
     
     private function formatModels(array $rawModels): array
@@ -113,7 +147,25 @@ class ModelService
 
     public function getModelsByProvider(string $provider): array
     {
-        return $this->modelRepository->findByProvider($provider);
+        $dbModels = $this->modelRepository->findBy(['provider' => $provider]);
+        
+        $formattedModels = [];
+        foreach ($dbModels as $model) {
+            $formattedModels[] = [
+                'id' => $model->getModelId(),
+                'name' => $model->getName(),
+                'description' => $model->getDescription(),
+                'provider' => $model->getProvider(),
+                'selected' => false,
+                'pricing' => $model->getPricing() ?? [
+                    'prompt' => null,
+                    'completion' => null,
+                    'unit' => 'tokens'
+                ]
+            ];
+        }
+        
+        return $formattedModels;
     }
 
     public function getModelByModelId(string $modelId): ?Model

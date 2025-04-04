@@ -73,18 +73,33 @@ function App() {
   // Fetch models on mount
   useEffect(() => {
     const fetchModels = async () => {
+      console.log('Starting to fetch models...');
       try {
-        // Try to get models from cache first
-        let fetchedModels = await getModels();
+        const cachedModels = localStorage.getItem('models');
+        console.log('Cached models:', cachedModels ? JSON.parse(cachedModels) : 'None');
         
-        // If no models returned, refresh the cache
-        if (!fetchedModels || fetchedModels.length === 0) {
-          fetchedModels = await refreshModels();
+        if (cachedModels) {
+          const parsedModels = JSON.parse(cachedModels);
+          console.log('Setting cached models:', parsedModels);
+          setModels(parsedModels);
+          return;
         }
+
+        console.log('No cache found, fetching from API...');
+        const response = await getModels();
+        console.log('API response:', response);
         
-        setModels(fetchedModels.map(model => ({ ...model, selected: false })));
+        if (response && Array.isArray(response)) {
+          console.log('Setting models from API:', response);
+          setModels(response);
+          localStorage.setItem('models', JSON.stringify(response));
+        } else {
+          console.error('Invalid API response:', response);
+          setModels([]);
+        }
       } catch (error) {
-        console.error('Failed to fetch models:', error);
+        console.error('Error fetching models:', error);
+        setModels([]);
       }
     };
 
@@ -413,18 +428,21 @@ function App() {
       </div>
       
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header />
+        <div className="bg-white border-b shadow-sm z-20">
+          <Header />
+        </div>
         
         {/* Chat area */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden">
           <ChatWindow 
             messages={messages}
             models={models}
             onModelToggle={handleModelToggle}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
+            maxModels={16}
           />
         </div>
       </div>
