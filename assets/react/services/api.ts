@@ -181,15 +181,24 @@ export const checkTokenRefresh = async (): Promise<void> => {
   }
 };
 
+// Check if we're in development mode
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 // Fetch available models
 export const getModels = async (): Promise<Model[]> => {
-  console.log('API: Fetching models...');
+  if (isDevelopment) {
+    console.log('API: Fetching models...');
+  }
   try {
     const response = await api.get('/models');
-    console.log('API: Raw response:', response);
+    if (isDevelopment) {
+      console.log('API: Raw response:', response);
+    }
     
     if (response.data && Array.isArray(response.data)) {
-      console.log('API: Models fetched successfully:', response.data);
+      if (isDevelopment) {
+        console.log('API: Models fetched successfully:', response.data);
+      }
       return response.data;
     }
     

@@ -9,6 +9,9 @@ interface ModelSelectorProps {
     maxModels: number;
 }
 
+// Check if we're in development mode
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 const ModelSelector: React.FC<ModelSelectorProps> = ({ models, onModelToggle, maxModels }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
@@ -43,9 +46,11 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, onModelToggle, ma
         return `$${(price / 1000).toFixed(3)}/1k tokens`;
     };
 
-    // Debug information
-    console.log('ModelSelector rendering with models:', models.length);
-    console.log('Selected models:', selectedCount);
+    // Debug information - only log in development
+    if (isDevelopment) {
+        console.log('ModelSelector rendering with models:', models.length);
+        console.log('Selected models:', selectedCount);
+    }
 
     return (
         <div className="relative border border-gray-200 rounded-lg p-4 bg-white shadow-sm" ref={dropdownRef}>
@@ -125,8 +130,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, onModelToggle, ma
                     ))}
             </div>
             
-            {/* Debug info */}
-            {models.length === 0 && (
+            {/* Debug info - only visible in development */}
+            {isDevelopment && models.length === 0 && (
                 <div className="mt-2 text-sm text-red-500">
                     No models available. Please check the API connection.
                 </div>

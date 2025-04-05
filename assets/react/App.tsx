@@ -73,24 +73,40 @@ function App() {
   // Fetch models on mount
   useEffect(() => {
     const fetchModels = async () => {
-      console.log('Starting to fetch models...');
+      // Only log in development mode
+      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (isDevelopment) {
+        console.log('Starting to fetch models...');
+      }
+      
       try {
         const cachedModels = localStorage.getItem('models');
-        console.log('Cached models:', cachedModels ? JSON.parse(cachedModels) : 'None');
+        if (isDevelopment) {
+          console.log('Cached models:', cachedModels ? JSON.parse(cachedModels) : 'None');
+        }
         
         if (cachedModels) {
           const parsedModels = JSON.parse(cachedModels);
-          console.log('Setting cached models:', parsedModels);
+          if (isDevelopment) {
+            console.log('Setting cached models:', parsedModels);
+          }
           setModels(parsedModels);
           return;
         }
 
-        console.log('No cache found, fetching from API...');
+        if (isDevelopment) {
+          console.log('No cache found, fetching from API...');
+        }
         const response = await getModels();
-        console.log('API response:', response);
+        if (isDevelopment) {
+          console.log('API response:', response);
+        }
         
         if (response && Array.isArray(response)) {
-          console.log('Setting models from API:', response);
+          if (isDevelopment) {
+            console.log('Setting models from API:', response);
+          }
           setModels(response);
           localStorage.setItem('models', JSON.stringify(response));
         } else {

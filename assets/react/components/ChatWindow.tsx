@@ -20,6 +20,9 @@ interface GroupedMessage {
   timestamp: string;
 }
 
+// Check if we're in development mode
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onModelToggle, onSendMessage, isLoading, maxModels = 16 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedModels = models.filter(model => model?.selected);
@@ -66,10 +69,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages = [], models = [], onM
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Debug info */}
-      <div className="bg-yellow-100 p-2 text-xs text-yellow-800">
-        Debug: {models.length} models available, {selectedModels.length} selected
-      </div>
+      {/* Debug info - only visible in development */}
+      {isDevelopment && (
+        <div className="bg-yellow-100 p-2 text-xs text-yellow-800">
+          Debug: {models.length} models available, {selectedModels.length} selected
+        </div>
+      )}
       
       {/* Model selector - always visible with prominent styling */}
       <div className="bg-white border-b p-4 shadow-md z-10">
