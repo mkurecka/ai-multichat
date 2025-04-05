@@ -1,7 +1,7 @@
 pentatrion_vite:
     # Default build name (can be omitted if you only have one build)
-    default_build: default
-    builds:
+    default_config: default
+    configs:
         default:
             # Optional: Output configuration
             build_directory: 'build'
