@@ -31,6 +31,9 @@ class Model
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $pricing = null;
 
+    #[ORM\Column(type: 'boolean')]
+    private bool $enabled = true;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -111,6 +114,17 @@ class Model
     public function setPricing(?array $pricing): static
     {
         $this->pricing = $pricing;
+        return $this;
+    }
+
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
+    public function setEnabled(bool $enabled): self
+    {
+        $this->enabled = $enabled;
         return $this;
     }
 
