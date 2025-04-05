@@ -32,7 +32,10 @@ class Model
     private ?array $pricing = null;
 
     #[ORM\Column(type: 'boolean')]
-    private bool $enabled = true;
+    private bool $enabled = false;
+
+    #[ORM\Column(type: 'boolean')]
+    private bool $supportsStreaming = false;
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -125,6 +128,17 @@ class Model
     public function setEnabled(bool $enabled): self
     {
         $this->enabled = $enabled;
+        return $this;
+    }
+
+    public function isSupportsStreaming(): bool
+    {
+        return $this->supportsStreaming;
+    }
+
+    public function setSupportsStreaming(bool $supportsStreaming): self
+    {
+        $this->supportsStreaming = $supportsStreaming;
         return $this;
     }
 

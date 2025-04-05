@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+
+{% block stylesheets %}
+    {{ vite_entry_link_tags('app') }}
+{% endblock %}
+
+{% block body %}
+    <div id="root">
+        {% block app_content %}{% endblock %}
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ vite_entry_script_tags('app') }}
+{% endblock %} 

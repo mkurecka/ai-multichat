@@ -1,4 +1,4 @@
-import { LogOut, DollarSign, MessageSquare, MessageCircle } from 'lucide-react';
+import { LogOut, DollarSign, MessageSquare, MessageCircle, Settings } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -6,6 +6,7 @@ export const Header = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isAdmin = user?.roles?.includes('ROLE_ADMIN') || false;
 
   const handleLogout = async () => {
     await logout();
@@ -39,6 +40,16 @@ export const Header = () => {
               >
                 <DollarSign className="h-5 w-5 text-gray-600" />
               </button>
+            )}
+            
+            {isAdmin && (
+              <a
+                href="/admin"
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title="Admin Dashboard"
+              >
+                <Settings className="h-5 w-5 text-gray-600" />
+              </a>
             )}
             
             <span className="text-gray-700">{user?.name}</span>

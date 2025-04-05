@@ -26,6 +26,7 @@ class JWTService
                 'sub' => $user->getId(),
                 'email' => $user->getEmail(),
                 'googleId' => $user->getGoogleId(),
+                'roles' => $user->getRoles(), // Include user roles in the token
                 'exp' => time() + $this->tokenLifetime // Add expiration time
             ];
             

@@ -1,47 +1,46 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
+    static targets = ['toggle'];
     static values = {
-        url: String
+        url: String,
+        modelId: String
+    };
+
+    connect() {
+        console.log('Model toggle controller connected');
     }
 
     async toggle(event) {
         event.preventDefault();
-        
+        const toggle = event.currentTarget;
+        const modelId = this.modelIdValue;
+        const url = this.urlValue;
+
         try {
-            const response = await fetch(this.urlValue, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
                 },
+                body: JSON.stringify({
+                    modelId: modelId,
+                    enabled: toggle.checked
+                })
             });
 
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-
             const data = await response.json();
-            
-            // Update button state
-            const button = event.currentTarget;
-            const toggle = button.querySelector('span[aria-hidden="true"]');
-            
-            if (data.enabled) {
-                button.classList.remove('bg-gray-200');
-                button.classList.add('bg-indigo-600');
-                button.setAttribute('aria-checked', 'true');
-                toggle.classList.remove('translate-x-0');
-                toggle.classList.add('translate-x-5');
+
+            if (data.success) {
+                console.log('Model status updated successfully');
             } else {
-                button.classList.remove('bg-indigo-600');
-                button.classList.add('bg-gray-200');
-                button.setAttribute('aria-checked', 'false');
-                toggle.classList.remove('translate-x-5');
-                toggle.classList.add('translate-x-0');
+                console.error('Failed to update model status:', data.error);
+                toggle.checked = !toggle.checked; // Revert the toggle
             }
         } catch (error) {
-            console.error('Error:', error);
-            // You might want to show an error message to the user here
+            console.error('Error updating model status:', error);
+            toggle.checked = !toggle.checked; // Revert the toggle
         }
     }
 } 

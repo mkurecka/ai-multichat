@@ -165,6 +165,15 @@ class OpenRouterService
                 
                 $this->log('Final messages array: ' . json_encode($messages));
                 
+                // Check if the model supports streaming
+                $modelEntity = $this->entityManager->getRepository(\App\Entity\Model::class)->findOneBy(['modelId' => $model]);
+                $shouldStream = false;
+                if ($stream && $modelEntity) {
+                    $shouldStream = $modelEntity->isSupportsStreaming();
+                }
+                
+                $this->log('Streaming for model ' . $model . ': ' . ($shouldStream ? 'enabled' : 'disabled'));
+                
                 $response = $this->client->request('POST', self::API_URL . '/chat/completions', [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $this->apiKey,
@@ -175,11 +184,11 @@ class OpenRouterService
                     'json' => [
                         'model' => $model,
                         'messages' => $messages,
-                        'stream' => $stream
+                        'stream' => $shouldStream
                     ]
                 ]);
                 
-                if ($stream) {
+                if ($shouldStream) {
                     $responses[$model] = [
                         'stream' => $response->toStream(),
                         'id' => null,
@@ -191,7 +200,7 @@ class OpenRouterService
                     ];
                 } else {
                     $data = $response->toArray();
-                    $responses[$model] = $this->processResponse($data, $model, $thread, $stream);
+                    $responses[$model] = $this->processResponse($data, $model, $thread, $shouldStream);
                 }
             } catch (\Exception $e) {
                 $this->log('Error in generateResponse for model ' . $model . ': ' . $e->getMessage());
@@ -212,6 +221,7 @@ class OpenRouterService
     
     /**
      * Stream response with context
+     * Note: This will only stream for models that support streaming (supportsStreaming = true)
      */
     public function streamResponse(string $prompt, array $models, ?Thread $thread = null): array
     {

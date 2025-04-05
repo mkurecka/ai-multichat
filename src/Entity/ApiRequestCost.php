@@ -5,7 +5,7 @@ namespace App\Entity;
 use DateTime;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: App\Repository\ApiRequestCostRepository::class)]
 class ApiRequestCost
 {
     #[ORM\Id]
@@ -443,4 +443,4 @@ class ApiRequestCost
         $this->requestReference = $requestReference;
         return $this;
     }
-} 
+}

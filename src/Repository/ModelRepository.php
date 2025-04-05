@@ -48,9 +48,16 @@ class ModelRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    public function findAllOrdered(): array
+    public function findAllOrdered(?bool $enabledOnly = false): array
     {
-        return $this->createQueryBuilder('m')
+        $queryBuilder = $this->createQueryBuilder('m');
+
+        if ($enabledOnly) {
+            $queryBuilder->andWhere('m.enabled = :enabled')
+                ->setParameter('enabled', true);
+        }
+
+        return $queryBuilder
             ->orderBy('m.name', 'ASC')
             ->getQuery()
             ->getResult();

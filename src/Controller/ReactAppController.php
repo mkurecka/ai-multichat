@@ -20,16 +20,16 @@ class ReactAppController extends AbstractController
     ) {}
 
     #[Route('/', name: 'app_home')]
-    #[Route('/app/{reactRouting}', name: 'app_react', defaults: ['reactRouting' => null], requirements: ['reactRouting' => '^(?!api).+'])]
+    #[Route('/app/{reactRouting}', name: 'app_react', defaults: ['reactRouting' => null], requirements: ['reactRouting' => '^(?!api|admin).+'])]
     #[Route('/app/callback', name: 'app_callback')]
     public function index(): Response
     {
         // Always show landing page for non-authenticated users
         if (!$this->security->isGranted('IS_AUTHENTICATED_FULLY')) {
-            return $this->render('landing/index.html.twig');
+            return $this->render('landing/index.html.twig', [], new Response('', Response::HTTP_OK, ['X-Template' => 'base_public.html.twig']));
         }
 
         // For authenticated users, always show the React app
-        return $this->render('react_app/index.html.twig');
+        return $this->render('react_app/index.html.twig', [], new Response('', Response::HTTP_OK, ['X-Template' => 'base_app.html.twig']));
     }
 }

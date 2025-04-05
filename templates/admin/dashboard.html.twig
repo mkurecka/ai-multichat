@@ -1,12 +1,12 @@
-{% extends 'base.html.twig' %}
+{% extends 'base_admin.html.twig' %}
 
 {% block title %}Admin Dashboard{% endblock %}
 
-{% block body %}
+{% block admin_content %}
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold mb-8">Admin Dashboard</h1>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 gap-8">
             <!-- User Usage Stats -->
             <div class="bg-white rounded-lg shadow p-6">
                 <h2 class="text-xl font-semibold mb-4">User Usage Statistics</h2>
@@ -17,6 +17,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Prompts</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tokens</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cost</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -25,37 +26,11 @@
                                     <td class="px-6 py-4 whitespace-nowrap">{{ stats.user.email }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ stats.totalPrompts }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap">{{ stats.totalTokens }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">{{ stats.totalCost }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <!-- Model Management -->
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-semibold mb-4">Model Management</h2>
-                <div class="space-y-4">
-                    {% for model in models %}
-                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg" 
-                             data-controller="model-toggle"
-                             data-model-toggle-url-value="{{ path('app_admin_toggle_model', {id: model.id}) }}">
-                            <div>
-                                <h3 class="font-medium">{{ model.name }}</h3>
-                                <p class="text-sm text-gray-500">{{ model.provider }}</p>
-                            </div>
-                            <button type="button"
-                                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 {{ model.enabled ? 'bg-indigo-600' : 'bg-gray-200' }}"
-                                    role="switch"
-                                    aria-checked="{{ model.enabled ? 'true' : 'false' }}"
-                                    data-action="model-toggle#toggle">
-                                <span class="sr-only">Toggle model</span>
-                                <span aria-hidden="true" 
-                                      class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{ model.enabled ? 'translate-x-5' : 'translate-x-0' }}">
-                                </span>
-                            </button>
-                        </div>
-                    {% endfor %}
                 </div>
             </div>
         </div>

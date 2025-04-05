@@ -4,6 +4,7 @@ import { logout as apiLogout } from '../services/api';
 interface User {
   name: string;
   email: string;
+  roles?: string[];
 }
 
 export const useAuth = () => {
@@ -17,7 +18,8 @@ export const useAuth = () => {
         const payload = JSON.parse(atob(token.split('.')[1]));
         setUser({
           name: payload.name || payload.email,
-          email: payload.email
+          email: payload.email,
+          roles: payload.roles || []
         });
       } catch (error) {
         console.error('Error parsing token:', error);
