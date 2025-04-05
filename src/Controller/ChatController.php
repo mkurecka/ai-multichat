@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Repository\ModelRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,7 +27,8 @@ class ChatController extends AbstractController
         private readonly OpenRouterService $openRouterService,
         private readonly EntityManagerInterface $em,
         private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly ModelRepository $modelRepository,
     ) {}
 
     #[Route('/models', methods: ['GET'])]
@@ -48,7 +50,7 @@ class ChatController extends AbstractController
         $prompt = $data['prompt'] ?? null;
         $models = $data['models'] ?? [];
         $threadId = $data['threadId'] ?? null;
-        $stream = $data['stream'] ?? false;
+        //$stream = $data['stream'] ?? false;
         $promptId = $data['promptId'] ?? null;
         
         if (!$prompt || empty($models)) {
@@ -81,7 +83,11 @@ class ChatController extends AbstractController
             // Get the thread ID to reuse with all models
             $threadId = $thread->getThreadId();
         }
-    
+
+        $modelId = $models[0]; // Get first model for streaming
+        $model = $this->modelRepository->findByModelId($modelId);
+        dump($model);
+        $stream = $model->isSupportsStreaming();
         if ($stream) {
             // For streaming, we'll handle one model at a time
             $modelId = $models[0]; // Get first model for streaming
