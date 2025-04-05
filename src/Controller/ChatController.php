@@ -50,7 +50,7 @@ class ChatController extends AbstractController
         $prompt = $data['prompt'] ?? null;
         $models = $data['models'] ?? [];
         $threadId = $data['threadId'] ?? null;
-        //$stream = $data['stream'] ?? false;
+        $stream = $data['stream'] ?? false;
         $promptId = $data['promptId'] ?? null;
         
         if (!$prompt || empty($models)) {
@@ -86,8 +86,7 @@ class ChatController extends AbstractController
 
         $modelId = $models[0]; // Get first model for streaming
         $model = $this->modelRepository->findByModelId($modelId);
-        dump($model);
-        $stream = $model->isSupportsStreaming();
+        
         if ($stream) {
             // For streaming, we'll handle one model at a time
             $modelId = $models[0]; // Get first model for streaming

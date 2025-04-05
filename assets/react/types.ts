@@ -18,6 +18,7 @@ export interface Model {
   description?: string;
   provider?: string;
   selected?: boolean;
+  supportsStreaming?: boolean;
   pricing?: {
     prompt: number;
     completion: number;

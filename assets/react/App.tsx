@@ -127,28 +127,24 @@ function App() {
     const fetchChatHistory = async () => {
       try {
         const history = await getChatHistory();
-        const sessions: ChatSession[] = history.map((entry: any) => ({
-          id: entry.id.toString(),
-          title: entry.title,
-          threadId: entry.threadId,
-          messages: entry.messages.map((msg: any) => [
-            { role: 'user' as const, content: msg.prompt },
-            ...Object.entries(msg.responses).map(([modelId, response]: [string, any]) => ({
-              role: 'assistant' as const,
-              content: typeof response === 'string' ? response : response.content || JSON.stringify(response),
-              modelId
-            }))
-          ]).flat(),
-          selectedModels: [],
-        }));
-        setChatHistory(sessions);
+        setChatHistory(history);
       } catch (error) {
-        console.error('Failed to fetch chat history:', error);
+        console.error('Error fetching chat history:', error);
       }
     };
 
     fetchChatHistory();
   }, []);
+
+  // Function to fetch chat history
+  const fetchChatHistory = async () => {
+    try {
+      const history = await getChatHistory();
+      setChatHistory(history);
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+    }
+  };
 
   const handleModelToggle = (modelId: string) => {
     setModels(prevModels => 
@@ -159,231 +155,116 @@ function App() {
   };
 
   const handleSendMessage = async (messages: Message[], prompt: string) => {
-    setIsLoading(true);
-    const selectedModelIds = models.filter(model => model.selected).map(model => model.id);
+    if (!prompt.trim() || selectedModels.length === 0) return;
     
-    if (selectedModelIds.length === 0) {
-      setIsLoading(false);
-      return;
-    }
-
-    const reloadThreadData = async (threadId: string) => {
-      try {
-        const threadData = await getThreadHistory(threadId);
-        
-        if (threadData && threadData.messages) {
-          const updatedMessages: Message[] = [];
-          for (const msg of threadData.messages) {
-            updatedMessages.push({
-              role: 'user',
-              content: msg.prompt,
-              modelId: msg.modelId
-            });
-            
-            if (msg.responses) {
-              Object.entries(msg.responses).forEach(([modelId, content]) => {
-                updatedMessages.push({
-                  role: 'assistant',
-                  content: content as string,
-                  modelId: modelId
-                });
-              });
-            }
-          }
-          setMessages(updatedMessages);
-          
-          setChatHistory(prev => prev.map(session => 
-            session.threadId === threadId
-              ? { ...session, messages: updatedMessages }
-              : session
-          ));
-        }
-      } catch (error) {
-        console.error('Error reloading thread data:', error);
-      }
+    // Create a new message object
+    const userMessage: Message = {
+      role: 'user',
+      content: prompt,
+      id: `msg_${Date.now()}`,
+      threadId: currentSessionId
     };
-
+    
+    // Add the user message to the messages array
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setMessage('');
+    
+    // Generate a unique promptId
+    const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Create placeholder messages for each selected model
+    const modelPlaceholders: Message[] = selectedModels.map(modelId => ({
+      role: 'assistant',
+      content: '...',
+      modelId,
+      id: `msg_${Date.now()}_${modelId}`,
+      threadId: currentSessionId,
+      promptId
+    }));
+    
+    // Add the placeholder messages to the messages array
+    setMessages([...updatedMessages, ...modelPlaceholders]);
+    
     try {
-      // Get promptId from sendMessageToModels
-      const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Add user message immediately
-      const userMessage: Message = {
-        role: 'user',
-        content: prompt,
-        modelId: selectedModelIds[0],
-        promptId: promptId,
-        threadId: currentSessionId
-      };
-
-      setMessages(prev => [...prev, userMessage]);
-
-      // Update chat history with user message
-      setChatHistory(prev => {
-        // Find existing session with matching threadId
-        const existingSession = prev.find(session => session.threadId === currentSessionId);
-        
-        if (existingSession) {
-          // Update existing session
-          return prev.map(session => 
-            session.threadId === currentSessionId
-              ? { ...session, messages: [...session.messages, userMessage] }
-              : session
+      // Stream handler function
+      const handleStream = (modelId: string, content: string, promptId: string, threadId: string) => {
+        setMessages(prevMessages => {
+          // Find the message with the matching modelId and promptId
+          const messageIndex = prevMessages.findIndex(
+            msg => msg.modelId === modelId && msg.promptId === promptId
           );
-        }
-        return prev;
-      });
-
+          
+          if (messageIndex === -1) return prevMessages;
+          
+          // Create a new array with the updated message
+          const newMessages = [...prevMessages];
+          newMessages[messageIndex] = {
+            ...newMessages[messageIndex],
+            content
+          };
+          
+          return newMessages;
+        });
+      };
+      
+      // Send the message to the selected models
       const response = await sendMessageToModels(
         prompt,
-        selectedModelIds,
+        selectedModels,
         currentSessionId || undefined,
         undefined,
-        (modelId, content: string | { content: string }, promptId: string, threadId?: string) => {
-          const contentString = typeof content === 'string' ? content : content.content || JSON.stringify(content);
+        handleStream
+      );
+      
+      // If we're not using streaming, update the messages with the responses
+      if (!response.streaming) {
+        setMessages(prevMessages => {
+          // Remove the placeholder messages
+          const filteredMessages = prevMessages.filter(
+            msg => !(msg.promptId === promptId && msg.role === 'assistant')
+          );
           
-          // Update currentSessionId if we got a new threadId
-          if (threadId) {
-            setCurrentSessionId(threadId);
-          }
-
-          setMessages(prev => {
-            const newMessages = [...prev];
-            // Find the message with matching modelId, threadId and promptId
-            const existingMessageIndex = newMessages.findIndex(msg => 
-              msg.role === 'assistant' && 
-              msg.modelId === modelId &&
-              msg.threadId === (threadId || currentSessionId) &&
-              msg.promptId === promptId
-            );
-
-            if (existingMessageIndex !== -1) {
-              newMessages[existingMessageIndex] = {
-                ...newMessages[existingMessageIndex],
-                content: contentString,
-                threadId: threadId || currentSessionId
-              };
-            } else {
-              newMessages.push({
-                role: 'assistant' as const,
-                content: contentString,
-                modelId: modelId,
-                threadId: threadId || currentSessionId,
-                promptId: promptId
-              });
-            }
-            return newMessages;
-          });
-
-          // Update chat history with streaming content
-          setChatHistory(prev => {
-            // Find existing session with matching threadId
-            const existingSession = prev.find(session => session.threadId === (threadId || currentSessionId));
-            
-            if (existingSession) {
-              return prev.map(session => {
-                if (session.threadId === (threadId || currentSessionId)) {
-                  const existingMessageIndex = session.messages.findIndex(msg => 
-                    msg.role === 'assistant' && 
-                    msg.modelId === modelId &&
-                    msg.threadId === (threadId || currentSessionId) &&
-                    msg.promptId === promptId
-                  );
-
-                  if (existingMessageIndex !== -1) {
-                    const updatedMessages = [...session.messages];
-                    updatedMessages[existingMessageIndex] = {
-                      ...updatedMessages[existingMessageIndex],
-                      content: contentString,
-                      threadId: threadId || currentSessionId
-                    };
-                    return { ...session, messages: updatedMessages };
-                  } else {
-                    return {
-                      ...session,
-                      messages: [...session.messages, {
-                        role: 'assistant',
-                        content: contentString,
-                        modelId: modelId,
-                        threadId: threadId || currentSessionId,
-                        promptId: promptId
-                      }]
-                    };
-                  }
-                }
-                return session;
-              });
-            }
-            return prev;
-          });
-        }
-      );
-
-      // Update currentSessionId if we got a new threadId from the response
-      if (response.threadId) {
+          // Add the actual responses
+          const modelResponses: Message[] = Object.entries(response.responses).map(([modelId, data]: [string, any]) => ({
+            role: 'assistant' as const,
+            content: data.content,
+            modelId,
+            id: `msg_${Date.now()}_${modelId}`,
+            threadId: response.threadId,
+            promptId,
+            usage: data.usage
+          }));
+          
+          return [...filteredMessages, ...modelResponses];
+        });
+      }
+      
+      // Update the current session ID if it's a new thread
+      if (!currentSessionId && response.threadId) {
         setCurrentSessionId(response.threadId);
-        // Update chat history with new threadId
-        setChatHistory(prev => prev.map(session => 
-          session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString())
-            ? { ...session, threadId: response.threadId }
-            : session
-        ));
-        // Update all messages with new threadId
-        setMessages(prev => prev.map(msg => ({
-          ...msg,
-          threadId: response.threadId
-        })));
       }
-
-      // Only reload thread data if we don't have streaming responses
-      const hasStreamingResponses = messages.some(msg => 
-        msg.role === 'assistant' && 
-        msg.threadId === currentSessionId && 
-        msg.promptId === promptId
+      
+      // Reload the chat history to include the new messages
+      await fetchChatHistory();
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Remove the placeholder messages
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => !(msg.promptId === promptId && msg.role === 'assistant'))
       );
       
-      if (!hasStreamingResponses && currentSessionId) {
-        setTimeout(async () => {
-          await reloadThreadData(currentSessionId);
-        }, 500);
-      }
-    } catch (error: any) {
-      console.error('Error sending message:', error);
-      let errorMessage = 'Error: Failed to send message. Please try again.';
-      
-      if (error.response?.status === 500 && error.response?.data?.detail?.includes('Maximum execution time')) {
-        errorMessage = 'The request took too long to process. Please try again or try with a shorter message.';
-      } else if (error.response?.data?.detail) {
-        errorMessage = `Error: ${error.response.data.detail}`;
-      }
-
-      const errorResponse: Message = {
-        role: 'assistant' as const,
-        content: errorMessage,
-        modelId: selectedModelIds[0]
-      };
-      
-      setMessages(prev => [...prev, errorResponse]);
-      
-      // Update chat history with error message
-      setChatHistory(prev => prev.map(session => 
-        (session.threadId === currentSessionId || (!session.threadId && session.id === Date.now().toString()))
-          ? { ...session, messages: [...session.messages, errorResponse] }
-          : session
-      ));
-
-      // If we have a thread ID, try to reload it after error
-      if (currentSessionId) {
-        setTimeout(async () => {
-          try {
-            await reloadThreadData(currentSessionId);
-          } catch (reloadError) {
-            console.error('Error reloading thread after error:', reloadError);
-          }
-        }, 1000);
-      }
-    } finally {
-      setIsLoading(false);
+      // Add an error message
+      setMessages(prevMessages => [
+        ...prevMessages,
+        {
+          role: 'assistant' as const,
+          content: 'Error: Failed to send message. Please try again.',
+          id: `error_${Date.now()}`,
+          threadId: currentSessionId
+        }
+      ]);
     }
   };
 

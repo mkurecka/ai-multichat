@@ -236,189 +236,69 @@ export const sendMessageToModels = async (
   parentId?: string,
   onStream?: (modelId: string, content: string, promptId: string, threadId: string) => void
 ): Promise<any> => {
+  if (isDevelopment) {
+    console.log('API: Sending message to models:', {
+      prompt,
+      modelIds,
+      threadId,
+      parentId,
+      hasStreamCallback: !!onStream
+    });
+  }
+
+  // Generate a unique promptId if not provided
+  const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  
+  // Check if any of the selected models support streaming
+  const models = JSON.parse(localStorage.getItem('models') || '[]');
+  const selectedModels = models.filter((m: Model) => modelIds.includes(m.id));
+  const supportsStreaming = selectedModels.some((m: Model) => m.supportsStreaming);
+  
+  // If we have a stream callback and at least one model supports streaming, use streaming
+  const useStreaming = !!onStream && supportsStreaming && modelIds.length === 1;
+
+  if (isDevelopment) {
+    console.log('API: Using streaming:', useStreaming);
+    console.log('API: Selected models:', selectedModels);
+    console.log('API: Supports streaming:', supportsStreaming);
+  }
+
   try {
-    // Generate a unique promptId for this prompt
-    const promptId = `prompt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const response = await api.post('/chat', {
+      prompt,
+      models: modelIds,
+      threadId,
+      parentId,
+      promptId,
+      stream: useStreaming
+    });
 
-    // If no threadId provided, create a new thread first
-    let currentThreadId = threadId;
-    if (!currentThreadId) {
-      const { threadId: newThreadId } = await createThread();
-      currentThreadId = newThreadId;
+    if (isDevelopment) {
+      console.log('API: Response received:', response);
     }
 
-    if (onStream) {
-      // For streaming, we'll handle all selected models
-      const responses = await Promise.allSettled(
-        modelIds.map(async (modelId) => {
-          try {
-            const response = await fetch(`${api.defaults.baseURL}/chat`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                prompt,
-                models: [modelId],
-                threadId: currentThreadId,
-                parentId,
-                promptId,
-                stream: true
-              })
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.detail || 'Network response was not ok');
-            }
-
-            const reader = response.body?.getReader();
-            if (!reader) {
-              throw new Error('No reader available');
-            }
-
-            const decoder = new TextDecoder();
-            let content = '';
-            let openRouterId = null;
-            let buffer = '';
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              const chunk = decoder.decode(value);
-              buffer += chunk;
-
-              // Process complete lines
-              const lines = buffer.split('\n');
-              // Keep the last (potentially incomplete) line in the buffer
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                if (line.trim() === '') continue;
-                
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6);
-                  if (data === '[DONE]') {
-                    break;
-                  }
-                  try {
-                    // Skip empty or malformed data
-                    if (!data.trim()) continue;
-                    
-                    const parsed = JSON.parse(data);
-                    if (parsed.done) {
-                      // Update content with the final response
-                      if (parsed.content) {
-                        content = parsed.content;
-                        onStream(modelId, content, promptId, currentThreadId);
-                      }
-                    }
-                    if (parsed.id) {
-                      openRouterId = parsed.id;
-                    }
-                    if (parsed.content) {
-                      content += parsed.content;
-                      onStream(modelId, content, promptId, currentThreadId);
-                    }
-                  } catch (e) {
-                    console.error('Error parsing streaming response:', e);
-                    // Skip malformed data and continue
-                    continue;
-                  }
-                }
-              }
-            }
-
-            // Process any remaining data in the buffer
-            if (buffer.trim()) {
-              const line = buffer.trim();
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data !== '[DONE]' && data.trim()) {
-                  try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.done) {
-                      if (parsed.content) {
-                        content = parsed.content;
-                        onStream(modelId, content, promptId, currentThreadId);
-                      }
-                    }
-                    if (parsed.id) {
-                      openRouterId = parsed.id;
-                    }
-                    if (parsed.content) {
-                      content += parsed.content;
-                      onStream(modelId, content, promptId, currentThreadId);
-                    }
-                  } catch (e) {
-                    console.error('Error parsing final streaming response:', e);
-                  }
-                }
-              }
-            }
-
-            return {
-              modelId,
-              content,
-              usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-              id: openRouterId,
-              threadId: currentThreadId
-            };
-          } catch (error: any) {
-            return {
-              modelId,
-              content: `Error: ${error.message}`,
-              usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-              id: null,
-              threadId: currentThreadId
-            };
-          }
-        })
-      );
-
-      // Process all responses, including errors
-      const combinedResponses = responses.reduce((acc: { responses: Record<string, { content: string; usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }; id: string | null }>; threadId: string }, result) => {
-        if (result.status === 'fulfilled') {
-          const response = result.value;
-          acc.responses[response.modelId] = {
-            content: response.content,
-            usage: response.usage,
-            id: response.id
-          };
-          acc.threadId = currentThreadId;
-        }
-        return acc;
-      }, { responses: {}, threadId: currentThreadId });
-
-      // Ensure we have all responses
-      if (Object.keys(combinedResponses.responses).length !== modelIds.length) {
-        console.warn('Some model responses were not received:', {
-          expected: modelIds.length,
-          received: Object.keys(combinedResponses.responses).length,
-          models: modelIds,
-          responses: Object.keys(combinedResponses.responses)
-        });
-      }
-
-      return combinedResponses;
-    } else {
-      // Non-streaming response
-      const response = await api.post('/chat', {
-        prompt,
-        models: modelIds,
-        threadId: currentThreadId,
-        parentId,
-        stream: false
-      });
-      return response.data;
+    // If we're using streaming, the response will be handled by the onStream callback
+    if (useStreaming) {
+      return {
+        promptId,
+        threadId: threadId || response.data.threadId,
+        streaming: true
+      };
     }
+
+    // For non-streaming responses, return the full response
+    return {
+      ...response.data,
+      promptId,
+      threadId: threadId || response.data.threadId,
+      streaming: false
+    };
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('API: Error sending message:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('API: Status:', error.response?.status);
+      console.error('API: Response data:', error.response?.data);
+    }
     throw error;
   }
 };

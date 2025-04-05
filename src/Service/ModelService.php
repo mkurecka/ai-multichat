@@ -36,7 +36,7 @@ class ModelService
             $item->expiresAfter($this->cacheTtl);
             
             // First try to get models from the database
-            $dbModels = $this->modelRepository->findAllOrdered();
+            $dbModels = $this->modelRepository->findAllOrdered(true);
             
             if (!empty($dbModels)) {
                 // Format database models
@@ -52,7 +52,8 @@ class ModelService
                             'prompt' => null,
                             'completion' => null,
                             'unit' => 'tokens'
-                        ]
+                        ],
+                        'supportsStreaming' => $model->isSupportsStreaming()
                     ];
                 }
                 
@@ -108,7 +109,8 @@ class ModelService
                     'prompt' => $model['pricing']['prompt'] ?? null,
                     'completion' => $model['pricing']['completion'] ?? null,
                     'unit' => 'tokens'
-                ]
+                ],
+                'supportsStreaming' => $model['supports_streaming'] ?? false
             ];
         }
         

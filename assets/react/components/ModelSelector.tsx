@@ -98,7 +98,14 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, onModelToggle, ma
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span>{model.name}</span>
+                                        <div className="flex items-center">
+                                            <span>{model.name}</span>
+                                            {model.supportsStreaming && (
+                                                <span className="ml-2 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
+                                                    Streaming
+                                                </span>
+                                            )}
+                                        </div>
                                         {model.selected && (
                                             <Check className="h-4 w-4 text-blue-600" />
                                         )}
