@@ -49,26 +49,33 @@ api.interceptors.response.use(
         const refreshed = await refreshToken();
         
         if (refreshed) {
-          // Retry the original request
-          const originalRequest = error.config;
-          return api(originalRequest);
-        } else {
-          // If refresh failed, redirect to login
-          localStorage.removeItem('token');
-          if (!window.location.pathname.includes('/login') && 
-              !window.location.pathname.includes('/callback')) {
-            window.location.href = '/login';
+          console.log('Interceptor: Refresh successful, retrying original request.');
+          // Update the header for the retried request before retrying
+          error.config.headers['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
+          console.log('Interceptor: Refresh successful, retrying original request.');
+          // Update the header for the retried request before retrying
+          error.config.headers['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
+          // Ensure the Authorization header is actually set if the token exists
+          const token = localStorage.getItem('token');
+          if (token) {
+              error.config.headers['Authorization'] = `Bearer ${token}`;
+          } else {
+              // If token somehow disappeared, don't retry with missing auth
+              console.warn('Interceptor: Token missing after successful refresh attempt? Aborting retry.');
+              return Promise.reject(error);
           }
-          return Promise.reject(error);
+          return api(error.config); // Retry with potentially new token
+        } else {
+          console.log('Interceptor: Refresh failed or did not return a new token. Rejecting original request.');
+          // refreshToken() handles token removal on 401 failure.
+          // Do not remove token or redirect here.
+          return Promise.reject(error); // Reject the original promise
         }
       } catch (refreshError) {
-        // If refresh failed, redirect to login
-        localStorage.removeItem('token');
-        if (!window.location.pathname.includes('/login') && 
-            !window.location.pathname.includes('/callback')) {
-          window.location.href = '/login';
-        }
-        return Promise.reject(refreshError);
+         console.error('Interceptor: Error during refresh attempt.', refreshError);
+         // Do not remove token or redirect here.
+         // Reject with the original error that caused the 401.
+         return Promise.reject(error);
       }
     }
     
@@ -122,15 +129,19 @@ export const isAuthenticated = (): boolean => {
     return false;
   }
   
-  // Check if token has exp claim and is not expired
-  if (decodedToken.exp && decodedToken.exp < Date.now() / 1000) {
-    // Token is expired
-    console.log('Token is expired. Exp:', new Date(decodedToken.exp * 1000).toISOString(), 'Current time:', new Date().toISOString());
-    localStorage.removeItem('token');
-    return false;
+  // Check if token has exp claim
+  if (decodedToken.exp) {
+      const isExpired = decodedToken.exp < Date.now() / 1000;
+      if (isExpired) {
+          // Token is expired
+          console.log('Token is expired (checked by isAuthenticated). Exp:', new Date(decodedToken.exp * 1000).toISOString(), 'Current time:', new Date().toISOString());
+          // DO NOT remove the token here. Let the refresh logic handle it.
+          // localStorage.removeItem('token');
+          return false; // Indicate not currently authenticated because token is expired
+      }
   }
-  
-  console.log('User is authenticated with valid token');
+  // If no 'exp' claim or not expired
+  console.log('User is authenticated with valid (non-expired) token');
   return true;
 };
 
