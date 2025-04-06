@@ -45,13 +45,26 @@ export default class extends Controller {
     connect() {
         console.log('Chat controller connected');
         console.log('Outlets defined:', this.constructor.outlets);
-        this.#setupApi(); // Setup Axios instance and interceptors
-        this.isAuthenticatedValue = false;
+        console.log('Initial authentication value from template:', this.isAuthenticatedValue);
+        console.log('User email from template:', this.userEmailValue);
+
+        // Initialize state
+        // Note: We don't set isAuthenticatedValue here because it's already set from the template
+        // this.isAuthenticatedValue = false;
         this.isLoadingValue = true;
         this.authLoadingIndicatorTarget.hidden = false;
         this.loadingIndicatorTarget.style.visibility = 'hidden'; // Make sure loading indicator starts hidden
         this.mainAppContainerTarget.hidden = true;
         this.authRequiredMessageTarget.hidden = true;
+
+        // Setup API with interceptors
+        this.#setupApi();
+
+        // Debug: Force authentication to true if it's set in the template
+        if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
+            console.log('Forcing authentication to true based on template data attribute');
+            this.isAuthenticatedValue = true;
+        }
 
         // Check if we have the chat-history outlet
         setTimeout(() => {
@@ -108,87 +121,30 @@ export default class extends Controller {
     #setupApi() {
         this.api = axios.create({
             baseURL: '/api',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // Add this for Symfony to recognize AJAX requests
+            },
+            // Important: Include credentials for Symfony session cookies
+            withCredentials: true
         });
 
-        // Request interceptor (add token, check refresh)
-        this.api.interceptors.request.use(async (config) => {
-            if (!config.url?.includes('/token/refresh')) {
-                await this.#checkTokenRefresh();
-            }
-            const token = localStorage.getItem('token');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-            return config;
-        });
-
-        // Response interceptor (handle 401, retry)
+        // Response interceptor (handle 401)
         this.api.interceptors.response.use(
             (response) => response,
             async (error) => {
-                const originalRequest = error.config;
+                // Handle 401 Unauthorized errors
+                if (error.response?.status === 401) {
+                    console.log('Received 401 Unauthorized response');
+                    console.log('Error details:', error.response?.data);
 
-                // Avoid retry loops for refresh endpoint
-                if (originalRequest.url?.includes('/token/refresh')) {
-                    localStorage.removeItem('token');
-                    if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/callback')) {
-                        window.location.href = '/login';
-                    }
-                    return Promise.reject(error);
-                }
-
-                // Handle 401: try refresh and retry original request
-                if (error.response?.status === 401 && !originalRequest._retry) {
-                    originalRequest._retry = true; // Mark to prevent infinite retry loops
-
-                    if (!this.isRefreshingToken) { // Prevent multiple concurrent refresh attempts
-                         this.isRefreshingToken = true;
-                         console.log('Attempting token refresh due to 401 error');
-                         try {
-                             const refreshed = await this.#refreshToken();
-                             if (refreshed) {
-                                 console.log('Interceptor: Refresh successful, retrying original request.');
-                                 // Update header for the retried request
-                                 const token = localStorage.getItem('token');
-                                 if (token) {
-                                     originalRequest.headers['Authorization'] = `Bearer ${token}`;
-                                     this.isRefreshingToken = false;
-                                     return this.api(originalRequest); // Retry with new token
-                                 } else {
-                                      console.warn('Interceptor: Token missing after successful refresh attempt? Aborting retry.');
-                                      this.isRefreshingToken = false;
-                                      return Promise.reject(error);
-                                 }
-                             } else {
-                                 console.log('Interceptor: Refresh failed or did not return a new token. Rejecting original request.');
-                                 this.isRefreshingToken = false;
-                                 // #refreshToken handles token removal on 401 failure. Redirect if needed.
-                                 if (!this.#isAuthenticated()) {
-                                     this.handleUnauthenticated(); // Update UI / redirect
-                                 }
-                                 return Promise.reject(error);
-                             }
-                         } catch (refreshError) {
-                             console.error('Interceptor: Error during refresh attempt.', refreshError);
-                             this.isRefreshingToken = false;
-                             if (!this.#isAuthenticated()) {
-                                 this.handleUnauthenticated(); // Update UI / redirect
-                             }
-                             return Promise.reject(error); // Reject with the original error
-                         }
+                    // Check if the template says we're authenticated
+                    if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
+                        console.log('Template says user is authenticated, but API returned 401');
+                        this.showNotification('API returned 401 Unauthorized, but Symfony says you are authenticated. This is likely a session issue.', 'error', 8000);
                     } else {
-                         console.log("Interceptor: Token refresh already in progress, waiting...");
-                         // Simple wait mechanism (could be improved with promises/event listeners)
-                         await new Promise(resolve => setTimeout(resolve, 1000));
-                         // Retry after waiting, assuming refresh completed
-                         const token = localStorage.getItem('token');
-                         if (token) {
-                             originalRequest.headers['Authorization'] = `Bearer ${token}`;
-                             return this.api(originalRequest);
-                         } else {
-                             return Promise.reject(error); // Refresh likely failed
-                         }
+                        // For Symfony session auth, show the auth required message
+                        this.handleUnauthenticated();
                     }
                 }
                 return Promise.reject(error);
@@ -196,96 +152,114 @@ export default class extends Controller {
         );
     }
 
-    #decodeToken(token) {
-        try {
-            if (!token) return null;
-            const parts = token.split('.');
-            if (parts.length !== 3) return null;
-            const payload = parts[1];
-            const jsonPayload = atob(payload);
-            return JSON.parse(jsonPayload);
-        } catch (error) {
-            console.error('Error decoding token:', error);
-            return null;
-        }
-    }
-
     #isAuthenticated() {
-        const token = localStorage.getItem('token');
-        if (!token) return false;
-        const decodedToken = this.#decodeToken(token);
-        if (!decodedToken) return false;
-        if (decodedToken.exp) {
-            const isExpired = decodedToken.exp < Date.now() / 1000;
-            if (isExpired) return false; // Expired
-        }
-        return true; // Has token, not expired (or no expiry)
-    }
+        // For Symfony session auth, we rely on the isAuthenticatedValue that's set from the template
+        // This value comes directly from Symfony's security system
+        console.log('Checking authentication status from Symfony:', this.isAuthenticatedValue);
 
-    async #refreshToken() {
-        console.log('Attempting token refresh...');
-        const currentToken = localStorage.getItem('token');
-        if (!currentToken) {
-            console.log('Refresh failed: No current token found.');
-            return false;
+        // Also check the data attribute directly from the element
+        const dataAttrValue = this.element.dataset.chatIsAuthenticatedValue === 'true';
+        console.log('Data attribute authentication value:', dataAttrValue);
+
+        // If either is true, consider the user authenticated
+        const isAuth = this.isAuthenticatedValue || dataAttrValue;
+        console.log('Final authentication decision:', isAuth);
+
+        // Update the controller value to match
+        if (isAuth) {
+            this.isAuthenticatedValue = true;
         }
 
-        try {
-            // Use a basic axios instance to avoid interceptors during refresh
-            const refreshApi = axios.create({ baseURL: '/api' });
-            const response = await refreshApi.post('/token/refresh', {}, {
-                 headers: {
-                     'Content-Type': 'application/json',
-                     'Authorization': `Bearer ${currentToken}`
-                 }
-            });
-
-            const { token } = response.data;
-            if (token) {
-                console.log('New token received, updating localStorage.');
-                localStorage.setItem('token', token);
-                return true;
-            } else {
-                console.warn('Refresh successful but no token in response data.');
-                return false;
-            }
-        } catch (error) {
-            console.error('Error during token refresh API call:', error);
-            if (axios.isAxiosError(error) && error.response?.status === 401) {
-                console.log('Refresh failed with 401, removing token.');
-                localStorage.removeItem('token');
-            } else {
-                console.log('Refresh failed with non-401 error, token not removed.');
-            }
-            return false;
-        }
-    }
-
-    async #checkTokenRefresh() {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const decodedToken = this.#decodeToken(token);
-        if (!decodedToken || !decodedToken.exp) return;
-
-        const expiresIn = decodedToken.exp - (Date.now() / 1000);
-        if (expiresIn < 3600) { // Less than 1 hour
-            console.log('Token nearing expiry, attempting proactive refresh.');
-            if (!this.isRefreshingToken) { // Avoid concurrent refresh
-                 this.isRefreshingToken = true;
-                 try {
-                     const refreshed = await this.#refreshToken();
-                     console.log(`Proactive token refresh ${refreshed ? 'successful' : 'failed'}.`);
-                 } finally {
-                     this.isRefreshingToken = false;
-                 }
-            }
-        }
+        return isAuth;
     }
 
     // --- Core Controller Logic ---
 
+    // Public methods for debugging authentication
+    checkAuth() {
+        console.log('Manual authentication check triggered');
+        this.verifyAuthentication();
+    }
+
+    // Force show the app regardless of authentication status
+    forceShowApp() {
+        console.log('Forcing app to show regardless of authentication status');
+        this.isAuthenticatedValue = true;
+        this.mainAppContainerTarget.hidden = false;
+        this.authRequiredMessageTarget.hidden = true;
+        this.headerNavTarget.hidden = false;
+
+        // Try to load initial data
+        this.loadInitialData();
+
+        this.showNotification('App forced to show. This is a temporary fix.', 'warning', 5000);
+    }
+
+    debugToken() {
+        console.log('Debugging Symfony session authentication...');
+
+        // For Symfony session auth, we can show the user email from the template
+        const userInfo = `User Email: ${this.userEmailValue || 'Not available'}\nAuthenticated: ${this.isAuthenticatedValue}`;
+        console.log(userInfo);
+        this.showNotification(userInfo, 'info', 5000);
+
+        // Test the session with an API call
+        this.testSessionWithApi();
+    }
+
+    async testSessionWithApi() {
+        console.log('Testing Symfony session with API call...');
+
+        // Force authentication to true if it's set in the template
+        if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
+            console.log('Forcing authentication to true based on template data attribute');
+            this.isAuthenticatedValue = true;
+        }
+
+        // Show current authentication state
+        const authState = `Current authentication state:\n` +
+            `- Controller value: ${this.isAuthenticatedValue}\n` +
+            `- Template data attribute: ${this.element.dataset.chatIsAuthenticatedValue}\n` +
+            `- User email: ${this.userEmailValue || 'Not available'}`;
+
+        console.log(authState);
+        this.showNotification(authState, 'info', 5000);
+
+        try {
+            // Make a simple API call to test the session
+            const response = await this.api.get('/models');
+            console.log('API test response:', response);
+            this.showNotification('API call successful! Symfony session is working.', 'success');
+
+            // If the API call was successful, try to verify authentication again
+            this.verifyAuthentication();
+
+            // Force show the main app container
+            this.mainAppContainerTarget.hidden = false;
+            this.authRequiredMessageTarget.hidden = true;
+            console.log('Forced main app container to be visible');
+        } catch (error) {
+            console.error('API test failed:', error);
+            let errorMessage = 'API call failed. Symfony session may be invalid.';
+
+            if (axios.isAxiosError(error)) {
+                errorMessage += `\nStatus: ${error.response?.status || 'unknown'}`;
+                errorMessage += `\nMessage: ${error.response?.data?.message || error.message || 'No details'}`;
+
+                // If we got a 401, the session is likely invalid
+                if (error.response?.status === 401) {
+                    errorMessage += '\n\nYour session appears to be invalid. Please try logging in again.';
+                }
+            }
+
+            this.showNotification(errorMessage, 'error', 8000);
+        }
+    }
+
     async verifyAuthentication() {
         console.log('Verifying authentication...');
+        console.log('Current authentication value:', this.isAuthenticatedValue);
+        console.log('Template data attribute:', this.element.dataset.chatIsAuthenticatedValue);
 
         // Make sure auth loading indicator is visible during verification
         // but keep the main loading indicator hidden
@@ -293,36 +267,45 @@ export default class extends Controller {
         this.authLoadingIndicatorTarget.hidden = false;
         this.loadingIndicatorTarget.style.visibility = 'hidden'; // Always keep main loader hidden during auth
 
+        // Force authentication to true if it's set in the template
+        if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
+            console.log('Forcing authentication to true based on template data attribute');
+            this.isAuthenticatedValue = true;
+        }
+
         try {
-            // Use the internal helper now
-            if (this.#isAuthenticated()) {
-                // Try a proactive refresh check just in case
-                await this.#checkTokenRefresh();
-                // Re-check after potential refresh
-                if (this.#isAuthenticated()) {
-                    const token = localStorage.getItem('token');
-                    const payload = this.#decodeToken(token);
-                    this.userEmailValue = payload?.email || '';
-                    this.isAuthenticatedValue = true;
-                    console.log('Authentication successful');
+            console.log('Checking authentication from Symfony...');
+            console.log('Authentication value after check:', this.isAuthenticatedValue);
+            // For Symfony session auth, we already have the authentication status from the template
+            if (this.isAuthenticatedValue) {
+                console.log('User is authenticated via Symfony session');
 
-                    // Update the user email display in the header
-                    if (this.hasUserEmailTarget) {
-                        this.userEmailTarget.textContent = this.userEmailValue;
-                    }
-
-                    // Show the header
-                    if (this.hasHeaderNavTarget) {
-                        this.headerNavTarget.hidden = false;
-                    }
-
-                    // Load initial data (which manages its own loading state)
-                    await this.loadInitialData();
+                // Update the user email display in the header
+                if (this.hasUserEmailTarget) {
+                    this.userEmailTarget.textContent = this.userEmailValue;
+                    console.log('Updated user email in header:', this.userEmailValue);
                 } else {
-                    // Refresh failed or token removed during check
-                    this.handleUnauthenticated();
+                    console.warn('User email target not found');
                 }
+
+                // Show the header
+                if (this.hasHeaderNavTarget) {
+                    this.headerNavTarget.hidden = false;
+                    console.log('Header nav is now visible');
+                } else {
+                    console.warn('Header nav target not found');
+                }
+
+                // Show the main app container and hide auth message
+                this.mainAppContainerTarget.hidden = false;
+                this.authRequiredMessageTarget.hidden = true;
+                console.log('Main app container is now visible, auth message hidden');
+
+                // Load initial data (which manages its own loading state)
+                console.log('Loading initial data...');
+                await this.loadInitialData();
             } else {
+                console.log('User is not authenticated according to Symfony');
                 this.handleUnauthenticated();
             }
         } catch (error) {
@@ -347,25 +330,43 @@ export default class extends Controller {
     }
 
     handleUnauthenticated() {
-        console.log('User is not authenticated');
+        console.log('User is not authenticated, handling unauthenticated state');
+
+        // Check if the template says we're authenticated
+        if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
+            console.log('Template says user is authenticated, but controller thinks not');
+            console.log('Forcing authentication to true based on template data attribute');
+            this.isAuthenticatedValue = true;
+
+            // Try to verify authentication again
+            this.verifyAuthentication();
+            return;
+        }
+
         this.isAuthenticatedValue = false;
-        localStorage.removeItem('token'); // Ensure token is removed
 
         // Update UI
+        console.log('Updating UI for unauthenticated state');
         this.mainAppContainerTarget.hidden = true;
         this.authRequiredMessageTarget.hidden = false;
+        console.log('Main app container hidden, auth required message shown');
 
         // Hide the header
         if (this.hasHeaderNavTarget) {
             this.headerNavTarget.hidden = true;
+            console.log('Header nav hidden');
+        } else {
+            console.warn('Header nav target not found');
         }
 
         // Make sure loading indicators are hidden
         this.isLoadingValue = false;
         this.loadingIndicatorTarget.style.visibility = 'hidden';
         this.authLoadingIndicatorTarget.hidden = true;
+        console.log('All loading indicators hidden');
 
-        // Consider redirecting: window.location.href = '/login';
+        // Show a notification instead of redirecting
+        this.showNotification('Authentication issue detected. Use the buttons below to debug or force show the app.', 'warning', 5000);
     }
 
     async loadInitialData() {
@@ -566,25 +567,17 @@ export default class extends Controller {
                 // Initialize content for the streaming response
                 let streamContent = '';
 
-                // Make the POST request
-                // Get the JWT token from localStorage
-                const token = localStorage.getItem('token');
-
-                // Make sure we have a token
-                if (!token) {
-                    console.error('No authentication token found');
-                    this.showNotification('Authentication error. Please log in again.', 'error');
-                    this.removePlaceholders(promptId);
-                    return;
-                }
+                // Make the POST request with Symfony session authentication
 
                 fetch('/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'text/event-stream',
-                        'Authorization': `Bearer ${token}`
+                        'X-Requested-With': 'XMLHttpRequest' // For Symfony to recognize AJAX requests
                     },
+                    // Include credentials for Symfony session cookies
+                    credentials: 'include',
                     body: JSON.stringify({
                         prompt: prompt,
                         models: [streamingModelId],
@@ -1071,7 +1064,7 @@ export default class extends Controller {
         this.chatWindowMessagesTarget.innerHTML = '';
     }
 
-    showNotification(message, type = 'warning') {
+    showNotification(message, type = 'warning', duration = 3000) {
         // Create a notification element
         const notification = document.createElement('div');
 
@@ -1087,6 +1080,13 @@ export default class extends Controller {
             bgColorClass, 'flex', 'items-center', 'space-x-2'
         );
 
+        // For longer messages, add max-width and allow text wrapping
+        if (message.length > 100 || message.includes('\n')) {
+            notification.classList.add('max-w-lg');
+            notification.style.whiteSpace = 'pre-wrap';
+            notification.style.textAlign = 'left';
+        }
+
         // Add an icon based on the notification type
         let iconSvg = '';
         if (type === 'warning') {
@@ -1099,9 +1099,13 @@ export default class extends Controller {
             iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
         }
 
+        // Add a close button for longer notifications
+        const closeButton = duration > 5000 ? '<button class="ml-2 text-white hover:text-gray-200" onclick="this.parentElement.remove();">×</button>' : '';
+
         notification.innerHTML = `
             <div class="flex-shrink-0">${iconSvg}</div>
             <div>${message}</div>
+            ${closeButton}
         `;
 
         // Add to the DOM
@@ -1110,11 +1114,11 @@ export default class extends Controller {
         // Add entrance animation
         notification.classList.add('animate-notification-in');
 
-        // Remove after 3 seconds
+        // Remove after specified duration
         setTimeout(() => {
             notification.classList.add('opacity-0', 'transition-opacity', 'duration-500');
             setTimeout(() => notification.remove(), 500);
-        }, 3000);
+        }, duration);
     }
 
     // Force hide all loading indicators
@@ -1135,17 +1139,11 @@ export default class extends Controller {
     logout() {
         console.log('Logging out...');
 
-        // Remove the token from localStorage
-        localStorage.removeItem('token');
+        // For Symfony session auth, we need to redirect to the logout route
+        this.showNotification('Logging out...', 'info');
 
-        // Show a notification
-        this.showNotification('You have been logged out successfully', 'info');
-
-        // Handle the unauthenticated state
-        this.handleUnauthenticated();
-
-        // Redirect to login page if needed
-        // window.location.href = '/login';
+        // Redirect to Symfony's logout route
+        window.location.href = '/logout';
     }
 
     appendMessageToDOM(message) {

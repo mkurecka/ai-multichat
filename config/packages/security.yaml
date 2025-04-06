@@ -13,9 +13,13 @@ security:
             security: false
         api:
             pattern: ^/api
-            stateless: true
+            stateless: false
             custom_authenticators:
                 - App\Security\JWTAuthenticator
+            # Add session authentication
+            provider: app_user_provider
+            # Allow session authentication to work alongside JWT
+            context: main
         main:
             lazy: true
             provider: app_user_provider

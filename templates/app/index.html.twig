@@ -2,8 +2,15 @@
 
 {% block body %}
     {# Main chat controller wraps everything #}
+    {# Debug authentication status #}
+    <script>
+        console.log('Symfony authentication status:', {{ app.user ? 'true' : 'false' }});
+        console.log('Symfony user:', {{ app.user ? ('"' ~ app.user.email ~ '"') : 'null' }});
+    </script>
+
     <div data-controller="chat"
-         data-chat-is-authenticated-value="false" {# Initial state, controller updates #}
+         data-chat-is-authenticated-value="{{ app.user ? 'true' : 'false' }}" {# User is already authenticated by Symfony #}
+         data-chat-user-email-value="{{ app.user ? app.user.email : '' }}" {# Pass user email from Symfony #}
          data-chat-is-loading-value="true"
          data-chat-models-value="[]"
          data-chat-chat-history-value="[]"
@@ -15,7 +22,15 @@
 
         {# Loading/Auth Indicators #}
         <div data-chat-target="authLoadingIndicator" class="p-4 text-center">Verifying Authentication...</div>
-        <div data-chat-target="authRequiredMessage" class="p-4 text-center text-red-600" hidden>Authentication required. Please log in.</div>
+        <div data-chat-target="authRequiredMessage" class="p-4 text-center text-red-600" hidden>
+            <p>Authentication required. Please log in.</p>
+            <div class="mt-4 flex justify-center space-x-4 flex-wrap">
+                <button type="button" data-action="chat#checkAuth" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 m-1">Retry Authentication</button>
+                <button type="button" data-action="chat#debugToken" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 m-1">Debug Session</button>
+                <button type="button" data-action="chat#forceShowApp" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 m-1">Force Show App</button>
+                <a href="/login" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 inline-flex items-center m-1">Go to Login</a>
+            </div>
+        </div>
         <div data-chat-target="loadingIndicator" class="fixed bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg z-50 flex items-center space-x-3 border border-blue-300" style="visibility: hidden;">
              <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
              <span class="text-sm font-medium text-blue-600">Loading data...</span>
