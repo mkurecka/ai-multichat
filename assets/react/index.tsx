@@ -1,5 +1,6 @@
 // frontend/src/index.tsx
-import '../app';
+// import '../app'; // Removed import causing Vite/Webpack conflict
+import '../styles/app.css'; // Directly import necessary global styles
 import './index.css';
 
 import React from 'react';

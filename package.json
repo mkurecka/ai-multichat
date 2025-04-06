@@ -2,6 +2,7 @@
     "private": true,
     "scripts": {
         "dev": "encore dev",
+        "dev:vite": "vite",
         "watch": "encore dev --watch",
         "build": "encore production --progress",
         "lint": "eslint ."

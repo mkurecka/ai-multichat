@@ -7,18 +7,16 @@ const Callback: React.FC = () => {
 
     useEffect(() => {
         console.log('Callback component mounted');
-        console.log('Full URL:', window.location.href);
-        
-        // Get the full URL and extract the token
-        const fullUrl = window.location.href;
-        const tokenMatch = fullUrl.match(/token=([^&]+)/);
-        const token = tokenMatch ? tokenMatch[1] : null;
-        
-        console.log('Extracted token:', token);
-        
-        // Check for error parameter
-        const errorParam = new URLSearchParams(window.location.search).get('error');
-        console.log('Error parameter:', errorParam);
+        console.log('Callback component mounted');
+        console.log('Current search params:', window.location.search);
+
+        // Use URLSearchParams to extract token and error
+        const searchParams = new URLSearchParams(window.location.search);
+        const token = searchParams.get('token');
+        const errorParam = searchParams.get('error');
+
+        console.log('Extracted token via URLSearchParams:', token);
+        console.log('Extracted error via URLSearchParams:', errorParam);
 
         if (errorParam) {
             setError(errorParam);

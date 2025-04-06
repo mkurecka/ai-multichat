@@ -136,33 +136,53 @@ export const isAuthenticated = (): boolean => {
 
 // Function to refresh the token
 export const refreshToken = async (): Promise<boolean> => {
+  console.log('Attempting token refresh...');
+  const currentToken = localStorage.getItem('token');
+  if (!currentToken) {
+    console.log('Refresh failed: No current token found.');
+    return false; // No token to refresh
+  }
+
   try {
-    // Get the current token (even if expired) to send with the refresh request
-    const currentToken = localStorage.getItem('token');
-    if (!currentToken) {
-      return false;
-    }
-    
-    // Create a new axios instance to avoid interceptors that might cause infinite loops
+    // Create a new axios instance to avoid interceptors
     const refreshApi = axios.create({
-      baseURL: '/api', // Changed to relative path
+      baseURL: '/api',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${currentToken}`
       }
     });
-    
-    const response = await refreshApi.post('/token/refresh');
+
+    console.log('Calling POST /api/token/refresh');
+    const response = await refreshApi.post('/token/refresh'); // Ensure endpoint is correct
+    console.log('Refresh API response status:', response.status);
+    console.log('Refresh API response data:', response.data);
+
     const { token } = response.data;
-    
+
     if (token) {
+      console.log('New token received, updating localStorage.');
       localStorage.setItem('token', token);
       return true;
+    } else {
+      console.warn('Refresh successful but no token in response data.');
+      // Decide if token should be removed here. For now, let's NOT remove it.
+      // localStorage.removeItem('token');
+      return false; // Indicate refresh didn't provide a new token
     }
-    return false;
+
   } catch (error) {
-    console.error('Error refreshing token:', error);
-    return false;
+    console.error('Error during token refresh API call:', error);
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      // Only remove token if refresh endpoint explicitly says unauthorized
+      console.log('Refresh failed with 401, removing token.');
+      localStorage.removeItem('token');
+    } else {
+      // For other errors (network, 500, etc.), don't remove the token,
+      // maybe the original token is still valid or the issue is temporary.
+      console.log('Refresh failed with non-401 error, token not removed.');
+    }
+    return false; // Indicate refresh failed
   }
 };
 
@@ -170,14 +190,27 @@ export const refreshToken = async (): Promise<boolean> => {
 export const checkTokenRefresh = async (): Promise<void> => {
   const token = localStorage.getItem('token');
   if (!token) return;
-  
+
   const decodedToken = decodeToken(token);
-  if (!decodedToken || !decodedToken.exp) return;
-  
-  // If token expires in less than 1 hour (3600 seconds), refresh it
+  if (!decodedToken || !decodedToken.exp) {
+    console.log('Cannot check refresh: Invalid or non-expiring token.');
+    return;
+  }
+
   const expiresIn = decodedToken.exp - (Date.now() / 1000);
+  console.log(`Token expires in approximately ${Math.round(expiresIn)} seconds.`);
+
+  // If token expires in less than 1 hour (3600 seconds), attempt refresh
   if (expiresIn < 3600) {
-    await refreshToken();
+    console.log('Token nearing expiry, attempting proactive refresh.');
+    const refreshed = await refreshToken();
+    if (refreshed) {
+      console.log('Proactive token refresh successful.');
+    } else {
+      console.log('Proactive token refresh failed.');
+      // If refresh failed here, refreshToken() might have removed the token if it was a 401.
+      // The main auth check in App.tsx will handle the consequences.
+    }
   }
 };
 

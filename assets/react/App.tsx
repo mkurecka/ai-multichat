@@ -1,26 +1,30 @@
 import { useState, useEffect } from 'react';
 import { Message, Model, ChatSession } from './types';
 import { getModels, getChatHistory, sendMessageToModels, refreshModels, isAuthenticated, checkTokenRefresh, getThreadHistory, logout, createThread } from './services/api';
-import { useNavigate, Routes, Route } from 'react-router-dom';
+import { useNavigate, Routes, Route, Navigate } from 'react-router-dom'; // Added Navigate
 import ModelSelector from './components/ModelSelector';
 import ChatWindow from './components/ChatWindow';
 import ChatHistory from './components/ChatHistory';
+import Callback from './components/Callback'; // Import the Callback component
+import Login from './components/Login'; // Import the actual Login component
 import { ChevronLeft, ChevronRight, LogOut, User, DollarSign } from 'lucide-react';
 import CostsPage from './components/CostsPage';
-import { Layout } from './components/Layout';
-import { Header } from './components/Header';
+import { Header } from './components/Header'; // Restore Header import
+
+type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
 function App() {
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Keep navigate for potential future use
   const [models, setModels] = useState<Model[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showModelSelector, setShowModelSelector] = useState(true);
   const [showChatHistory, setShowChatHistory] = useState(true);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Restore isLoading state for chat operations
   const [message, setMessage] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading'); // Keep authStatus for initial load/auth check
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const MAX_MODELS = 16;
@@ -36,42 +40,43 @@ function App() {
     return JSON.stringify(message.content);
   };
 
-  // Check authentication on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      setIsLoading(true);
-      
-      // Check if user is authenticated
-      if (!isAuthenticated()) {
-        // Redirect to login if not authenticated
-        navigate('/login');
-        return;
-      }
-      
-      // Check if token needs to be refreshed
-      try {
-        await checkTokenRefresh();
-        // Get user email from token
-        const token = localStorage.getItem('token');
-        if (token) {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          setUserEmail(payload.email);
-        }
-      } catch (error) {
-        console.error('Error checking token:', error);
-        // If token refresh fails, redirect to login
-        navigate('/login');
-        return;
-      }
-      
-      setIsLoading(false);
-    };
-    
-    checkAuth();
-  }, [navigate]);
+   // Verify authentication status ONCE on mount
+   useEffect(() => {
+     const verifyAuth = async () => {
+       // No need to set isLoading here, authStatus handles initial load state
+       const authenticated = isAuthenticated(); // Initial check
 
-  // Fetch models on mount
+       if (authenticated) {
+        try {
+          await checkTokenRefresh(); // Try to refresh if needed
+          // Re-check authentication after potential refresh/removal
+          if (isAuthenticated()) {
+              const token = localStorage.getItem('token');
+              if (token) {
+                  const payload = JSON.parse(atob(token.split('.')[1]));
+                  setUserEmail(payload.email);
+              }
+              setAuthStatus('authenticated');
+          } else {
+             // Token was removed during refresh check
+             setAuthStatus('unauthenticated');
+          }
+        } catch (error) {
+          console.error('Token refresh/validation failed:', error);
+          localStorage.removeItem('token');
+          setAuthStatus('unauthenticated'); // Treat as unauthenticated if refresh fails
+        }
+      } else {
+        setAuthStatus('unauthenticated'); // Not authenticated initially
+      }
+    };
+    verifyAuth();
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Fetch models only when authenticated
   useEffect(() => {
+    if (authStatus !== 'authenticated') return; // Only run if authenticated
+
     const fetchModels = async () => {
       // Only log in development mode
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -120,10 +125,12 @@ function App() {
     };
 
     fetchModels();
-  }, []);
+  }, [authStatus]); // Re-run if authStatus changes to authenticated
 
-  // Fetch chat history on mount
+  // Fetch chat history only when authenticated
   useEffect(() => {
+    if (authStatus !== 'authenticated') return; // Only run if authenticated
+
     const fetchChatHistory = async () => {
       try {
         const history = await getChatHistory();
@@ -134,9 +141,9 @@ function App() {
     };
 
     fetchChatHistory();
-  }, []);
+  }, [authStatus]); // Re-run if authStatus changes to authenticated
 
-  // Function to fetch chat history
+   // Function to fetch chat history (keep as is)
   const fetchChatHistory = async () => {
     try {
       const history = await getChatHistory();
@@ -156,7 +163,9 @@ function App() {
 
   const handleSendMessage = async (messages: Message[], prompt: string) => {
     if (!prompt.trim() || selectedModels.length === 0) return;
-    
+
+    setIsLoading(true); // Set loading true before sending
+
     // Create a new message object
     const userMessage: Message = {
       role: 'user',
@@ -244,12 +253,11 @@ function App() {
       if (!currentSessionId && response.threadId) {
         setCurrentSessionId(response.threadId);
       }
-      
       // Reload the chat history to include the new messages
       await fetchChatHistory();
     } catch (error) {
       console.error('Error sending message:', error);
-      
+
       // Remove the placeholder messages
       setMessages(prevMessages => 
         prevMessages.filter(msg => !(msg.promptId === promptId && msg.role === 'assistant'))
@@ -265,6 +273,8 @@ function App() {
           threadId: currentSessionId
         }
       ]);
+    } finally {
+       setIsLoading(false); // Set loading false after completion or error
     }
   };
 
@@ -313,40 +323,78 @@ function App() {
     setShowChatHistory(!showChatHistory);
   };
 
+  // Define a ProtectedRoute component using authStatus state
+  const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+    // Still show loading while verifying auth
+    if (authStatus === 'loading') {
+      return <div className="flex items-center justify-center min-h-screen">Verifying Authentication...</div>;
+    }
+    // Redirect if not authenticated
+    return authStatus === 'authenticated' ? children : <Navigate to="/login" replace />;
+  };
+
+  // Show loading indicator while authStatus is 'loading'
+  if (authStatus === 'loading') {
+    return <div className="flex items-center justify-center min-h-screen">Loading Application...</div>;
+  }
+
+  // --- Main Router ---
   return (
     <Routes>
-      <Route path="/" element={
-        <div className="flex h-screen bg-gray-100">
-          {/* Sidebar */}
-          <div className={`${showChatHistory ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-white shadow-md`}>
-            <ChatHistory 
-              chatSessions={chatHistory} 
-              onSelectChat={handleSelectChat}
+       {/* Public route for Login - Redirect if already logged in */}
+       <Route path="/login" element={authStatus === 'authenticated' ? <Navigate to="/" replace /> : <Login />} />
+
+       {/* Public route for Callback - Handled by Callback component */}
+       <Route path="/callback" element={<Callback />} />
+
+       {/* Protected Routes - Use ProtectedRoute component */}
+       <Route
+         path="/" // Main application route
+         element={
+           <ProtectedRoute>
+             <div className="flex h-screen bg-gray-100">
+               {/* Sidebar */}
+               <div className={`${showChatHistory ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-white shadow-md`}>
+                 <ChatHistory
+                   chatSessions={chatHistory}
+                   onSelectChat={handleSelectChat}
               onStartNewChat={handleStartNewChat}
             />
           </div>
           
           {/* Main content */}
           <div className="flex-1 flex flex-col">
-            {/* Header */}
-            <Header />
-            
-            {/* Chat area */}
+                 {/* Header */}
+                 <Header />
+                 {/* Chat area */}
             <div className="flex-1 overflow-hidden flex flex-col">
               <ChatWindow 
                 messages={messages}
                 models={models}
                 onModelToggle={handleModelToggle}
                 onSendMessage={handleSendMessage}
-                isLoading={isLoading}
-                maxModels={16}
-              />
-            </div>
-          </div>
-        </div>
-      } />
-      <Route path="/login" element={<div>Login Page</div>} />
-      <Route path="/costs" element={<CostsPage />} />
+                 isLoading={isLoading} // Use the restored isLoading state
+                 maxModels={16}
+               />
+                 </div>
+               </div>
+             </div>
+           </ProtectedRoute>
+         }
+       />
+       <Route
+         path="/costs"
+         element={
+           <ProtectedRoute>
+             <CostsPage />
+           </ProtectedRoute>
+         }
+       />
+       {/* Add other protected routes here */}
+
+       {/* Optional: Redirect any unknown paths */}
+       {/* Catch-all Route - Redirect based on auth status */}
+       <Route path="*" element={<Navigate to={authStatus === 'authenticated' ? "/" : "/login"} replace />} />
     </Routes>
   );
 }
