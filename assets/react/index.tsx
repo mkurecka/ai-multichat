@@ -4,7 +4,7 @@ import './index.css';
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { HashRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom'; // Changed from HashRouter
 import App from './App';
 
 const container = document.getElementById('root');
@@ -12,9 +12,9 @@ if (container) {
     const root = createRoot(container);
     root.render(
         <React.StrictMode>
-            <HashRouter>
+            <BrowserRouter basename="/app"> {/* Changed from HashRouter, added basename */}
                 <App />
-            </HashRouter>
+            </BrowserRouter>
         </React.StrictMode>
     );
 }
