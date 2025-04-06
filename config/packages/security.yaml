@@ -31,7 +31,7 @@ security:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google/check, roles: PUBLIC_ACCESS }
-        - { path: ^/app/callback, roles: PUBLIC_ACCESS }
+        # - { path: ^/app/callback, roles: PUBLIC_ACCESS } # Removed, no longer used
         - { path: ^/api/public, roles: PUBLIC_ACCESS }
         # - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS } # Removed: Must be protected by 'api' firewall
         - { path: ^/index, roles: PUBLIC_ACCESS }

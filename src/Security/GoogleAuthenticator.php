@@ -21,7 +21,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
 
 class GoogleAuthenticator extends OAuth2Authenticator
 {
-    private string $frontendUrl;
+    // Removed private string $frontendUrl;
 
     public function __construct(
         private ClientRegistry $clientRegistry,
@@ -30,7 +30,7 @@ class GoogleAuthenticator extends OAuth2Authenticator
         private OrganizationRepository $organizationRepository,
         private EntityManagerInterface $entityManager,
     ) {
-        $this->frontendUrl = $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173';
+        // Removed $this->frontendUrl assignment
     }
 
     public function supports(Request $request): ?bool
@@ -97,15 +97,22 @@ class GoogleAuthenticator extends OAuth2Authenticator
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response
     {
-        // Let the controller handle the redirect with token
-        return null;
+        // Redirect to the main app page after successful login
+        $targetUrl = $this->router->generate('app_main'); // Fixed typo: Use ->
+        return new RedirectResponse($targetUrl);
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        // Redirect to frontend with error
-        return new RedirectResponse(
-            $this->frontendUrl . '/callback?error=' . urlencode($exception->getMessage())
-        );
+        // Redirect back to a login page (or handle differently) on failure
+        // For simplicity, redirecting to the Google connect start page again
+        // You might want a dedicated login page with error display
+        $message = strtr($exception->getMessageKey(), $exception->getMessageData());
+        $request->getSession()->getFlashBag()->add('error', $message); // Optional: Flash message
+
+        // Redirect to the route that initiates the Google login
+        return new RedirectResponse($this->router->generate('connect_google')); // Fixed typo: Use ->
+        // Or redirect to a dedicated login page:
+        // return new RedirectResponse($this->router->generate('app_login')); // Assuming 'app_login' route exists
     }
 }

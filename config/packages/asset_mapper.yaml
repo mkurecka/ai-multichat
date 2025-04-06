@@ -1,11 +1,15 @@
-# framework:
-#     asset_mapper:
-#         # The paths to make available to the asset mapper.
-#         paths:
-#             - assets/
-#         missing_import_mode: strict
+framework:
+    asset_mapper:
+        # The paths to make available to the asset mapper.
+        paths:
+            - assets/
+        # Controls behavior for imports not found in the importmap.
+        # "strict": an exception is thrown. Recommended for development.
+        # "warn": a warning is logged. Recommended for production.
+        # "ignore": does nothing.
+        missing_import_mode: strict # Recommended for dev
 
-# when@prod:
-#     framework:
-#         asset_mapper:
-#             missing_import_mode: warn
+when@prod:
+    framework:
+        asset_mapper:
+            missing_import_mode: warn # Recommended for prod

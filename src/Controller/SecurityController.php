@@ -16,9 +16,10 @@ use Symfony\Component\Routing\Annotation\Route;
 class SecurityController extends AbstractController
 {
     #[Route('/login', name: 'app_login')]
-    public function login()
+    public function login(): Response // Added Response type hint
     {
-        return $this->redirectToRoute('connect_google');
+        // Render the login page which contains the "Login with Google" button
+        return $this->render('security/login.html.twig'); // Fixed typo here
     }
 
     #[Route('/logout', name: 'app_logout')]

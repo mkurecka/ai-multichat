@@ -28,4 +28,7 @@ return [
     'axios' => [
         'version' => '1.8.4',
     ],
+    '@symfony/stimulus-bridge' => [
+        'version' => '4.0.0',
+    ],
 ];

@@ -1,11 +1,4 @@
-import { startStimulusApp } from '@symfony/stimulus-bridge';
+import { startStimulusApp } from '@symfony/stimulus-bundle';
 
-// Registers Stimulus controllers from controllers.json and in the controllers/ directory
-export const app = startStimulusApp(require.context(
-    './controllers',
-    true,
-    /\.[jt]sx?$/
-));
-
-// Make app global for debugging
-window.app = app;
+// Start the Stimulus application
+export const app = startStimulusApp();

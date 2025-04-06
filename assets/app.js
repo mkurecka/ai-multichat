@@ -4,5 +4,5 @@ import './styles/app.css';
 // Import bootstrap.js for Stimulus
 import './bootstrap.js';
 
-// Your JavaScript code
-console.log('Vite ⚡️ Symfony');
+// Stimulus app is initialized in bootstrap.js
+console.log('Symfony Stimulus App Initialized');
