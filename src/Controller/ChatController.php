@@ -245,23 +245,6 @@ class ChatController extends AbstractController
             // Non-streaming response
             $responses = [];
 
-            // Save initial user prompt only once
-            $userPromptHistory = new ChatHistory();
-            $userPromptHistory->setThread($thread)
-                ->setPrompt($prompt)
-                ->setPromptId($promptId)
-                ->setResponse([
-                    'content' => '',
-                    'usage' => [
-                        'prompt_tokens' => 0,
-                        'completion_tokens' => 0,
-                        'total_tokens' => 0
-                    ]
-                ])
-                ->setModelId('user_prompt')
-                ->setCreatedAt(new \DateTime());
-            $em->persist($userPromptHistory);
-
             // Process all models but use the same thread
             foreach ($models as $modelId) {
                 $modelResponses = $openRouter->generateResponse($prompt, [$modelId], $thread);

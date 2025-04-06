@@ -685,41 +685,51 @@ export default class extends Controller {
     updateStreamingContent(promptId, modelId, content) {
         console.log(`Updating streaming content for ${modelId} (Prompt: ${promptId})`);
 
-        // Find the placeholder element for this model and prompt
-        const placeholderElement = this.chatWindowMessagesTarget.querySelector(`[data-prompt-id="${promptId}"][data-model-id="${modelId}"]`);
+        // Find the message group for this prompt
+        const messageGroupElement = this.chatWindowMessagesTarget.querySelector(`.message-group[data-prompt-id="${promptId}"]`);
 
-        if (placeholderElement) {
-            // Find the content element within the placeholder
-            const contentElement = placeholderElement.querySelector('[data-role="content"]');
+        if (messageGroupElement) {
+            // Find the assistant responses container
+            const assistantResponsesContainer = messageGroupElement.querySelector('.assistant-responses-container');
 
-            if (contentElement) {
-                // Update the content element with the streaming content
-                contentElement.textContent = content;
+            if (assistantResponsesContainer) {
+                // Find the placeholder element for this model
+                const placeholderElement = assistantResponsesContainer.querySelector(`[data-model-id="${modelId}"]`);
 
-                // Keep the placeholder attribute during streaming
-                // but add a class to indicate it's being streamed
-                placeholderElement.classList.add('streaming-active');
+                if (placeholderElement) {
+                    // Find the content element within the placeholder
+                    const contentElement = placeholderElement.querySelector('[data-role="content"]');
 
-                // Format the content with Markdown if needed
-                // This is optional and depends on your requirements
-                // You might want to use a library like marked.js for this
+                    if (contentElement) {
+                        // Update the content element with the streaming content
+                        contentElement.textContent = content;
 
-                // Update the message in the currentMessagesValue array
-                const messageIndex = this.currentMessagesValue.findIndex(msg =>
-                    msg.promptId === promptId && msg.modelId === modelId && msg.role === 'assistant');
+                        // Keep the placeholder attribute during streaming
+                        // but add a class to indicate it's being streamed
+                        placeholderElement.classList.add('streaming-active');
 
-                if (messageIndex !== -1) {
-                    const updatedMessages = [...this.currentMessagesValue];
-                    updatedMessages[messageIndex] = {
-                        ...updatedMessages[messageIndex],
-                        content: content,
-                        isPlaceholder: false
-                    };
-                    this.currentMessagesValue = updatedMessages;
+                        // Format the content with Markdown if needed
+                        // This is optional and depends on your requirements
+                        // You might want to use a library like marked.js for this
+
+                        // Update the message in the currentMessagesValue array
+                        const messageIndex = this.currentMessagesValue.findIndex(msg =>
+                            msg.promptId === promptId && msg.modelId === modelId && msg.role === 'assistant');
+
+                        if (messageIndex !== -1) {
+                            const updatedMessages = [...this.currentMessagesValue];
+                            updatedMessages[messageIndex] = {
+                                ...updatedMessages[messageIndex],
+                                content: content,
+                                isPlaceholder: false
+                            };
+                            this.currentMessagesValue = updatedMessages;
+                        }
+
+                        // Scroll to the bottom to show the latest content
+                        this.scrollToBottom();
+                    }
                 }
-
-                // Scroll to the bottom to show the latest content
-                this.scrollToBottom();
             }
         }
     }
@@ -739,35 +749,43 @@ export default class extends Controller {
             };
             this.currentMessagesValue = updatedMessages;
 
-            // Find the placeholder element for this model and prompt
-            const placeholderElement = this.chatWindowMessagesTarget.querySelector(`[data-prompt-id="${promptId}"][data-model-id="${modelId}"]`);
-            if (placeholderElement) {
-                // Find the content element within the placeholder
-                const contentElement = placeholderElement.querySelector('[data-role="content"]');
-                if (contentElement) {
-                    // Update the content element with the final content
-                    contentElement.textContent = finalContent;
+            // Find the message group for this prompt
+            const messageGroupElement = this.chatWindowMessagesTarget.querySelector(`.message-group[data-prompt-id="${promptId}"]`);
+            if (messageGroupElement) {
+                // Find the assistant responses container
+                const assistantResponsesContainer = messageGroupElement.querySelector('.assistant-responses-container');
+                if (assistantResponsesContainer) {
+                    // Find the placeholder element for this model
+                    const placeholderElement = assistantResponsesContainer.querySelector(`[data-model-id="${modelId}"]`);
+                    if (placeholderElement) {
+                        // Find the content element within the placeholder
+                        const contentElement = placeholderElement.querySelector('[data-role="content"]');
+                        if (contentElement) {
+                            // Update the content element with the final content
+                            contentElement.textContent = finalContent;
+                        }
+
+                        // Remove the placeholder attribute
+                        placeholderElement.removeAttribute('data-placeholder');
+
+                        // Update usage information if available
+                        const usageElement = placeholderElement.querySelector('[data-role="usage"]');
+                        if (usageElement && usage) {
+                            usageElement.textContent = `(Tokens: ${usage.total_tokens})`;
+                        } else if (usageElement) {
+                            usageElement.textContent = '';
+                        }
+
+                        // Add a class to indicate the response is complete
+                        placeholderElement.classList.add('response-complete');
+
+                        // Add a highlight effect to show the response is complete
+                        placeholderElement.classList.add('highlight-complete');
+                        setTimeout(() => {
+                            placeholderElement.classList.remove('highlight-complete');
+                        }, 1000);
+                    }
                 }
-
-                // Remove the placeholder attribute
-                placeholderElement.removeAttribute('data-placeholder');
-
-                // Update usage information if available
-                const usageElement = placeholderElement.querySelector('[data-role="usage"]');
-                if (usageElement && usage) {
-                    usageElement.textContent = `(Tokens: ${usage.total_tokens})`;
-                } else if (usageElement) {
-                    usageElement.textContent = '';
-                }
-
-                // Add a class to indicate the response is complete
-                placeholderElement.classList.add('response-complete');
-
-                // Add a highlight effect to show the response is complete
-                placeholderElement.classList.add('highlight-complete');
-                setTimeout(() => {
-                    placeholderElement.classList.remove('highlight-complete');
-                }, 1000);
 
                 // Scroll to the bottom to show the final content
                 this.scrollToBottom();
@@ -793,8 +811,27 @@ export default class extends Controller {
     }
 
     removePlaceholders(promptId) {
+        // Remove placeholders from the currentMessagesValue array
         this.currentMessagesValue = this.currentMessagesValue.filter(msg => !(msg.promptId === promptId && msg.role === 'assistant' && msg.isPlaceholder));
-        this.chatWindowMessagesTarget.querySelectorAll(`[data-prompt-id="${promptId}"][data-role="assistant"][data-placeholder="true"]`).forEach(el => el.remove());
+
+        // Find the message group for this prompt
+        const messageGroupElement = this.chatWindowMessagesTarget.querySelector(`.message-group[data-prompt-id="${promptId}"]`);
+        if (messageGroupElement) {
+            // Find the assistant responses container
+            const assistantResponsesContainer = messageGroupElement.querySelector('.assistant-responses-container');
+            if (assistantResponsesContainer) {
+                // Find and remove all placeholder elements
+                assistantResponsesContainer.querySelectorAll(`[data-placeholder="true"]`).forEach(el => el.remove());
+
+                // If there are no assistant responses left, remove the entire message group
+                if (assistantResponsesContainer.children.length === 0) {
+                    messageGroupElement.remove();
+                }
+            }
+        } else {
+            // Fallback to the old method if message group not found
+            this.chatWindowMessagesTarget.querySelectorAll(`[data-prompt-id="${promptId}"][data-role="assistant"][data-placeholder="true"]`).forEach(el => el.remove());
+        }
     }
 
     async handleSelectChat({ detail: { threadId } }) {
@@ -818,11 +855,115 @@ export default class extends Controller {
             // Assuming history.messages is the array needed by appendMessageToDOM
             this.currentMessagesValue = this.#flattenHistory(history.messages || []); // Adapt based on actual API response structure
 
-            this.currentMessagesValue.forEach(msg => this.appendMessageToDOM(msg));
+            // Clear the chat window before adding new messages
+            this.clearChatWindow();
 
-            const modelIdsInThread = [...new Set(this.currentMessagesValue.filter(m => m.role === 'assistant' && m.modelId).map(m => m.modelId))];
-            this.selectedModelIdsValue = modelIdsInThread;
-            this.dispatch('setSelectedModels', { detail: { selectedIds: modelIdsInThread } });
+            // Check if there are any assistant messages in the thread
+            const hasAssistantMessages = this.currentMessagesValue.some(msg => msg.role === 'assistant');
+            console.log('Thread has assistant messages:', hasAssistantMessages);
+
+            // Group messages by promptId to ensure we add them in the right order
+            const messagesByPrompt = {};
+            this.currentMessagesValue.forEach(msg => {
+                const promptId = msg.promptId || (msg.id && msg.id.includes('_') ? msg.id.split('_')[1] : null) || `prompt_${Date.now()}`;
+                if (!messagesByPrompt[promptId]) {
+                    messagesByPrompt[promptId] = [];
+                }
+                messagesByPrompt[promptId].push(msg);
+            });
+
+            // Add messages in order: first user messages, then assistant messages
+            Object.values(messagesByPrompt).forEach(messages => {
+                // First add user messages
+                messages.filter(msg => msg.role === 'user').forEach(msg => this.appendMessageToDOM(msg));
+
+                // Then add assistant messages, but only if there are any
+                const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+                if (assistantMessages.length > 0) {
+                    assistantMessages.forEach(msg => this.appendMessageToDOM(msg));
+                }
+            });
+
+            // After adding all messages, remove any empty assistant responses containers
+            document.querySelectorAll('.assistant-responses-container:empty').forEach(container => {
+                console.log('Removing empty assistant responses container');
+                container.remove();
+            });
+
+            // Extract unique model IDs from assistant messages in the thread
+            console.log('Current messages in thread:', this.currentMessagesValue);
+
+            const assistantMessages = this.currentMessagesValue.filter(m => m.role === 'assistant' && m.modelId);
+            console.log('Assistant messages with modelId:', assistantMessages);
+
+            const modelIdsInThread = [...new Set(assistantMessages.map(m => m.modelId))];
+            console.log('Unique model IDs in thread:', modelIdsInThread);
+
+            // Only update if there are models in the thread
+            if (modelIdsInThread.length > 0) {
+                console.log('Setting selectedModelIdsValue to:', modelIdsInThread);
+                this.selectedModelIdsValue = modelIdsInThread;
+
+                // Dispatch the event with the correct name to match the listener in model-selector controller
+                console.log('Dispatching setSelectedModels event with selectedIds:', modelIdsInThread);
+
+                // Try different event naming patterns to ensure it's received
+                this.dispatch('setSelectedModels', { detail: { selectedIds: modelIdsInThread } });
+                this.dispatch('set-selected-models', { detail: { selectedIds: modelIdsInThread } });
+
+                // Dispatch a global event that can be caught by any listener
+                console.log('Dispatching global chat:setSelectedModels event');
+                const event = new CustomEvent('chat:setSelectedModels', {
+                    detail: { selectedIds: modelIdsInThread },
+                    bubbles: true
+                });
+                document.dispatchEvent(event);
+
+                // Also try a direct call to the model-selector element if possible
+                const modelSelectorElement = document.querySelector('[data-controller="model-selector"]');
+                if (modelSelectorElement) {
+                    console.log('Found model-selector element, dispatching event directly');
+                    modelSelectorElement.dispatchEvent(new CustomEvent('chat:setSelectedModels', {
+                        detail: { selectedIds: modelIdsInThread },
+                        bubbles: true
+                    }));
+                }
+
+                // Also try a direct approach by finding the model-selector controller
+                const modelSelectorController = document.querySelector('[data-controller="model-selector"]');
+                if (modelSelectorController) {
+                    console.log('Found model-selector controller, setting selectedIds directly');
+
+                    // Set the value directly on the controller
+                    if (modelSelectorController.hasAttribute('data-model-selector-selected-ids-value')) {
+                        modelSelectorController.setAttribute('data-model-selector-selected-ids-value', JSON.stringify(modelIdsInThread));
+                    }
+
+                    // Try to access the Stimulus controller instance
+                    try {
+                        // This is a bit of a hack to access the Stimulus controller instance
+                        // It might not work in all versions of Stimulus
+                        const controllerInstance = window.Stimulus.getControllerForElementAndIdentifier(modelSelectorController, 'model-selector');
+                        if (controllerInstance) {
+                            console.log('Found Stimulus controller instance, calling chatSetSelectedModels directly');
+                            controllerInstance.chatSetSelectedModels({ detail: { selectedIds: modelIdsInThread } });
+                        }
+                    } catch (error) {
+                        console.error('Error accessing Stimulus controller instance:', error);
+                    }
+                }
+
+                // Get model names for the notification
+                const modelNames = this.modelsValue
+                    .filter(model => modelIdsInThread.includes(model.id))
+                    .map(model => model.name)
+                    .join(', ');
+
+                // Show a notification about the selected models
+                if (modelNames) {
+                    this.showNotification(`Selected models: ${modelNames}`, 'info');
+                }
+            }
 
             console.log('Chat loaded:', threadId, 'Messages:', this.currentMessagesValue.length);
         } catch (error) {
@@ -916,15 +1057,41 @@ export default class extends Controller {
     showNotification(message, type = 'warning') {
         // Create a notification element
         const notification = document.createElement('div');
+
+        // Determine background color based on notification type
+        let bgColorClass = 'bg-yellow-500';
+        if (type === 'error') bgColorClass = 'bg-red-500';
+        if (type === 'info') bgColorClass = 'bg-blue-500';
+        if (type === 'success') bgColorClass = 'bg-green-500';
+
         notification.classList.add(
             'fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2',
             'px-4', 'py-2', 'rounded', 'shadow-lg', 'z-50', 'text-white',
-            type === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+            bgColorClass, 'flex', 'items-center', 'space-x-2'
         );
-        notification.textContent = message;
+
+        // Add an icon based on the notification type
+        let iconSvg = '';
+        if (type === 'warning') {
+            iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>';
+        } else if (type === 'error') {
+            iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
+        } else if (type === 'info') {
+            iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+        } else if (type === 'success') {
+            iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
+        }
+
+        notification.innerHTML = `
+            <div class="flex-shrink-0">${iconSvg}</div>
+            <div>${message}</div>
+        `;
 
         // Add to the DOM
         document.body.appendChild(notification);
+
+        // Add entrance animation
+        notification.classList.add('animate-notification-in');
 
         // Remove after 3 seconds
         setTimeout(() => {
@@ -948,37 +1115,98 @@ export default class extends Controller {
     }
 
     appendMessageToDOM(message) {
-        const messageElement = document.createElement('div');
-        // Add base classes, role-specific classes, dataset attributes
-        messageElement.classList.add('message', `message--${message.role}`);
-        messageElement.dataset.messageId = message.id;
-        if (message.modelId) messageElement.dataset.modelId = message.modelId;
-        if (message.promptId) messageElement.dataset.promptId = message.promptId;
-        if (message.role === 'assistant') messageElement.dataset.role = 'assistant';
-        if (message.isPlaceholder) messageElement.dataset.placeholder = 'true';
+        // For user messages, we need to check if we need to create a new message group
+        if (message.role === 'user') {
+            // Create a message group container for this prompt
+            const messageGroupElement = document.createElement('div');
+            messageGroupElement.classList.add('message-group');
+            messageGroupElement.dataset.promptId = message.promptId || `prompt_${Date.now()}`;
 
-        let contentHTML = '';
-        let modelName = 'User';
-        if (message.role === 'assistant') {
-             modelName = this.modelsValue.find(m => m.id === message.modelId)?.name || 'Assistant';
+            // Create the user message element
+            const userMessageElement = document.createElement('div');
+            userMessageElement.classList.add('message', 'message--user');
+            userMessageElement.dataset.messageId = message.id;
+            userMessageElement.dataset.role = 'user';
+
+            // Add user message content
+            userMessageElement.innerHTML = `
+                <div class="message-header font-semibold text-blue-600">User</div>
+                <div class="message-content" data-role="content">${message.content || ''}</div>
+            `;
+
+            // Add user message to the group
+            messageGroupElement.appendChild(userMessageElement);
+
+            // We'll create the assistant responses container only when needed
+            // This will be done when the first assistant message for this prompt is added
+
+            // Add the message group to the chat window
+            this.chatWindowMessagesTarget.appendChild(messageGroupElement);
+        } else if (message.role === 'assistant') {
+            // For assistant messages, find the corresponding message group
+            const promptId = message.promptId || (message.id && message.id.includes('_') ? message.id.split('_')[1] : null);
+            let messageGroupElement = this.chatWindowMessagesTarget.querySelector(`.message-group[data-prompt-id="${promptId}"]`);
+
+            // If no message group found, create a new one (fallback)
+            if (!messageGroupElement) {
+                messageGroupElement = document.createElement('div');
+                messageGroupElement.classList.add('message-group');
+                messageGroupElement.dataset.promptId = promptId || `prompt_${Date.now()}`;
+
+                // Add the message group to the chat window
+                this.chatWindowMessagesTarget.appendChild(messageGroupElement);
+            }
+
+            // Find or create the assistant responses container
+            let assistantResponsesContainer = messageGroupElement.querySelector('.assistant-responses-container');
+            if (!assistantResponsesContainer) {
+                // Create the container if it doesn't exist
+                assistantResponsesContainer = document.createElement('div');
+                assistantResponsesContainer.classList.add('assistant-responses-container');
+                messageGroupElement.appendChild(assistantResponsesContainer);
+                console.log('Created assistant responses container for prompt:', promptId);
+            }
+
+            // Create the assistant message element
+            const assistantMessageElement = document.createElement('div');
+            assistantMessageElement.classList.add('message', 'message--assistant');
+            assistantMessageElement.dataset.messageId = message.id;
+            assistantMessageElement.dataset.modelId = message.modelId;
+            assistantMessageElement.dataset.promptId = promptId;
+            assistantMessageElement.dataset.role = 'assistant';
+            if (message.isPlaceholder) assistantMessageElement.dataset.placeholder = 'true';
+
+            // Get model name
+            const modelName = this.modelsValue.find(m => m.id === message.modelId)?.name || 'Assistant';
+
+            // Add assistant message content
+            assistantMessageElement.innerHTML = `
+                <div class="message-header font-semibold text-green-600">${modelName}</div>
+                <div class="message-content assistant-content" data-role="content">${message.content || ''}</div>
+                ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
+            `;
+
+            // Add the assistant message to the responses container
+            assistantResponsesContainer.appendChild(assistantMessageElement);
+
+            // Make sure the container is visible
+            assistantResponsesContainer.classList.add('has-messages');
+        } else {
+            // For system messages or other types
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', `message--${message.role}`);
+            messageElement.dataset.messageId = message.id;
+
+            // Add system message content
+            messageElement.innerHTML = `
+                <div class="message-header font-semibold text-gray-600">System</div>
+                <div class="message-content" data-role="content">${message.content || ''}</div>
+            `;
+
+            // Add the message to the chat window
+            this.chatWindowMessagesTarget.appendChild(messageElement);
         }
 
-        // Basic structure - Adapt based on desired layout (e.g., grid for assistant)
-        // This simplified version puts each message on a new line.
-        contentHTML = `
-            <div class="message-header font-semibold ${message.role === 'user' ? 'text-blue-600' : 'text-green-600'}">${modelName}</div>
-            <div class="message-content ${message.role === 'assistant' ? 'assistant-content' : ''}" data-role="content">${message.content || ''}</div>
-            ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
-        `;
-         if (message.isPlaceholder) {
-             contentHTML += `<span class="inline-block ml-1 animate-pulse">▊</span>`;
-         }
-
-
-        messageElement.innerHTML = contentHTML;
-        // TODO: Group assistant messages under user message if desired layout needs it.
-        // This simple append adds each message sequentially.
-        this.chatWindowMessagesTarget.appendChild(messageElement);
         this.scrollToBottom();
     }
 

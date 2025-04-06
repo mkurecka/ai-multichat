@@ -1386,6 +1386,86 @@ body {
   padding: 0;
 }
 
+/* Message group and layout styles */
+.message-group {
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Hide empty message groups */
+.message-group:empty {
+  display: none;
+}
+
+/* User message styling */
+.message--user {
+  padding: 1rem;
+  background-color: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0; /* Remove bottom margin by default */
+}
+
+/* Add margin between user message and assistant responses if they exist */
+.message--user + .assistant-responses-container.has-messages {
+  margin-top: 0.5rem;
+}
+
+.assistant-responses-container {
+  display: none; /* Hide by default */
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  height: 0;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Only show the container if it has the has-messages class */
+.assistant-responses-container.has-messages {
+  display: flex;
+  height: auto;
+  padding: 0.5rem;
+  overflow: visible;
+}
+
+.message--assistant {
+  flex: 1 1 calc(25% - 0.5rem); /* 25% width with gap */
+  min-width: 250px; /* Minimum width to prevent too narrow cards */
+  max-width: calc(50% - 0.5rem); /* Maximum width for larger screens */
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.message--system {
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background-color: #fff8e6;
+  border-left: 3px solid #f59e0b;
+  border-radius: 0.375rem;
+}
+
+.message-header {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.message-content {
+  flex: 1;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
 /* Streaming content styles */
 .message[data-placeholder="true"] .message-content,
 .streaming-active .message-content {
@@ -1402,8 +1482,7 @@ body {
 }
 
 .streaming-active {
-  border-left: 3px solid #3b82f6;
-  padding-left: 8px;
+  border: 1px solid #3b82f6;
   background-color: rgba(59, 130, 246, 0.05);
 }
 
@@ -1411,6 +1490,18 @@ body {
   border-left: 3px solid #10b981;
   padding-left: 8px;
   background-color: rgba(16, 185, 129, 0.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .assistant-responses-container {
+    flex-direction: column;
+  }
+
+  .message--assistant {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
 }
 
 /* Highlight effect for completed responses */
@@ -1429,6 +1520,27 @@ body {
   0% { opacity: 0; }
   50% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+/* Animation for newly selected models */
+@keyframes pulseOnce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); background-color: rgba(59, 130, 246, 0.3); }
+  100% { transform: scale(1); }
+}
+
+.animate-pulse-once {
+  animation: pulseOnce 1s ease-in-out;
+}
+
+/* Animation for notifications */
+@keyframes notificationIn {
+  0% { transform: translate(-50%, 100%); opacity: 0; }
+  100% { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.animate-notification-in {
+  animation: notificationIn 0.3s ease-out forwards;
 }
 
 .form-check-input {

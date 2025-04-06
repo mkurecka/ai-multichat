@@ -46,7 +46,15 @@ export default class extends Controller {
         this.boundKeyDown = this.handleKeyDown.bind(this);
         document.addEventListener('keydown', this.boundKeyDown);
 
+        // Add listener for the custom event from the chat controller
+        this.boundHandleSetSelectedModels = this.handleSetSelectedModels.bind(this);
+        this.element.addEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
+
+        // Also add a global document listener to ensure we catch the event
+        document.addEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
+
         // Check if we have models from the chat controller
+        console.log('Model selector ID:', this.element.id);
         console.log('Initial models value:', this.modelsValue);
 
         // Add a timeout to check if models are loaded after a delay
@@ -63,7 +71,23 @@ export default class extends Controller {
     disconnect() {
         document.removeEventListener('click', this.boundClickOutside);
         document.removeEventListener('keydown', this.boundKeyDown);
+        this.element.removeEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
+        document.removeEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
         console.log('Model selector disconnected');
+    }
+
+    // Handler for the custom event from the chat controller
+    handleSetSelectedModels(event) {
+        console.log('Received custom setSelectedModels event:', event.detail);
+        const { selectedIds } = event.detail;
+
+        if (!selectedIds || selectedIds.length === 0) {
+            console.log('No models to select from custom event');
+            return;
+        }
+
+        // Use the same logic as chatSetSelectedModels
+        this.chatSetSelectedModels({ detail: { selectedIds } });
     }
 
     // Handle keyboard events
@@ -96,16 +120,53 @@ export default class extends Controller {
         // this.openDropdown();
     }
 
-     // Listener for the parent chat controller setting selected models (e.g., when loading a chat)
+    // Listener for the parent chat controller setting selected models (e.g., when loading a chat)
     chatSetSelectedModels({ detail: { selectedIds } }) {
         console.log('Received selected IDs from chat controller:', selectedIds);
-        this.selectedIdsValue = selectedIds;
+
+        // If no models are selected, don't update the selection
+        if (!selectedIds || selectedIds.length === 0) {
+            console.log('No models to select');
+            return;
+        }
+
+        // Validate that the selected IDs exist in our models list
+        const validSelectedIds = selectedIds.filter(id =>
+            this.modelsValue.some(model => model.id === id)
+        );
+
+        if (validSelectedIds.length === 0) {
+            console.warn('None of the selected IDs exist in the models list');
+            return;
+        }
+
+        console.log('Setting selected models to:', validSelectedIds);
+        this.selectedIdsValue = validSelectedIds;
+
         // Update the internal 'selected' state of modelsValue
         this.modelsValue = this.modelsValue.map(model => ({
             ...model,
-            selected: selectedIds.includes(model.id)
+            selected: validSelectedIds.includes(model.id)
         }));
+
+        // Force update the selectedIdsValue attribute to ensure it's reflected in the DOM
+        this.element.setAttribute('data-model-selector-selected-ids-value', JSON.stringify(validSelectedIds));
+
+        // Notify parent controller about the selection
+        if (this.hasChatOutlet) {
+            console.log('Notifying chat controller about model selection change');
+            this.chatOutlet.handleModelSelectionChange({ detail: { selectedIds: this.selectedIdsValue } });
+        }
+
         this.render(); // Re-render with new selections
+
+        // Show a notification to indicate which models were selected
+        const modelNames = this.modelsValue
+            .filter(model => validSelectedIds.includes(model.id))
+            .map(model => model.name)
+            .join(', ');
+
+        console.log(`Selected models: ${modelNames}`);
     }
 
     search() {
@@ -341,30 +402,52 @@ export default class extends Controller {
             header.classList.add('w-full', 'text-sm', 'font-medium', 'text-gray-700', 'mb-2');
             header.textContent = 'Selected Models:';
             fragment.appendChild(header);
-        }
 
-        selectedModels.forEach(model => {
+            // Add a container for the chips
+            const chipsContainer = document.createElement('div');
+            chipsContainer.classList.add('flex', 'flex-wrap', 'gap-2', 'mb-2');
+
+            selectedModels.forEach(model => {
                 const chip = document.createElement('div');
-                chip.classList.add('inline-flex', 'items-center', 'px-3', 'py-2', 'mb-2', 'mr-2', 'rounded-lg', 'text-sm', 'font-medium', 'bg-blue-100', 'text-blue-800', 'border', 'border-blue-300');
+                chip.classList.add('inline-flex', 'items-center', 'px-3', 'py-2', 'rounded-lg', 'text-sm', 'font-medium', 'bg-blue-100', 'text-blue-800', 'border', 'border-blue-300', 'shadow-sm');
+
+                // Add a highlight animation for newly selected models
+                if (model.selected && !this._previouslySelectedIds?.includes(model.id)) {
+                    chip.classList.add('animate-pulse-once');
+                    setTimeout(() => {
+                        chip.classList.remove('animate-pulse-once');
+                    }, 2000);
+                }
+
                 chip.innerHTML = `
-                    <span class="mr-1">${model.name}</span>
+                    <span class="mr-1 font-semibold">${model.name}</span>
                     ${model.supportsStreaming ? `<span class="mr-2 text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">Streaming</span>` : ''}
                     <button type="button" data-action="click->model-selector#toggleModel" data-model-id="${model.id}" class="ml-2 text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 `;
-                fragment.appendChild(chip);
+                chipsContainer.appendChild(chip);
             });
 
-        this.selectedChipContainerTarget.appendChild(fragment);
+            fragment.appendChild(chipsContainer);
 
-        // Add a hint to reopen the dropdown if models are selected
-        if (selectedModels.length > 0) {
+            // Store the current selection for future reference
+            this._previouslySelectedIds = [...this.selectedIdsValue];
+
+            // Add a hint to reopen the dropdown if models are selected
             const hint = document.createElement('div');
             hint.classList.add('w-full', 'text-xs', 'text-gray-500', 'mt-1');
             hint.textContent = 'Click the Models button to add more models';
-            this.selectedChipContainerTarget.appendChild(hint);
+            fragment.appendChild(hint);
+        } else {
+            // If no models are selected, show a message
+            const noModelsMessage = document.createElement('div');
+            noModelsMessage.classList.add('text-sm', 'text-gray-500', 'italic');
+            noModelsMessage.textContent = 'No models selected. Click the Models button to select models.';
+            fragment.appendChild(noModelsMessage);
         }
+
+        this.selectedChipContainerTarget.appendChild(fragment);
     }
 
     // Method to directly fetch models if they're not loaded from the chat controller
