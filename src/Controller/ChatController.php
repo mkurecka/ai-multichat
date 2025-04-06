@@ -107,12 +107,19 @@ class ChatController extends AbstractController
             $threadId = $thread->getThreadId();
         }
 
-        $modelId = $models[0]; // Get first model for streaming
-        $model = $this->modelRepository->findByModelId($modelId);
+        $modelId = $models[0];
+        $allowsStream = false;
+        foreach ($models as $modelId) {
+            $model = $this->modelRepository->findByModelId($modelId);
+            if ($stream && $model->isEnabled() && $model->isSupportsStreaming()) {
+                $allowsStream = true;
+                $modelId = $model->getId();
+                break;
+            }
+        }
 
-        if ($stream) {
+        if ($allowsStream) {
             // For streaming, we'll handle one model at a time
-            $modelId = $models[0]; // Get first model for streaming
             $modelResponses = $openRouter->streamResponse($prompt, [$modelId], $thread);
 
             if (!isset($modelResponses[$modelId])) {
@@ -282,6 +289,7 @@ class ChatController extends AbstractController
                     ->setOpenRouterId($modelResponse['id']);
 
                 $em->persist($modelHistory);
+                $em->flush();
 
                 // Log before event dispatch
                 $this->logger->info('Dispatching OpenRouterRequestCompletedEvent', [

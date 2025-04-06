@@ -534,20 +534,132 @@ export default class extends Controller {
                     this.updatePlaceholderMessage(promptId, modelId, data.content, data.usage);
                 });
             } else if (useStreaming) {
-                 // Streaming is handled by the backend sending Server-Sent Events
-                 // We need an EventSource listener here, NOT in the post response.
-                 // The backend /chat endpoint needs modification to return immediately
-                 // for stream=true, and the actual stream happens via a separate mechanism
-                 // (or the StreamedResponse setup in PHP controller needs careful handling client-side).
+                // Streaming is handled by the backend sending Server-Sent Events
+                // We'll create an EventSource to listen for streaming updates
+                console.log('Setting up EventSource for streaming response');
 
-                 // TODO: Implement EventSource listener for streaming updates
-                 console.warn("Streaming response expected via EventSource, but client-side listener is not implemented in this refactor.");
-                 // For now, just remove placeholders after a delay as a fallback
-                 setTimeout(() => this.removePlaceholders(promptId), 5000);
+                // Get the model ID for streaming (we only support one model for streaming)
+                const streamingModelId = this.selectedModelIdsValue[0];
+
+                // For streaming, we need to make a POST request and handle the response as a stream
+                // We'll use the fetch API with the appropriate headers
+                const controller = new AbortController();
+                const signal = controller.signal;
+
+                // Initialize content for the streaming response
+                let streamContent = '';
+
+                // Make the POST request
+                // Get the JWT token from localStorage
+                const token = localStorage.getItem('token');
+
+                // Make sure we have a token
+                if (!token) {
+                    console.error('No authentication token found');
+                    this.showNotification('Authentication error. Please log in again.', 'error');
+                    this.removePlaceholders(promptId);
+                    return;
+                }
+
+                fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        models: [streamingModelId],
+                        promptId: promptId,
+                        threadId: this.currentThreadIdValue || undefined,
+                        stream: true
+                    }),
+                    signal: signal
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Get a reader from the response body stream
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+
+                    // Function to process the stream
+                    const processStream = ({ done, value }) => {
+                        if (done) {
+                            console.log('Stream complete');
+                            return;
+                        }
+
+                        // Decode the chunk and process it
+                        const chunk = decoder.decode(value, { stream: true });
+                        console.log('Received chunk:', chunk);
+
+                        // Process each line in the chunk
+                        const lines = chunk.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.substring(6);
+                                if (data === '[DONE]') {
+                                    console.log('Received [DONE] message');
+                                    // Update the placeholder with the final content
+                                    this.updatePlaceholderMessage(promptId, streamingModelId, streamContent);
+                                    return;
+                                }
+
+                                try {
+                                    const event = JSON.parse(data);
+                                    console.log('Parsed event:', event);
+
+                                    // Process the event
+                                    if (event.content) {
+                                        streamContent += event.content;
+                                        this.updateStreamingContent(promptId, streamingModelId, streamContent);
+                                    }
+
+                                    // If we have a thread ID, update it
+                                    if (event.threadId && !this.currentThreadIdValue) {
+                                        this.currentThreadIdValue = event.threadId;
+                                        console.log('New thread created from streaming response:', this.currentThreadIdValue);
+                                        this.currentMessagesValue = this.currentMessagesValue.map(msg => ({ ...msg, threadId: msg.threadId || this.currentThreadIdValue }));
+                                    }
+                                } catch (error) {
+                                    console.error('Error parsing streaming data:', error, data);
+                                }
+                            }
+                        }
+
+                        // Continue reading the stream
+                        return reader.read().then(processStream);
+                    };
+
+                    // Start reading the stream
+                    return reader.read().then(processStream);
+                })
+                .catch(error => {
+                    console.error('Error with streaming request:', error);
+                    // If we have content, update the placeholder with the final content
+                    if (streamContent) {
+                        this.updatePlaceholderMessage(promptId, streamingModelId, streamContent);
+                    } else {
+                        this.removePlaceholders(promptId);
+                    }
+                });
+
+                // Set a timeout to abort the request if it takes too long
+                setTimeout(() => {
+                    console.log('Aborting streaming request after timeout');
+                    controller.abort();
+                }, 60000); // 1 minute timeout as a safety measure
             }
 
-            // Refresh chat history only if authenticated
-            if (this.isAuthenticatedValue) {
+            // For streaming responses, we don't need to refresh chat history
+            // The streaming response is already displayed in the chat window
+            // Only refresh chat history for non-streaming responses
+            if (!useStreaming && this.isAuthenticatedValue) {
+                console.log('Non-streaming response, refreshing chat history');
                 this.chatHistoryValue = await this.fetchChatHistory();
                 // Explicitly tell history outlet to render after update
                 if (this.hasChatHistoryOutlet) {
@@ -569,43 +681,114 @@ export default class extends Controller {
         }
     }
 
-    // Placeholder for stream update - needs proper EventSource implementation
-    handleStreamUpdate(modelId, contentChunk, promptId, threadId) {
-        console.log(`Stream update (via EventSource - TBD) for ${modelId} (Prompt: ${promptId}):`, contentChunk);
+    // Method to update the chat window with streaming content
+    updateStreamingContent(promptId, modelId, content) {
+        console.log(`Updating streaming content for ${modelId} (Prompt: ${promptId})`);
+
+        // Find the placeholder element for this model and prompt
         const placeholderElement = this.chatWindowMessagesTarget.querySelector(`[data-prompt-id="${promptId}"][data-model-id="${modelId}"]`);
+
         if (placeholderElement) {
+            // Find the content element within the placeholder
             const contentElement = placeholderElement.querySelector('[data-role="content"]');
+
             if (contentElement) {
-                 // Append chunk? Replace? Depends on stream format.
-                 contentElement.textContent += contentChunk; // Simple append example
-                 placeholderElement.removeAttribute('data-placeholder');
-            }
-            if (!this.currentThreadIdValue && threadId) {
-                this.currentThreadIdValue = threadId;
+                // Update the content element with the streaming content
+                contentElement.textContent = content;
+
+                // Keep the placeholder attribute during streaming
+                // but add a class to indicate it's being streamed
+                placeholderElement.classList.add('streaming-active');
+
+                // Format the content with Markdown if needed
+                // This is optional and depends on your requirements
+                // You might want to use a library like marked.js for this
+
+                // Update the message in the currentMessagesValue array
+                const messageIndex = this.currentMessagesValue.findIndex(msg =>
+                    msg.promptId === promptId && msg.modelId === modelId && msg.role === 'assistant');
+
+                if (messageIndex !== -1) {
+                    const updatedMessages = [...this.currentMessagesValue];
+                    updatedMessages[messageIndex] = {
+                        ...updatedMessages[messageIndex],
+                        content: content,
+                        isPlaceholder: false
+                    };
+                    this.currentMessagesValue = updatedMessages;
+                }
+
+                // Scroll to the bottom to show the latest content
+                this.scrollToBottom();
             }
         }
     }
 
     updatePlaceholderMessage(promptId, modelId, finalContent, usage) {
+        console.log(`Updating placeholder with final content for ${modelId} (Prompt: ${promptId})`);
+
+        // Update the message in the currentMessagesValue array
         const messageIndex = this.currentMessagesValue.findIndex(msg => msg.promptId === promptId && msg.modelId === modelId && msg.role === 'assistant');
         if (messageIndex !== -1) {
             const updatedMessages = [...this.currentMessagesValue];
-            updatedMessages[messageIndex] = { ...updatedMessages[messageIndex], content: finalContent, usage: usage, isPlaceholder: false };
+            updatedMessages[messageIndex] = {
+                ...updatedMessages[messageIndex],
+                content: finalContent,
+                usage: usage,
+                isPlaceholder: false
+            };
             this.currentMessagesValue = updatedMessages;
 
+            // Find the placeholder element for this model and prompt
             const placeholderElement = this.chatWindowMessagesTarget.querySelector(`[data-prompt-id="${promptId}"][data-model-id="${modelId}"]`);
             if (placeholderElement) {
+                // Find the content element within the placeholder
                 const contentElement = placeholderElement.querySelector('[data-role="content"]');
-                if (contentElement) contentElement.textContent = finalContent;
+                if (contentElement) {
+                    // Update the content element with the final content
+                    contentElement.textContent = finalContent;
+                }
+
+                // Remove the placeholder attribute
                 placeholderElement.removeAttribute('data-placeholder');
+
+                // Update usage information if available
                 const usageElement = placeholderElement.querySelector('[data-role="usage"]');
-                if (usageElement && usage) usageElement.textContent = `(Tokens: ${usage.total_tokens})`; else if (usageElement) usageElement.textContent = '';
+                if (usageElement && usage) {
+                    usageElement.textContent = `(Tokens: ${usage.total_tokens})`;
+                } else if (usageElement) {
+                    usageElement.textContent = '';
+                }
+
+                // Add a class to indicate the response is complete
+                placeholderElement.classList.add('response-complete');
+
+                // Add a highlight effect to show the response is complete
+                placeholderElement.classList.add('highlight-complete');
+                setTimeout(() => {
+                    placeholderElement.classList.remove('highlight-complete');
+                }, 1000);
+
+                // Scroll to the bottom to show the final content
+                this.scrollToBottom();
             }
         } else {
-             console.warn(`Could not find placeholder message in state for model ${modelId} and prompt ${promptId} to update.`);
-             const finalMessage = { role: 'assistant', content: finalContent, modelId, id: `msg_${Date.now()}_${modelId}_final`, threadId: this.currentThreadIdValue || null, promptId, usage: usage };
-             this.appendMessageToDOM(finalMessage);
-             this.currentMessagesValue = [...this.currentMessagesValue, finalMessage];
+            // If we couldn't find the placeholder, create a new message
+            console.warn(`Could not find placeholder message in state for model ${modelId} and prompt ${promptId} to update.`);
+            const finalMessage = {
+                role: 'assistant',
+                content: finalContent,
+                modelId,
+                id: `msg_${Date.now()}_${modelId}_final`,
+                threadId: this.currentThreadIdValue || null,
+                promptId,
+                usage: usage
+            };
+            this.appendMessageToDOM(finalMessage);
+            this.currentMessagesValue = [...this.currentMessagesValue, finalMessage];
+
+            // Scroll to the bottom to show the new message
+            this.scrollToBottom();
         }
     }
 
