@@ -35,11 +35,14 @@ export default class extends Controller {
         userEmail: String,
     };
 
+    static outlets = ['chat-history']; // This should match the data-chat-history-outlet attribute in the HTML
+
     api = null; // To hold the configured Axios instance
     isRefreshingToken = false; // Flag to prevent multiple refresh attempts
 
     connect() {
         console.log('Chat controller connected');
+        console.log('Outlets defined:', this.constructor.outlets);
         this.#setupApi(); // Setup Axios instance and interceptors
         this.isAuthenticatedValue = false;
         this.isLoadingValue = true;
@@ -47,7 +50,44 @@ export default class extends Controller {
         this.mainAppContainerTarget.hidden = true;
         this.authRequiredMessageTarget.hidden = true;
 
+        // Check if we have the chat-history outlet
+        setTimeout(() => {
+            console.log('Checking for chat-history outlet after timeout');
+            console.log('Has chat-history outlet:', this.hasChatHistoryOutlet);
+            if (this.hasChatHistoryOutlet) {
+                console.log('Chat history outlet is connected:', this.chatHistoryOutlet);
+            }
+        }, 1000);
+
         this.verifyAuthentication();
+    }
+
+    // Re-add chatHistoryOutletConnected callback
+    chatHistoryOutletConnected(outlet) {
+        console.log('CALLBACK: chatHistoryOutletConnected fired.');
+        console.log('Chat history outlet connected:', outlet);
+
+        // If history data was loaded before the outlet connected, render it now
+        if (this.chatHistoryValue && this.chatHistoryValue.length > 0) {
+            console.log('Rendering history from outletConnected callback. History items:', this.chatHistoryValue.length);
+            console.log('History data in outlet connected callback:', JSON.stringify(this.chatHistoryValue));
+            outlet.renderHistory(this.chatHistoryValue);
+        } else {
+            console.log('No history data available yet when outlet connected');
+        }
+
+        // Force a check for history data
+        if (this.isAuthenticatedValue && (!this.chatHistoryValue || this.chatHistoryValue.length === 0)) {
+            console.log('No history data yet but authenticated, fetching history now...');
+            this.fetchChatHistory().then(history => {
+                console.log(`Fetched ${history.length} history items after outlet connected`);
+                this.chatHistoryValue = history;
+                outlet.renderHistory(this.chatHistoryValue);
+            });
+        }
+
+        // Dispatch an event to notify the chat-history controller that the outlet is connected
+        this.dispatch('outletConnected', { detail: { controller: 'chat' } });
     }
 
     // --- Private API Setup & Helpers ---
@@ -274,18 +314,30 @@ export default class extends Controller {
         this.loadingIndicatorTarget.hidden = false;
 
         try {
-            // Use the controller's api instance
-            const [modelsResponse, historyResponse] = await Promise.all([
-                this.fetchModels(), // Uses internal method now
-                this.fetchChatHistory() // Uses internal method now
-            ]);
-            // Assuming fetchModels/fetchChatHistory now return the data directly
+            // First fetch models only
+            const modelsResponse = await this.fetchModels();
             this.modelsValue = modelsResponse;
-            this.chatHistoryValue = historyResponse;
+
+            // Then fetch chat history only if authenticated
+            if (this.isAuthenticatedValue) {
+                const historyResponse = await this.fetchChatHistory();
+                this.chatHistoryValue = historyResponse;
+
+                // If the outlet connected *before* data loaded, render now.
+                if (this.hasChatHistoryOutlet) {
+                    console.log('Rendering history from loadInitialData (outlet was already connected).');
+                    console.log('History data being passed to outlet:', JSON.stringify(this.chatHistoryValue));
+                    this.chatHistoryOutlet.renderHistory(this.chatHistoryValue);
+                } else {
+                    console.warn('History outlet not connected yet, cannot render history');
+                }
+            }
 
             this.dispatch('modelsLoaded', { detail: { models: this.modelsValue } });
-            this.dispatch('historyLoaded', { detail: { history: this.chatHistoryValue } });
-            console.log('Initial data loaded:', { models: this.modelsValue.length, history: this.chatHistoryValue.length });
+            console.log('Initial data loaded:', {
+                models: this.modelsValue.length,
+                history: this.chatHistoryValue ? this.chatHistoryValue.length : 0
+            });
         } catch (error) {
             console.error('Error loading initial data:', error);
         } finally {
@@ -326,7 +378,10 @@ export default class extends Controller {
         try {
             // Use controller's api instance
             const response = await this.api.get('/chat/history');
-            return response.data || [];
+            console.log('Chat history response:', response.data);
+            const history = response.data || [];
+            console.log(`Received ${history.length} history items`);
+            return history;
         } catch (error) {
             console.error('Error fetching chat history:', error);
              if (axios.isAxiosError(error)) {
@@ -408,9 +463,15 @@ export default class extends Controller {
                  setTimeout(() => this.removePlaceholders(promptId), 5000);
             }
 
-            // Refresh chat history
-            this.chatHistoryValue = await this.fetchChatHistory();
-            this.dispatch('historyLoaded', { detail: { history: this.chatHistoryValue } });
+            // Refresh chat history only if authenticated
+            if (this.isAuthenticatedValue) {
+                this.chatHistoryValue = await this.fetchChatHistory();
+                // Explicitly tell history outlet to render after update
+                if (this.hasChatHistoryOutlet) {
+                    console.log('Rendering updated history after message sent');
+                    this.chatHistoryOutlet.renderHistory(this.chatHistoryValue);
+                }
+            }
 
         } catch (error) {
             console.error('Error sending message:', error);
@@ -557,8 +618,15 @@ export default class extends Controller {
             this.clearChatWindow();
             this.dispatch('setSelectedModels', { detail: { selectedIds: [] } });
 
-            this.chatHistoryValue = await this.fetchChatHistory();
-            this.dispatch('historyLoaded', { detail: { history: this.chatHistoryValue } });
+            // Refresh chat history only if authenticated
+            if (this.isAuthenticatedValue) {
+                this.chatHistoryValue = await this.fetchChatHistory();
+                // Explicitly tell history outlet to render after update
+                if (this.hasChatHistoryOutlet) {
+                    console.log('Rendering updated history after new chat created');
+                    this.chatHistoryOutlet.renderHistory(this.chatHistoryValue);
+                }
+            }
         } catch (error) {
             console.error('Error starting new chat:', error);
              const errorMessage = { role: 'system', content: `Error: Failed to start new chat. ${error.message || ''}`, id: `error_new_${Date.now()}`, threadId: null };

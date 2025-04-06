@@ -10,6 +10,7 @@
          data-chat-current-messages-value="[]"
          data-chat-current-thread-id-value=""
          data-chat-selected-model-ids-value="[]"
+         data-chat-chat-history-outlet="[data-controller='chat-history']" {# Connect outlet with name 'chat-history' #}
          class="flex flex-col h-screen"> {# Ensure full height #}
 
         {# Loading/Auth Indicators #}
@@ -26,7 +27,7 @@
             {# Sidebar (Chat History) #}
             {# Note: Add classes for transition if sidebar toggle is re-implemented #}
             <div data-controller="chat-history"
-                 data-chat-history-chat-outlet="#[data-controller='chat']" {# Connect outlet #}
+                 data-chat-history-chat-outlet="[data-controller='chat']" {# Connect outlet #}
                  data-chat-history-chat-history-value="{{ []|json_encode }}" {# Initial empty, updated by chat controller #}
                  data-chat-history-current-thread-id-value=""
                  class="w-64 bg-white shadow-md flex flex-col flex-shrink-0"> {# Fixed width for sidebar #}
@@ -52,7 +53,7 @@
 
                     {# Model Selector #}
                     <div data-controller="model-selector"
-                         data-model-selector-chat-outlet="#[data-controller='chat']" {# Connect outlet #}
+                         data-model-selector-chat-outlet="[data-controller='chat']" {# Connect outlet #}
                          data-model-selector-models-value="{{ []|json_encode }}" {# Initial empty, updated by chat controller #}
                          data-model-selector-selected-ids-value="{{ []|json_encode }}"
                          data-model-selector-max-models-value="16" {# Example value, could be passed from backend #}
@@ -98,7 +99,7 @@
 
                     {# Chat Input Area #}
                     <div data-controller="chat-input"
-                         data-chat-input-chat-outlet="#[data-controller='chat']" {# Connect outlet #}
+                         data-chat-input-chat-outlet="[data-controller='chat']" {# Connect outlet #}
                          data-chat-input-disabled-value="true" {# Initially disabled #}
                          data-chat-input-is-loading-value="false"
                          data-chat-target="chatInputContainer" {# Target for chat controller #}

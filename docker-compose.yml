@@ -42,7 +42,7 @@ services:
       - /app/node_modules
       - ./.env.local:/app/.env.local:ro
     working_dir: /app
-    command: npm run dev
+    command: npm run watch
     ports:
       - "5173:5173"
     environment:

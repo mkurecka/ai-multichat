@@ -1,8 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./assets/react/**/*.{js,ts,jsx,tsx}", // Updated path for React components
-    "./templates/**/*.html.twig", // Added path for Twig templates
+    "./assets/**/*.js", // Scan all JS files in assets, including controllers
+    "./templates/**/*.html.twig",
   ],
   theme: {
     extend: {},
