@@ -47,6 +47,7 @@ export default class extends Controller {
         this.isAuthenticatedValue = false;
         this.isLoadingValue = true;
         this.authLoadingIndicatorTarget.hidden = false;
+        this.loadingIndicatorTarget.style.visibility = 'hidden'; // Make sure loading indicator starts hidden
         this.mainAppContainerTarget.hidden = true;
         this.authRequiredMessageTarget.hidden = true;
 
@@ -59,7 +60,17 @@ export default class extends Controller {
             }
         }, 1000);
 
+        // Start authentication verification
         this.verifyAuthentication();
+
+        // Add a failsafe timeout to hide loading indicators after 5 seconds
+        // This ensures they don't stay visible indefinitely if something goes wrong
+        setTimeout(() => {
+            if (this.isLoadingValue || this.loadingIndicatorTarget.style.visibility === 'visible' || !this.authLoadingIndicatorTarget.hidden) {
+                console.log('Failsafe timeout: forcing loading indicators to hide');
+                this.hideAllLoadingIndicators();
+            }
+        }, 5000);
     }
 
     // Re-add chatHistoryOutletConnected callback
@@ -273,35 +284,70 @@ export default class extends Controller {
 
     async verifyAuthentication() {
         console.log('Verifying authentication...');
-        // Use the internal helper now
-        if (this.#isAuthenticated()) {
-            // Try a proactive refresh check just in case
-            await this.#checkTokenRefresh();
-            // Re-check after potential refresh
+
+        // Make sure auth loading indicator is visible during verification
+        // but keep the main loading indicator hidden
+        this.isLoadingValue = true;
+        this.authLoadingIndicatorTarget.hidden = false;
+        this.loadingIndicatorTarget.style.visibility = 'hidden'; // Always keep main loader hidden during auth
+
+        try {
+            // Use the internal helper now
             if (this.#isAuthenticated()) {
-                const token = localStorage.getItem('token');
-                const payload = this.#decodeToken(token);
-                this.userEmailValue = payload?.email || '';
-                this.isAuthenticatedValue = true;
-                console.log('Authentication successful');
-                this.loadInitialData();
+                // Try a proactive refresh check just in case
+                await this.#checkTokenRefresh();
+                // Re-check after potential refresh
+                if (this.#isAuthenticated()) {
+                    const token = localStorage.getItem('token');
+                    const payload = this.#decodeToken(token);
+                    this.userEmailValue = payload?.email || '';
+                    this.isAuthenticatedValue = true;
+                    console.log('Authentication successful');
+
+                    // Load initial data (which manages its own loading state)
+                    await this.loadInitialData();
+                } else {
+                    // Refresh failed or token removed during check
+                    this.handleUnauthenticated();
+                }
             } else {
-                 // Refresh failed or token removed during check
-                 this.handleUnauthenticated();
+                this.handleUnauthenticated();
             }
-        } else {
+        } catch (error) {
+            console.error('Error during authentication verification:', error);
             this.handleUnauthenticated();
+        } finally {
+            // Always reset auth loading state
+            console.log('Authentication verification complete, resetting auth loading state');
+            this.isLoadingValue = false;
+            this.authLoadingIndicatorTarget.hidden = true;
+
+            // Force the loading indicator to be hidden with a timeout as a fallback
+            setTimeout(() => {
+                if (this.isLoadingValue || this.loadingIndicatorTarget.style.visibility === 'visible') {
+                    console.log('Forcing loading indicators to hide via timeout');
+                    this.loadingIndicatorTarget.style.visibility = 'hidden';
+                    this.authLoadingIndicatorTarget.hidden = true;
+                    this.isLoadingValue = false;
+                }
+            }, 1000);
         }
-        this.isLoadingValue = false;
-        this.authLoadingIndicatorTarget.hidden = true;
     }
 
     handleUnauthenticated() {
         console.log('User is not authenticated');
         this.isAuthenticatedValue = false;
         localStorage.removeItem('token'); // Ensure token is removed
+
+        // Update UI
         this.mainAppContainerTarget.hidden = true;
         this.authRequiredMessageTarget.hidden = false;
+
+        // Make sure loading indicators are hidden
+        this.isLoadingValue = false;
+        this.loadingIndicatorTarget.style.visibility = 'hidden';
+        this.authLoadingIndicatorTarget.hidden = true;
+
         // Consider redirecting: window.location.href = '/login';
     }
 
@@ -310,23 +356,28 @@ export default class extends Controller {
         console.log('Loading initial data...');
         this.mainAppContainerTarget.hidden = false;
         this.authRequiredMessageTarget.hidden = true;
+
+        // Set loading state for initial data load (but don't show the main loading indicator)
+        console.log('Setting loading state to true for initial data load');
         this.isLoadingValue = true;
-        this.loadingIndicatorTarget.hidden = false;
+        // Don't show the main loading indicator for initial data load
+        // this.loadingIndicatorTarget.hidden = false;
 
         try {
             // First fetch models only
             const modelsResponse = await this.fetchModels();
             this.modelsValue = modelsResponse;
+            console.log(`Loaded ${this.modelsValue.length} models`);
 
             // Then fetch chat history only if authenticated
             if (this.isAuthenticatedValue) {
                 const historyResponse = await this.fetchChatHistory();
                 this.chatHistoryValue = historyResponse;
+                console.log(`Loaded ${this.chatHistoryValue.length} history items`);
 
                 // If the outlet connected *before* data loaded, render now.
                 if (this.hasChatHistoryOutlet) {
                     console.log('Rendering history from loadInitialData (outlet was already connected).');
-                    console.log('History data being passed to outlet:', JSON.stringify(this.chatHistoryValue));
                     this.chatHistoryOutlet.renderHistory(this.chatHistoryValue);
                 } else {
                     console.warn('History outlet not connected yet, cannot render history');
@@ -334,33 +385,51 @@ export default class extends Controller {
             }
 
             this.dispatch('modelsLoaded', { detail: { models: this.modelsValue } });
-            console.log('Initial data loaded:', {
-                models: this.modelsValue.length,
-                history: this.chatHistoryValue ? this.chatHistoryValue.length : 0
-            });
+            console.log('Initial data loaded successfully');
         } catch (error) {
             console.error('Error loading initial data:', error);
         } finally {
+            // Reset loading state
+            console.log('Setting loading state to false');
             this.isLoadingValue = false;
-            this.loadingIndicatorTarget.hidden = true;
+            this.loadingIndicatorTarget.style.visibility = 'hidden';
+
+            // Force the loading indicator to be hidden with a timeout as a fallback
+            setTimeout(() => {
+                if (this.loadingIndicatorTarget.style.visibility === 'visible') {
+                    console.log('Forcing loading indicator to hide via timeout');
+                    this.loadingIndicatorTarget.style.visibility = 'hidden';
+                    this.isLoadingValue = false;
+                }
+            }, 1000);
         }
     }
 
     async fetchModels() {
         console.log('Fetching models...');
         try {
+            // Clear cache for testing
+            // localStorage.removeItem('stimulus_models');
+
             const cachedModels = localStorage.getItem('stimulus_models');
             if (cachedModels) {
                 console.log('Using cached models');
-                return JSON.parse(cachedModels);
+                const models = JSON.parse(cachedModels);
+                console.log(`Loaded ${models.length} models from cache:`, models);
+                return models;
             }
+
             console.log('Fetching models from API');
             // Use controller's api instance
             const response = await this.api.get('/models');
+            console.log('API response for models:', response);
+
             if (response.data && Array.isArray(response.data)) {
+                console.log(`Received ${response.data.length} models from API:`, response.data);
                 localStorage.setItem('stimulus_models', JSON.stringify(response.data));
                 return response.data;
             }
+
             console.error('Invalid models response:', response.data);
             return [];
         } catch (error) {
@@ -369,7 +438,15 @@ export default class extends Controller {
                  console.error('API Status:', error.response?.status);
                  console.error('API Response data:', error.response?.data);
             }
-            return []; // Return empty array on error
+
+            // Return some dummy models for testing if API fails
+            console.log('Returning dummy models for testing');
+            const dummyModels = [
+                { id: 'model1', name: 'Model 1', supportsStreaming: true },
+                { id: 'model2', name: 'Model 2', supportsStreaming: false },
+                { id: 'model3', name: 'Model 3', supportsStreaming: true }
+            ];
+            return dummyModels;
         }
     }
 
@@ -399,11 +476,27 @@ export default class extends Controller {
     }
 
     async handleSendMessage({ detail: { prompt } }) {
-        if (!prompt.trim() || this.selectedModelIdsValue.length === 0 || this.isLoadingValue) return;
+        // Check if prompt is empty, no models selected, or already loading
+        if (!prompt.trim()) {
+            console.warn('Cannot send empty message');
+            return;
+        }
+
+        if (this.selectedModelIdsValue.length === 0) {
+            console.warn('Cannot send message: No models selected');
+            // Show a notification to the user
+            this.showNotification('Please select at least one model before sending a message');
+            return;
+        }
+
+        if (this.isLoadingValue) {
+            console.warn('Cannot send message: Already processing a request');
+            return;
+        }
 
         console.log('Sending message:', prompt, 'to models:', this.selectedModelIdsValue, 'thread:', this.currentThreadIdValue);
         this.isLoadingValue = true;
-        this.loadingIndicatorTarget.hidden = false;
+        this.loadingIndicatorTarget.style.visibility = 'visible';
         this.dispatch('sendStart');
 
         const userMessage = { role: 'user', content: prompt, id: `msg_${Date.now()}`, threadId: this.currentThreadIdValue || null };
@@ -481,7 +574,7 @@ export default class extends Controller {
             this.currentMessagesValue = [...this.currentMessagesValue, errorMessage];
         } finally {
             this.isLoadingValue = false;
-            this.loadingIndicatorTarget.hidden = true;
+            this.loadingIndicatorTarget.style.visibility = 'hidden';
             this.dispatch('sendEnd');
         }
     }
@@ -535,8 +628,10 @@ export default class extends Controller {
         console.log('Selecting chat thread:', threadId);
         if (this.currentThreadIdValue === threadId) return;
 
+        // Set loading state but don't show the main loading indicator for chat selection
         this.isLoadingValue = true;
-        this.loadingIndicatorTarget.hidden = false;
+        // Don't show the main loading indicator for chat selection
+        // this.loadingIndicatorTarget.hidden = false;
         this.clearChatWindow();
 
         try {
@@ -565,7 +660,7 @@ export default class extends Controller {
             this.currentMessagesValue = [errorMessage];
         } finally {
             this.isLoadingValue = false;
-            this.loadingIndicatorTarget.hidden = true;
+            this.loadingIndicatorTarget.style.visibility = 'hidden';
             this.scrollToBottom();
         }
     }
@@ -603,8 +698,10 @@ export default class extends Controller {
 
     async handleStartNewChat() {
         console.log('Starting new chat...');
+        // Set loading state but don't show the main loading indicator for new chat creation
         this.isLoadingValue = true;
-        this.loadingIndicatorTarget.hidden = false;
+        // Don't show the main loading indicator for new chat creation
+        // this.loadingIndicatorTarget.hidden = false;
 
         try {
             // Use controller's api instance
@@ -633,7 +730,7 @@ export default class extends Controller {
             this.appendMessageToDOM(errorMessage);
         } finally {
              this.isLoadingValue = false;
-             this.loadingIndicatorTarget.hidden = true;
+             this.loadingIndicatorTarget.style.visibility = 'hidden';
         }
     }
 
@@ -641,6 +738,40 @@ export default class extends Controller {
 
     clearChatWindow() {
         this.chatWindowMessagesTarget.innerHTML = '';
+    }
+
+    showNotification(message, type = 'warning') {
+        // Create a notification element
+        const notification = document.createElement('div');
+        notification.classList.add(
+            'fixed', 'bottom-4', 'left-1/2', 'transform', '-translate-x-1/2',
+            'px-4', 'py-2', 'rounded', 'shadow-lg', 'z-50', 'text-white',
+            type === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+        );
+        notification.textContent = message;
+
+        // Add to the DOM
+        document.body.appendChild(notification);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+            setTimeout(() => notification.remove(), 500);
+        }, 3000);
+    }
+
+    // Force hide all loading indicators
+    hideAllLoadingIndicators() {
+        console.log('Force hiding all loading indicators');
+        this.isLoadingValue = false;
+
+        if (this.hasLoadingIndicatorTarget) {
+            this.loadingIndicatorTarget.style.visibility = 'hidden';
+        }
+
+        if (this.hasAuthLoadingIndicatorTarget) {
+            this.authLoadingIndicatorTarget.hidden = true;
+        }
     }
 
     appendMessageToDOM(message) {

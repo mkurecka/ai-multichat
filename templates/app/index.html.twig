@@ -16,9 +16,14 @@
         {# Loading/Auth Indicators #}
         <div data-chat-target="authLoadingIndicator" class="p-4 text-center">Verifying Authentication...</div>
         <div data-chat-target="authRequiredMessage" class="p-4 text-center text-red-600" hidden>Authentication required. Please log in.</div>
-        <div data-chat-target="loadingIndicator" class="fixed bottom-4 right-4 bg-white p-2 rounded shadow z-50 flex items-center space-x-2" hidden>
-             <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-             <span class="text-sm text-gray-600">Loading...</span>
+        <div data-chat-target="loadingIndicator" class="fixed bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg z-50 flex items-center space-x-3 border border-blue-300" style="visibility: hidden;">
+             <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+             <span class="text-sm font-medium text-blue-600">Loading data...</span>
+             <button type="button" onclick="this.parentElement.style.visibility = 'hidden';" class="ml-2 text-gray-400 hover:text-gray-600">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                 </svg>
+             </button>
         </div>
 
         {# Main App Container (hidden until authenticated) #}
@@ -65,20 +70,49 @@
                              <span data-model-selector-target="selectedCount" class="text-xs text-gray-500">0/16 selected</span>
                         </div>
                         <div class="relative">
-                             <input type="text"
-                                    data-model-selector-target="searchInput"
-                                    data-action="input->model-selector#search focus->model-selector#openDropdown"
-                                    placeholder="Search models..."
-                                    class="w-full px-3 py-2 pl-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                             {# Search Icon #}
-                             <svg class="absolute left-2 top-2.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            <div class="flex space-x-2">
+                                <div class="relative flex-grow">
+                                    <input type="text"
+                                           data-model-selector-target="searchInput"
+                                           data-action="input->model-selector#search focus->model-selector#openDropdown"
+                                           placeholder="Search models..."
+                                           class="w-full px-3 py-2 pl-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                                    {# Search Icon #}
+                                    <svg class="absolute left-2 top-2.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </div>
+                                <button type="button"
+                                        data-action="click->model-selector#openDropdown"
+                                        class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                    Models
+                                </button>
+                            </div>
                         </div>
                         {# Dropdown - Position relative to the main container #}
-                        <div data-model-selector-target="dropdown" hidden class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto left-0 right-0">
-                             <div data-model-selector-target="modelList" class="p-2">
-                                 {# Model items rendered here by model-selector controller #}
-                             </div>
-                             <div data-model-selector-target="noResultsMessage" hidden class="text-sm text-gray-500 py-2 text-center">No models found</div>
+                        <div data-model-selector-target="dropdown" hidden class="absolute z-20 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-80 overflow-y-auto left-0 right-0">
+                            <div class="flex justify-between items-center p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                                <h3 class="font-medium text-gray-700">Select Models</h3>
+                                <button type="button"
+                                        data-action="click->model-selector#closeDropdown"
+                                        class="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div data-model-selector-target="modelList" class="p-3">
+                                {# Model items rendered here by model-selector controller #}
+                            </div>
+                            <div data-model-selector-target="noResultsMessage" hidden class="text-sm text-gray-500 py-3 text-center font-medium">No models found</div>
+                            <div class="p-2 border-t border-gray-200 sticky bottom-0 bg-white">
+                                <button type="button"
+                                        data-action="click->model-selector#closeDropdown"
+                                        class="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
+                                    Done
+                                </button>
+                            </div>
                         </div>
                         {# Selected Chips #}
                         <div data-model-selector-target="selectedChipContainer" class="mt-2 flex flex-wrap gap-2">
