@@ -11,6 +11,7 @@ use App\Service\OpenRouterService;
 use App\Service\ModelService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\ChatHistory;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\SerializerInterface;
 use App\Entity\Thread;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,7 @@ use App\Event\OpenRouterRequestCompletedEvent;
 use Psr\Log\LoggerInterface;
 
 #[Route('/api')]
+#[IsGranted('ROLE_USER')]
 class ChatController extends AbstractController
 {
     public function __construct(

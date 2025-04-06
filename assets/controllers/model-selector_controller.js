@@ -371,26 +371,27 @@ export default class extends Controller {
     async fetchModelsDirectly() {
         console.log('Fetching models directly from model-selector controller');
         try {
-            // Try to get from localStorage first
-            const cachedModels = localStorage.getItem('stimulus_models');
-            if (cachedModels) {
-                console.log('Using cached models from localStorage');
-                const models = JSON.parse(cachedModels);
-                this.modelsValue = models.map(m => ({ ...m, selected: false }));
-                this.render();
-                return models;
-            }
-
-            // If not in localStorage, fetch from API
-            const response = await fetch('/api/models');
+            // Fetch from API
+            // This is the correct path since we're using fetch() directly
+            // Add the Authorization header with the JWT token
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/models', {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            });
             if (!response.ok) {
+                // If we get a 401 Unauthorized error, it means the token is invalid or missing
+                if (response.status === 401) {
+                    console.error('401 Unauthorized: Authentication token is missing or invalid');
+                    // Redirect to login if needed
+                    // window.location.href = '/login';
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const models = await response.json();
             console.log(`Fetched ${models.length} models directly:`, models);
-
-            // Store in localStorage for future use
-            localStorage.setItem('stimulus_models', JSON.stringify(models));
 
             // Update the controller's models value and render
             this.modelsValue = models.map(m => ({ ...m, selected: false }));

@@ -408,25 +408,15 @@ export default class extends Controller {
     async fetchModels() {
         console.log('Fetching models...');
         try {
-            // Clear cache for testing
-            // localStorage.removeItem('stimulus_models');
-
-            const cachedModels = localStorage.getItem('stimulus_models');
-            if (cachedModels) {
-                console.log('Using cached models');
-                const models = JSON.parse(cachedModels);
-                console.log(`Loaded ${models.length} models from cache:`, models);
-                return models;
-            }
-
             console.log('Fetching models from API');
-            // Use controller's api instance
+            // Use controller's api instance with the correct path
+            // Note: this.api already has baseURL set to '/api', so we just need '/models'
+            // The Authorization header is automatically added by the axios interceptor
             const response = await this.api.get('/models');
             console.log('API response for models:', response);
 
             if (response.data && Array.isArray(response.data)) {
                 console.log(`Received ${response.data.length} models from API:`, response.data);
-                localStorage.setItem('stimulus_models', JSON.stringify(response.data));
                 return response.data;
             }
 

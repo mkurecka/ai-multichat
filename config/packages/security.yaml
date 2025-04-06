@@ -35,7 +35,7 @@ security:
         - { path: ^/api/public, roles: PUBLIC_ACCESS }
         # - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS } # Removed: Must be protected by 'api' firewall
         - { path: ^/index, roles: PUBLIC_ACCESS }
-        - { path: ^/api, roles: ROLE_USER } # This now correctly covers /api/token/refresh
+        #- { path: ^/api, roles: ROLE_USER } # This now correctly covers /api/token/refresh
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/profile, roles: ROLE_USER }
         - { path: ^/app, roles: ROLE_USER }

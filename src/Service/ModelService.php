@@ -15,7 +15,7 @@ class ModelService
     private int $cacheTtl;
     private EntityManagerInterface $entityManager;
     private ModelRepository $modelRepository;
-    
+
     public function __construct(
         OpenRouterService $openRouterService,
         AdapterInterface $cache,
@@ -29,63 +29,83 @@ class ModelService
         $this->entityManager = $entityManager;
         $this->modelRepository = $modelRepository;
     }
-    
+
     public function getModels(): array
     {
         return $this->cache->get('openrouter_models', function ($item) {
             $item->expiresAfter($this->cacheTtl);
-            
-            // First try to get models from the database
-            $dbModels = $this->modelRepository->findAllOrdered(true);
-            
-            if (!empty($dbModels)) {
-                // Format database models
-                $formattedModels = [];
-                foreach ($dbModels as $model) {
-                    $formattedModels[] = [
-                        'id' => $model->getModelId(),
-                        'name' => $model->getName(),
-                        'description' => $model->getDescription(),
-                        'provider' => $model->getProvider(),
-                        'selected' => false,
-                        'pricing' => $model->getPricing() ?? [
-                            'prompt' => null,
-                            'completion' => null,
-                            'unit' => 'tokens'
-                        ],
-                        'supportsStreaming' => $model->isSupportsStreaming()
-                    ];
-                }
-                
-                return $formattedModels;
-            }
-            
-            // If no models in database, fetch from API
+
+            // Always fetch fresh models from the API
             $rawModels = $this->openRouterService->getModels();
             $formattedModels = $this->formatModels($rawModels);
-            
-            // Save to database
+
+            // Save to database in the background (for admin purposes)
             $this->saveModelsToDatabase($rawModels);
-            
+
+            // Apply enabled/disabled status from database
+            $formattedModels = $this->applyDatabaseSettings($formattedModels);
+
             return $formattedModels;
         });
     }
-    
+
+    /**
+     * Apply database settings (enabled/disabled, streaming support) to API models
+     */
+    private function applyDatabaseSettings(array $formattedModels): array
+    {
+        // Get all models from database
+        $dbModels = $this->modelRepository->findAll();
+        $dbModelMap = [];
+
+        // Create a map of model IDs to database models
+        foreach ($dbModels as $model) {
+            $dbModelMap[$model->getModelId()] = $model;
+        }
+
+        // Apply database settings to formatted models
+        foreach ($formattedModels as $key => $model) {
+            $modelId = $model['id'];
+
+            // If model exists in database, apply its settings
+            if (isset($dbModelMap[$modelId])) {
+                $dbModel = $dbModelMap[$modelId];
+
+                // Only include enabled models
+                if (!$dbModel->isEnabled()) {
+                    unset($formattedModels[$key]);
+                    continue;
+                }
+
+                // Apply streaming support setting
+                $formattedModels[$key]['supportsStreaming'] = $dbModel->isSupportsStreaming();
+            }
+        }
+
+        // Re-index the array
+        return array_values($formattedModels);
+    }
+
     public function refreshModels(): array
     {
         // Clear the cache
         $this->cache->delete('openrouter_models');
-        
+
         // Fetch fresh models from API
         $rawModels = $this->openRouterService->getModels();
-        
+
         // Save to database
         $this->saveModelsToDatabase($rawModels);
-        
-        // Format and return
-        return $this->formatModels($rawModels);
+
+        // Format models
+        $formattedModels = $this->formatModels($rawModels);
+
+        // Apply database settings
+        $formattedModels = $this->applyDatabaseSettings($formattedModels);
+
+        return $formattedModels;
     }
-    
+
     private function formatModels(array $rawModels): array
     {
         if (empty($rawModels)) {
@@ -93,7 +113,7 @@ class ModelService
         }
 
         $formattedModels = [];
-        
+
         foreach ($rawModels as $model) {
             if (!isset($model['id'])) {
                 continue;
@@ -113,10 +133,10 @@ class ModelService
                 'supportsStreaming' => $model['supports_streaming'] ?? false
             ];
         }
-        
+
         return $formattedModels;
     }
-    
+
     private function extractProviderFromId(string $id): ?string
     {
         if (strpos($id, '/') !== false) {
@@ -132,8 +152,18 @@ class ModelService
                 continue;
             }
 
-            $model = $this->modelRepository->findByModelId($modelData['id']) ?? new Model();
-            
+            $isNewModel = false;
+            $model = $this->modelRepository->findByModelId($modelData['id']);
+
+            if (!$model) {
+                $model = new Model();
+                $isNewModel = true;
+                // Enable new models by default
+                $model->setEnabled(true);
+                // Set streaming support based on API data
+                $model->setSupportsStreaming($modelData['supports_streaming'] ?? false);
+            }
+
             $model->setName($modelData['name'] ?? $modelData['id']);
             $model->setModelId($modelData['id']);
             $model->setDescription($modelData['description'] ?? null);
@@ -150,7 +180,7 @@ class ModelService
     public function getModelsByProvider(string $provider): array
     {
         $dbModels = $this->modelRepository->findBy(['provider' => $provider]);
-        
+
         $formattedModels = [];
         foreach ($dbModels as $model) {
             $formattedModels[] = [
@@ -166,7 +196,7 @@ class ModelService
                 ]
             ];
         }
-        
+
         return $formattedModels;
     }
 
