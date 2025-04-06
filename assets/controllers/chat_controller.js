@@ -21,7 +21,9 @@ export default class extends Controller {
         "loadingIndicator",
         "authLoadingIndicator",
         "authRequiredMessage",
-        "mainAppContainer"
+        "mainAppContainer",
+        "headerNav",
+        "userEmail"
     ];
 
     static values = {
@@ -304,6 +306,16 @@ export default class extends Controller {
                     this.isAuthenticatedValue = true;
                     console.log('Authentication successful');
 
+                    // Update the user email display in the header
+                    if (this.hasUserEmailTarget) {
+                        this.userEmailTarget.textContent = this.userEmailValue;
+                    }
+
+                    // Show the header
+                    if (this.hasHeaderNavTarget) {
+                        this.headerNavTarget.hidden = false;
+                    }
+
                     // Load initial data (which manages its own loading state)
                     await this.loadInitialData();
                 } else {
@@ -342,6 +354,11 @@ export default class extends Controller {
         // Update UI
         this.mainAppContainerTarget.hidden = true;
         this.authRequiredMessageTarget.hidden = false;
+
+        // Hide the header
+        if (this.hasHeaderNavTarget) {
+            this.headerNavTarget.hidden = true;
+        }
 
         // Make sure loading indicators are hidden
         this.isLoadingValue = false;
@@ -1112,6 +1129,23 @@ export default class extends Controller {
         if (this.hasAuthLoadingIndicatorTarget) {
             this.authLoadingIndicatorTarget.hidden = true;
         }
+    }
+
+    // Handle logout button click
+    logout() {
+        console.log('Logging out...');
+
+        // Remove the token from localStorage
+        localStorage.removeItem('token');
+
+        // Show a notification
+        this.showNotification('You have been logged out successfully', 'info');
+
+        // Handle the unauthenticated state
+        this.handleUnauthenticated();
+
+        // Redirect to login page if needed
+        // window.location.href = '/login';
     }
 
     appendMessageToDOM(message) {

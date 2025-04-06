@@ -1504,6 +1504,33 @@ body {
   }
 }
 
+/* Header styles */
+header {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+header .app-logo {
+  transition: transform 0.2s ease-in-out;
+}
+
+header .app-logo:hover {
+  transform: scale(1.05);
+}
+
+header .user-email {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+header .logout-button {
+  transition: all 0.2s ease-in-out;
+}
+
+header .logout-button:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
 /* Highlight effect for completed responses */
 @keyframes highlightComplete {
   0% { background-color: rgba(16, 185, 129, 0.1); }
