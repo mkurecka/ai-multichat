@@ -1,5 +1,5 @@
 import { Controller } from '@hotwired/stimulus';
-import Sortable from 'sortablejs';
+//import Sortable from 'sortablejs';
 
 /*
  * Basic Stimulus controller to handle Symfony Form Collections.
