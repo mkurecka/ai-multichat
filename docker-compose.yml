@@ -33,25 +33,6 @@ services:
     networks:
       - app-network
 
-  node:
-    build:
-      context: .
-      dockerfile: docker/node/Dockerfile
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - ./.env.local:/app/.env.local:ro
-    working_dir: /app
-    command: npm run watch
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_BASE_URL=http://localhost:5173
-    env_file:
-      - .env.local
-    networks:
-      - app-network
-
   database:
     image: mysql:8.0
     environment:
@@ -62,7 +43,7 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "3316:3306"
     networks:
       - app-network
 

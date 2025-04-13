@@ -1,0 +1,20 @@
+# config/packages/gedmo.yaml
+services: # Correct indentation level 0
+    # default configuration for services in *this* file
+    _defaults: # Correct indentation level 1 (4 spaces)
+        autowire: true      # Correct indentation level 2 (8 spaces)
+        autoconfigure: true # Correct indentation level 2 (8 spaces)
+
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
+    App\: # Correct indentation level 1 (4 spaces)
+        resource: '../../src/' # Corrected path: Go up two levels
+        exclude: # Correct indentation level 2 (8 spaces)
+            - '../../src/DependencyInjection/' # Corrected path
+            - '../../src/Entity/' # Corrected path
+            - '../../src/Kernel.php' # Corrected path
+
+    # Gedmo Timestampable Listener
+    Gedmo\Timestampable\TimestampableListener: # Correct indentation level 1 (4 spaces)
+        tags: # Correct indentation level 2 (8 spaces)
+            - { name: doctrine.event_subscriber, connection: default } # Correct indentation level 3 (12 spaces)

@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\PromptTemplate; // Add import for PromptTemplate
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -35,12 +36,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?Organization $organization = null;
 
-    #[ORM\OneToMany(targetEntity: Thread::class, mappedBy: "user", cascade: ["persist", "remove"])]
+    #[ORM\OneToMany(targetEntity: Thread::class, mappedBy: 'user', cascade: ['persist', 'remove'])]
     private Collection $threads;
+
+    #[ORM\OneToMany(mappedBy: 'owner', targetEntity: PromptTemplate::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $promptTemplates;
 
     public function __construct()
     {
         $this->threads = new ArrayCollection();
+        $this->promptTemplates = new ArrayCollection(); // Initialize the new collection
     }
 
     public function getId(): ?int
@@ -155,5 +160,35 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setRoles(array $roles): void
     {
         $this->roles = $roles;
+    }
+
+    /**
+     * @return Collection<int, PromptTemplate>
+     */
+    public function getPromptTemplates(): Collection
+    {
+        return $this->promptTemplates;
+    }
+
+    public function addPromptTemplate(PromptTemplate $promptTemplate): static
+    {
+        if (!$this->promptTemplates->contains($promptTemplate)) {
+            $this->promptTemplates->add($promptTemplate);
+            $promptTemplate->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removePromptTemplate(PromptTemplate $promptTemplate): static
+    {
+        if ($this->promptTemplates->removeElement($promptTemplate)) {
+            // set the owning side to null (unless already changed)
+            if ($promptTemplate->getOwner() === $this) {
+                $promptTemplate->setOwner(null);
+            }
+        }
+
+        return $this;
     }
 }

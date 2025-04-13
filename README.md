@@ -1,219 +1,130 @@
 # AI MultiChat Application
 
-A multi-model chat application with Symfony 7 backend and React frontend.
+A multi-model chat application built with Symfony 7 and using AssetMapper with Tailwind CSS for the frontend.
 
 ## Docker Setup
 
 This project uses Docker for local development. The setup includes:
 
-- PHP 8.2 (FPM) for the Symfony backend
-- Nginx as a web server for the backend
+- PHP 8.3+ (FPM) for the Symfony backend
+- Nginx as a web server
 - MySQL 8.0 database
-- Node.js for the React frontend
 
 ### Prerequisites
 
 - Docker and Docker Compose installed on your system
-- Git
+- Gitte
 
 ### Getting Started
 
-#### Option 1: Using the initialization script
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd ai-multichat
+    ```
 
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd ai-multichat
-   ```
+2.  **Copy Environment File:**
+    Create a local environment file from the example:
+    ```bash
+    cp .env .env.local
+    ```
+    *(Optional)* Adjust variables in `.env.local` if needed (e.g., database credentials, API keys).
 
-2. Run the initialization script:
-   ```
-   ./docker-init.sh
-   ```
-   
-   This script will:
-   - Start all Docker containers
-   - Install backend dependencies
-   - Run database migrations
-   - Generate JWT keys if needed
-   - Cache models
+3.  **Build and Start Containers:**
+    ```bash
+    docker compose up -d --build
+    ```
 
-3. Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000/api
+4.  **Install Dependencies:**
+    ```bash
+    docker compose exec php composer install
+    ```
 
-#### Option 2: Manual setup
+5.  **Run Database Migrations:**
+    ```bash
+    docker compose exec php bin/console doctrine:migrations:migrate --no-interaction
+    ```
 
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd ai-multichat
-   ```
+6.  **Generate JWT Keys (if needed):**
+    Run this if you haven't generated keys before or if the `config/jwt/` directory is empty.
+    ```bash
+    docker compose exec php bin/console lexik:jwt:generate-keypair
+    ```
 
-2. Start the Docker containers:
-   ```
-   docker-compose up -d
-   ```
+7.  **Build Frontend Assets:**
+    Compile Tailwind CSS:
+    ```bash
+    docker compose exec php bin/console tailwind:build
+    ```
 
-3. Install backend dependencies:
-   ```
-   docker-compose exec php composer install
-   ```
+8.  **Access the Application:**
+    - Main Application: http://localhost:8000 (or the port configured in `docker-compose.yml`)
 
-4. Create the database schema:
-   ```
-   docker-compose exec php bin/console doctrine:migrations:migrate --no-interaction
-   ```
+*(Note: The old `docker-init.sh` script might be outdated. Following the manual steps above is recommended.)*
 
-5. Generate JWT keys (if not already present):
-   ```
-   docker-compose exec php bin/console lexik:jwt:generate-keypair
-   ```
+## Development Workflow with Makefile
 
-6. Cache models:
-   ```
-   docker-compose exec php bin/console app:cache:models
-   ```
+A `Makefile` is included to simplify common development tasks. Run `make help` to see all available commands.
 
-7. Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000/api
+**Common Commands:**
 
-### Useful Commands
+-   `make up`: Start Docker containers in detached mode.
+-   `make down`: Stop and remove Docker containers.
+-   `make php`: Enter the PHP container's shell (`sh`).
+-   `make composer-install`: Install PHP dependencies.
+-   `make migrate`: Run database migrations.
+-   `make make-migration`: Generate a new database migration file.
+-   `make tailwind-build`: Build Tailwind CSS assets once.
+-   `make tailwind-watch`: Watch Tailwind CSS files for changes and rebuild automatically.
+-   `make cache-clear`: Clear the Symfony application cache.
+-   `make test`: Run PHPUnit tests.
+-   `make load-fixtures`: **(Destructive!)** Drops the database schema, reapplies migrations, and loads test data (users: `user@test.local`, `orgadmin@test.local`, `admin@test.local`). Useful for resetting the local environment.
+-   `make promote-user EMAIL=<email> [ROLE=<role>]`: Promotes a user to a specific role (default `ROLE_ADMIN`, allowed: `ROLE_ADMIN`, `ROLE_ORGANIZATION_ADMIN`).
+    *   **Example:** `make promote-user EMAIL=test@example.com ROLE=ROLE_ORGANIZATION_ADMIN`
+    *   **Example (default role):** `make promote-user EMAIL=test@example.com` (assigns `ROLE_ADMIN`)
 
-- View logs:
-  ```
-  docker-compose logs -f
-  ```
+## Testing Different User Roles Locally
 
-- Access the PHP container:
-  ```
-  docker-compose exec php bash
-  ```
+To test the application from the perspective of different user roles without needing multiple Google accounts, you can use Symfony's impersonation feature (`switch_user`) combined with the test data loaded by `make load-fixtures`.
 
-- Access the database:
-  ```
-  docker-compose exec database mysql -u app -p
-  ```
+1.  **Load Test Data:**
+    Run `make load-fixtures`. **Warning:** This deletes all existing data in your local database. This creates users like `user@test.local` (regular user), `orgadmin@test.local` (organization admin), and `admin@test.local` (super admin).
 
-- Stop the containers:
-  ```
-  docker-compose down
-  ```
+2.  **Log In as Admin:**
+    Log in to the application normally using your primary Google account, which should have the `ROLE_ADMIN` assigned (you might need to use `make promote-user EMAIL=your-email@example.com ROLE=ROLE_ADMIN` the first time, after the user exists in the database).
 
-- Rebuild containers after Dockerfile changes:
-  ```
-  docker-compose up -d --build
-  ```
+3.  **Switch User:**
+    Once logged in as an admin, navigate to any page within the application (e.g., `http://localhost:8000/app`) and append the `_switch_user` query parameter with the email of the user you want to impersonate:
+    -   To become `user@test.local`: `http://localhost:8000/app?_switch_user=user@test.local`
+    -   To become `orgadmin@test.local`: `http://localhost:8000/app?_switch_user=orgadmin@test.local`
+
+    You should see a confirmation banner indicating you are now acting as the specified user.
+
+4.  **Test:**
+    Browse the application and test features based on the impersonated user's role (e.g., access to prompt template management).
+
+5.  **Exit Impersonation:**
+    To return to your original admin account, navigate to any page and append `_switch_user=_exit`:
+    `http://localhost:8000/app?_switch_user=_exit`
 
 ## Environment Variables
 
-The main environment variables are stored in the `.env` file at the root of the project. You can modify these values to suit your needs.
-
-For backend-specific environment variables, check the `backend/.env` file.
-
-## Development
-
-- Backend code is in the `backend/` directory
-- Frontend code is in the `frontend/` directory
-
-Changes to the code will be automatically reflected in the running application due to the volume mounts in the Docker Compose configuration.
+-   `.env`: Default environment variables (should generally not be modified directly).
+-   `.env.local`: Local overrides for development. Create this file by copying `.env`. **This file is ignored by Git.**
+-   `.env.test`: Environment variables for automated tests.
+-   *(Production)* `.env.prod.local`: Production-specific overrides (if needed, also ignored by Git).
 
 ## Production Deployment
 
-For production deployment, this project includes optimized Docker configurations:
+*(Note: This section might need review and adaptation based on your specific production environment and deployment strategy. The project structure has changed since this section was likely last updated.)*
 
-### Setup
+The project includes a `Dockerfile.prod` for building an optimized production image. A typical deployment might involve:
 
-#### Option 1: Using the deployment script
+1.  Building the production Docker image.
+2.  Pushing the image to a container registry.
+3.  Deploying the image to your hosting environment (e.g., Kubernetes, Docker Swarm, managed container service).
+4.  Ensuring production environment variables (database credentials, `APP_ENV=prod`, `APP_DEBUG=0`, secrets, API keys) are securely configured in the production environment.
+5.  Running database migrations in the production environment after deployment.
+6.  Clearing/warming up the Symfony cache (`bin/console cache:clear --env=prod`).
 
-1. Copy the example production environment file:
-   ```
-   cp .env.prod.example .env.prod
-   ```
-
-2. Edit `.env.prod` with your production settings:
-   - Set secure passwords for the database
-   - Configure domain names
-   - Set API keys
-   - Adjust other settings as needed
-
-3. Run the deployment script:
-   ```
-   ./docker-deploy.sh
-   ```
-   
-   This script will:
-   - Build and start all production containers
-   - Run database migrations
-   - Generate JWT keys if needed
-   - Cache models
-   - Clear the Symfony cache
-
-#### Option 2: Manual deployment
-
-1. Copy the example production environment file:
-   ```
-   cp .env.prod.example .env.prod
-   ```
-
-2. Edit `.env.prod` with your production settings:
-   - Set secure passwords for the database
-   - Configure domain names
-   - Set API keys
-   - Adjust other settings as needed
-
-3. Build and start the production containers:
-   ```
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-   ```
-
-4. Run database migrations:
-   ```
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod exec php bin/console doctrine:migrations:migrate --no-interaction
-   ```
-
-5. Generate JWT keys if needed:
-   ```
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod exec php bin/console lexik:jwt:generate-keypair --no-interaction
-   ```
-
-6. Cache models:
-   ```
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod exec php bin/console app:cache:models
-   ```
-
-7. Clear the Symfony cache:
-   ```
-   docker-compose -f docker-compose.prod.yml --env-file .env.prod exec php bin/console cache:clear --env=prod
-   ```
-
-### Production Architecture
-
-The production setup includes:
-
-- Multi-stage builds for optimized container images
-- Nginx for serving both frontend and backend
-- PHP-FPM with optimized settings for Symfony
-- Persistent MySQL database volume
-- Environment variable configuration
-- Security headers and optimizations
-
-### Maintenance
-
-- View logs:
-  ```
-  docker-compose -f docker-compose.prod.yml --env-file .env.prod logs -f
-  ```
-
-- Restart services:
-  ```
-  docker-compose -f docker-compose.prod.yml --env-file .env.prod restart
-  ```
-
-- Update application:
-  ```
-  git pull
-  docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-  docker-compose -f docker-compose.prod.yml --env-file .env.prod exec php bin/console doctrine:migrations:migrate --no-interaction
-  ```
+Consider using deployment tools like Deployer (a `deploy.php` file exists) or platform-specific deployment methods.

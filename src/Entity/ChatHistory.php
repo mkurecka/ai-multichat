@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\PromptTemplate; // Import PromptTemplate
 use DateTime;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -35,10 +36,15 @@ class ChatHistory
     #[ORM\Column(type: "datetime")]
     private DateTime $createdAt;
 
+    #[ORM\ManyToOne(targetEntity: PromptTemplate::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')] // Allow template deletion without deleting history
+    private ?PromptTemplate $usedTemplate = null;
+
     public function __construct()
     {
         $this->createdAt = new DateTime();
-        $this->promptId = uniqid('prompt_');
+        // Keep promptId generation if needed, or remove if frontend always provides it
+        // $this->promptId = uniqid('prompt_');
     }
 
     public function getId(): ?int
@@ -120,6 +126,18 @@ class ChatHistory
     public function setCreatedAt(DateTime $createdAt): self
     {
         $this->createdAt = $createdAt;
+        return $this;
+    }
+
+    public function getUsedTemplate(): ?PromptTemplate
+    {
+        return $this->usedTemplate;
+    }
+
+    public function setUsedTemplate(?PromptTemplate $usedTemplate): static
+    {
+        $this->usedTemplate = $usedTemplate;
+
         return $this;
     }
 }

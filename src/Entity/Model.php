@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\ModelRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups; // Import Groups annotation
 
 #[ORM\Entity(repositoryClass: ModelRepository::class)]
 class Model
@@ -11,30 +12,39 @@ class Model
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['template:read', 'template:write'])] // Read for display, Write to accept ID for association
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['template:read'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['template:read'])]
     private ?string $modelId = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['template:read'])]
     private ?string $description = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['template:read'])]
     private ?string $provider = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['template:read'])]
     private ?string $apiService = 'openrouter';
 
     #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['template:read'])]
     private ?array $pricing = null;
 
     #[ORM\Column(type: 'boolean')]
+    #[Groups(['template:read'])]
     private bool $enabled = false;
 
     #[ORM\Column(type: 'boolean')]
+    #[Groups(['template:read'])]
     private bool $supportsStreaming = false;
 
     #[ORM\Column]
@@ -163,4 +173,4 @@ class Model
         $this->updatedAt = $updatedAt;
         return $this;
     }
-} 
+}

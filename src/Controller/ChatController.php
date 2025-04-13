@@ -2,24 +2,28 @@
 
 namespace App\Controller;
 
+use App\Entity\ChatHistory;
+use App\Entity\PromptTemplate; // Import PromptTemplate
+use App\Entity\Thread;
+use App\Entity\User; // Make sure User is imported if not already
+use App\Event\OpenRouterRequestCompletedEvent;
 use App\Repository\ModelRepository;
+use App\Repository\PromptTemplateRepository; // Import PromptTemplateRepository
+use App\Service\ModelService;
+use App\Service\OpenRouterService;
+// use App\Service\PromptTemplateService; // Service for processing template text (currently handled by frontend)
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Annotation\Route;
-use App\Service\OpenRouterService;
-use App\Service\ModelService;
-use Doctrine\ORM\EntityManagerInterface;
-use App\Entity\ChatHistory;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\SerializerInterface;
-use App\Entity\Thread;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use App\Event\OpenRouterRequestCompletedEvent;
-use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+// use Symfony\Component\Serializer\SerializerInterface; // Not used currently
 
 #[Route('/api')]
 #[IsGranted('ROLE_USER')]
@@ -31,6 +35,8 @@ class ChatController extends AbstractController
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
         private readonly ModelRepository $modelRepository,
+        private readonly PromptTemplateRepository $promptTemplateRepository // Inject PromptTemplateRepository
+        // private readonly PromptTemplateService $promptTemplateService // Inject if needed later
     ) {}
 
     #[Route('/models', methods: ['GET'])]
@@ -70,170 +76,257 @@ class ChatController extends AbstractController
     public function chat(Request $request, EntityManagerInterface $em, OpenRouterService $openRouter): Response
     {
         $data = json_decode($request->getContent(), true);
-        $prompt = $data['prompt'] ?? null;
-        $models = $data['models'] ?? [];
+        // Expect 'userInput' for raw user text, keep 'prompt' for potential backward compatibility or processed text if needed?
+        // Let's prioritize 'userInput' if available.
+        $userInput = $data['userInput'] ?? $data['prompt'] ?? null;
+        $models = $data['models'] ?? []; // Original models selected by user (might be overridden by template)
         $threadId = $data['threadId'] ?? null;
         $stream = $data['stream'] ?? false;
-        $promptId = $data['promptId'] ?? null;
+        $promptId = $data['promptId'] ?? null; // Frontend generated ID for the specific prompt instance
+        $templateId = $data['templateId'] ?? null; // Optional ID of the template used
 
-        if (!$prompt || empty($models)) {
-            throw new HttpException(400, 'Prompt and models are required');
+        // $finalPrompt = $prompt; // We no longer use a single 'finalPrompt' in the same way
+        $finalModels = $models; // Array of model *string IDs* (e.g., 'openai/gpt-4')
+        $selectedTemplate = null;
+        /** @var User $currentUser */
+        $currentUser = $this->getUser(); // Get current user
+
+        // --- Template Processing Logic ---
+        if ($templateId) {
+            $selectedTemplate = $this->promptTemplateRepository->find((int)$templateId);
+
+            if (!$selectedTemplate) {
+                throw new HttpException(404, 'Prompt template not found.');
+            }
+
+            // Authorization Check for Template Usage
+            $isOwner = $selectedTemplate->getOwner() === $currentUser;
+            $isOrgMatch = $selectedTemplate->getOrganization() === $currentUser->getOrganization();
+
+            if (!($selectedTemplate->getScope() === PromptTemplate::SCOPE_PRIVATE && $isOwner) &&
+                !($selectedTemplate->getScope() === PromptTemplate::SCOPE_ORGANIZATION && $isOrgMatch)) {
+                 throw new HttpException(403, 'You do not have permission to use this prompt template.');
+            }
+
+            // Override models with the one associated with the template
+            if ($associatedModel = $selectedTemplate->getAssociatedModel()) {
+                if (!$associatedModel->isEnabled()) {
+                     throw new HttpException(400, 'The AI model associated with this template is currently disabled.');
+                }
+                 $finalModels = [$associatedModel->getModelId()]; // Use the model's string ID
+                 $stream = $stream && $associatedModel->isSupportsStreaming(); // Adjust stream capability
+            } else {
+                 throw new HttpException(500, 'The selected template does not have an associated AI model.');
+            }
+
+            // Template found and authorized, model is set in $finalModels
+        } else {
+            // --- No Template Provided ---
+            // Decide fallback behavior. For now, require a template or handle differently.
+            // Option 1: Throw error if no template ID is provided (enforce template usage)
+            // throw new HttpException(400, 'A prompt template ID (templateId) is required for chat requests.');
+
+            // Option 2: Allow direct chat (requires constructing a minimal message array or using a default template)
+            // This path needs careful consideration. Let's assume for now a template is required.
+            // If we allow direct chat, we'd need to fetch a default template or handle it in OpenRouterService.
+             // throw new HttpException(400, 'A prompt template ID (templateId) is required for chat requests.'); // REMOVED: Allow non-template chat
+
+            // If allowing direct chat without template:
+             $finalModels = $models; // Use user-selected models
+             $selectedTemplate = null; // No template used
+             // Ensure stream is based on user request if no template overrides it
+             // $stream = $data['stream'] ?? false; // Already set based on initial request data
         }
+        // --- End Template Processing ---
 
+        // Validation
+        if (!$userInput || empty($finalModels)) {
+             throw new HttpException(400, 'User input (userInput) and models are required.');
+        }
+        // Removed check requiring selectedTemplate
         if (!$promptId) {
-            throw new HttpException(400, 'PromptId is required');
+            throw new HttpException(400, 'PromptId is required.');
         }
 
-        $user = $this->getUser();
-        $organization = $user->getOrganization();
+        $organization = $currentUser->getOrganization(); // Get organization from current user
 
-        // Handle thread creation or retrieval
+        // --- Handle Thread ---
         if ($threadId) {
-            // If thread ID is provided, use it
-            $thread = $em->getRepository(Thread::class)->findOneBy(['threadId' => $threadId]);
+            $thread = $em->getRepository(Thread::class)->findOneBy(['threadId' => $threadId, 'user' => $currentUser]);
             if (!$thread) {
-                throw new HttpException(404, 'Thread not found');
+                throw new HttpException(404, 'Thread not found or access denied.');
             }
         } else {
-            // No thread ID provided - create exactly one new thread
             $thread = new Thread();
-            $thread->setTitle(substr($prompt, 0, 100));
-            $thread->setUser($user);
+            // Use the raw user input for the initial title
+            $thread->setTitle(substr($userInput, 0, 100));
+            $thread->setUser($currentUser);
             $thread->setThreadId(uniqid('thread_', true));
             $em->persist($thread);
-            $em->flush(); // Flush immediately to ensure thread is saved
-
-            // Get the thread ID to reuse with all models
-            $threadId = $thread->getThreadId();
+            $em->flush(); // Save thread to get ID
+            $threadId = $thread->getThreadId(); // Update threadId variable
         }
 
-        $modelId = $models[0];
+        // --- Determine Model and Streaming ---
+        $modelDbId = null; // Model DB ID for history
+        $modelIdString = $finalModels[0]; // Model string ID for API call
         $allowsStream = false;
-        foreach ($models as $modelId) {
-            $model = $this->modelRepository->findByModelId($modelId);
-            if ($stream && $model->isEnabled() && $model->isSupportsStreaming()) {
-                $allowsStream = true;
-                $modelId = $model->getId();
-                break;
-            }
+        $modelEntity = $this->modelRepository->findByModelId($modelIdString);
+
+        if (!$modelEntity || !$modelEntity->isEnabled()) {
+             throw new HttpException(400, "The selected model '{$modelIdString}' is not available or disabled.");
         }
 
+        $modelDbId = $modelEntity->getId();
+        $allowsStream = $stream && $modelEntity->isSupportsStreaming();
+
+        // --- Streaming Response ---
         if ($allowsStream) {
-            // For streaming, we'll handle one model at a time
-            $modelResponses = $openRouter->streamResponse($prompt, [$modelId], $thread);
+            // Call with potentially null Template object and raw userInput
+            $modelResponses = $openRouter->streamResponse($selectedTemplate, $userInput, [$modelIdString], $thread); // Pass $selectedTemplate (can be null)
 
-            if (!isset($modelResponses[$modelId])) {
-                throw new HttpException(500, 'Failed to generate streaming response');
+            if (!isset($modelResponses[$modelIdString])) {
+                throw new HttpException(500, 'Failed to generate streaming response from OpenRouter.');
             }
+            $modelResponse = $modelResponses[$modelIdString]; // Contains stream resource and initial usage data
 
-            $modelResponse = $modelResponses[$modelId];
+            // Define the closure for streaming, ensuring all needed variables are passed via 'use'
+            $streamClosure = function() use ($modelResponse, $modelDbId, $modelIdString, $userInput, $thread, $em, $promptId, $selectedTemplate, $currentUser) {
+                $streamResource = $modelResponse['stream'] ?? null;
+                if (!is_resource($streamResource)) {
+                     $this->logger->error('Invalid stream resource received from OpenRouterService', ['model' => $modelIdString]);
+                     echo "data: " . json_encode(['error' => 'Internal error: Could not get stream.', 'modelId' => $modelIdString]) . "\n\n";
+                     flush();
+                     return;
+                }
 
-            // Create a new StreamedResponse
-            $response = new StreamedResponse(function() use ($modelResponse, $modelId, $prompt, $thread, $em, $promptId) {
-                $stream = $modelResponse['stream'];
+                // Initialize variables for the stream processing
                 $content = '';
                 $openRouterId = null;
+                $finalUsage = $modelResponse['usage'] ?? ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
+                $chatHistory = null;
                 $historySaved = false;
 
-                while (!feof($stream)) {
-                    $chunk = fread($stream, 8192);
-                    if ($chunk === false) break;
+                // Start the actual loop to process the stream
+                while (!feof($streamResource)) {
+                    $chunk = fread($streamResource, 8192);
+                    if ($chunk === false || $chunk === '') {
+                        $this->logger->info('Stream ended or read error.', ['model' => $modelIdString]);
+                        break;
+                    };
 
                     $lines = explode("\n", $chunk);
                     foreach ($lines as $line) {
                         if (empty(trim($line))) continue;
-                        if (strpos($line, 'data: ') === 0) {
-                            $data = substr($line, 6);
-                            if ($data === '[DONE]') {
-                                // Save the complete response to chat history
-                                $chatHistory = new ChatHistory();
-                                $chatHistory->setThread($thread)
-                                    ->setPrompt($prompt)
-                                    ->setPromptId($promptId)
-                                    ->setResponse([
-                                        'content' => $content,
-                                        'usage' => [
-                                            'prompt_tokens' => $modelResponse['usage']['prompt_tokens'] ?? 0,
-                                            'completion_tokens' => $modelResponse['usage']['completion_tokens'] ?? 0,
-                                            'total_tokens' => $modelResponse['usage']['total_tokens'] ?? 0
-                                        ]
-                                    ])
-                                    ->setModelId($modelId)
-                                    ->setOpenRouterId($openRouterId);
 
-                                $em->persist($chatHistory);
-                                $em->flush();
-                                $historySaved = true;
-                                continue;
+                        if (strpos($line, 'data: ') === 0) {
+                            $jsonData = substr($line, 6);
+
+                            if ($jsonData === '[DONE]') {
+                                $this->logger->info('[DONE] received for stream.', ['model' => $modelIdString]);
+                                // Ensure history is saved if content exists
+                                if (!$historySaved && !empty($content)) {
+                                    $chatHistory = new ChatHistory();
+                                    $chatHistory->setThread($thread)
+                                        ->setPrompt($userInput) // Save raw user input
+                                        ->setPromptId($promptId)
+                                        ->setResponse(['content' => $content, 'usage' => $finalUsage])
+                                        ->setModelId($modelDbId)
+                                        ->setOpenRouterId($openRouterId)
+                                        ->setUsedTemplate($selectedTemplate);
+                                    $em->persist($chatHistory);
+                                    try {
+                                        $em->flush();
+                                        $historySaved = true; // Mark as saved
+                                        $this->logger->info('ChatHistory saved on [DONE].', ['historyId' => $chatHistory->getId()]);
+                                    } catch (\Exception $e) {
+                                         $this->logger->error("Error flushing ChatHistory on [DONE]: " . $e->getMessage(), ['exception' => $e]);
+                                    }
+                                }
+                                break 2; // Exit both loops
                             }
 
                             try {
-                                $parsed = json_decode($data, true);
-                                if (isset($parsed['id'])) {
+                                $parsed = json_decode($jsonData, true, 512, JSON_THROW_ON_ERROR);
+
+                                if (isset($parsed['id']) && !$openRouterId) {
                                     $openRouterId = $parsed['id'];
-                                    echo "data: " . json_encode(['id' => $openRouterId]) . "\n\n";
-                                    flush();
+                                    $this->logger->info('Captured OpenRouter ID from stream.', ['id' => $openRouterId]);
                                 }
+
                                 if (isset($parsed['choices'][0]['delta']['content'])) {
-                                    $content .= $parsed['choices'][0]['delta']['content'];
+                                    $deltaContent = $parsed['choices'][0]['delta']['content'];
+                                    $content .= $deltaContent;
                                     echo "data: " . json_encode([
-                                        'content' => $parsed['choices'][0]['delta']['content'],
-                                        'modelId' => $modelId,
+                                        'content' => $deltaContent,
+                                        'modelId' => $modelIdString,
                                         'threadId' => $thread->getThreadId(),
                                         'promptId' => $promptId
                                     ], JSON_UNESCAPED_UNICODE) . "\n\n";
                                     flush();
                                 }
-                                if (isset($parsed['choices'][0]['delta']['usage'])) {
-                                    $usage = $parsed['choices'][0]['delta']['usage'];
-                                    echo "data: " . json_encode([
-                                        'usage' => $usage,
-                                        'modelId' => $modelId,
-                                        'threadId' => $thread->getThreadId(),
-                                        'promptId' => $promptId
-                                    ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                                    flush();
+
+                                if (isset($parsed['choices'][0]['usage'])) {
+                                     $finalUsage = $parsed['choices'][0]['usage'];
+                                     $this->logger->info('Received final usage from stream.', ['usage' => $finalUsage]);
                                 }
+                                if (isset($parsed['usage'])) { // Less common, but check root
+                                     $finalUsage = $parsed['usage'];
+                                     $this->logger->info('Received final usage from stream (root).', ['usage' => $finalUsage]);
+                                }
+
+                            } catch (\JsonException $e) {
+                                $this->logger->error('Error parsing streaming JSON: ' . $e->getMessage(), ['data' => $jsonData]);
                             } catch (\Exception $e) {
-                                error_log('Error parsing streaming response: ' . $e->getMessage());
-                                // Send error message to client
-                                echo "data: " . json_encode([
-                                    'error' => 'Error processing response',
-                                    'modelId' => $modelId
-                                ], JSON_UNESCAPED_UNICODE) . "\n\n";
-                                flush();
+                                 $this->logger->error('Generic error processing stream chunk: ' . $e->getMessage(), ['exception' => $e]);
                             }
+                        } else {
+                             $this->logger->warning('Received non-SSE line from stream.', ['line' => $line]);
                         }
+                    }
+                } // end while
+
+                 if (is_resource($streamResource)) {
+                     fclose($streamResource);
+                 }
+
+                // Final save attempt if not saved via [DONE] and content exists
+                if (!$historySaved && !empty($content)) {
+                    $this->logger->warning('[DONE] not received or history not saved, attempting final save.', ['model' => $modelIdString]);
+                    $chatHistory = new ChatHistory();
+                    $chatHistory->setThread($thread)
+                        ->setPrompt($userInput) // Save raw user input
+                        ->setPromptId($promptId)
+                        ->setResponse(['content' => $content, 'usage' => $finalUsage])
+                        ->setModelId($modelDbId)
+                        ->setOpenRouterId($openRouterId)
+                        ->setUsedTemplate($selectedTemplate);
+                    $em->persist($chatHistory);
+                    try {
+                        $em->flush();
+                        $historySaved = true; // Mark as saved
+                        $this->logger->info('ChatHistory saved after stream end.', ['historyId' => $chatHistory->getId()]);
+                    } catch (\Exception $e) {
+                         $this->logger->error("Error flushing ChatHistory after stream end: " . $e->getMessage(), ['exception' => $e]);
                     }
                 }
 
-                // If we get here without a [DONE] message, save what we have
-                if (!$historySaved && !empty($content)) {
-                    $chatHistory = new ChatHistory();
-                    $chatHistory->setThread($thread)
-                        ->setPrompt($prompt)
-                        ->setPromptId($promptId)
-                        ->setResponse([
-                            'content' => $content,
-                            'usage' => [
-                                'prompt_tokens' => $modelResponse['usage']['prompt_tokens'] ?? 0,
-                                'completion_tokens' => $modelResponse['usage']['completion_tokens'] ?? 0,
-                                'total_tokens' => $modelResponse['usage']['total_tokens'] ?? 0
-                            ]
-                        ])
-                        ->setModelId($modelId)
-                        ->setOpenRouterId($openRouterId);
-
-                    $em->persist($chatHistory);
-                    $em->flush();
+                // Dispatch event only if history was successfully saved and we have an ID
+                if ($historySaved && $chatHistory && $openRouterId) {
+                    try {
+                         $event = new OpenRouterRequestCompletedEvent($openRouterId, $chatHistory->getId(), 'chat');
+                         $this->eventDispatcher->dispatch($event, OpenRouterRequestCompletedEvent::NAME);
+                         $this->logger->info('OpenRouterRequestCompletedEvent dispatched successfully for streaming.', ['openRouterId' => $openRouterId]);
+                    } catch (\Exception $e) {
+                         $this->logger->error("Error dispatching OpenRouterRequestCompletedEvent: " . $e->getMessage(), ['exception' => $e]);
+                    }
+                } else {
+                     $this->logger->warning('Cost tracking event not dispatched.', ['historySaved' => $historySaved, 'hasOpenRouterId' => !is_null($openRouterId)]);
                 }
+            }; // End $streamClosure definition
 
-                // Dispatch event for cost tracking with just the requestId
-                if ($openRouterId) {
-                    $event = new OpenRouterRequestCompletedEvent($openRouterId, $chatHistory->getId(), 'chat');
-                    $this->eventDispatcher->dispatch($event, OpenRouterRequestCompletedEvent::NAME);
-                }
-            });
+            // Create the StreamedResponse *after* defining the closure
+            $response = new StreamedResponse($streamClosure);
 
             $response->headers->set('Content-Type', 'text/event-stream');
             $response->headers->set('Cache-Control', 'no-cache');
@@ -241,72 +334,70 @@ class ChatController extends AbstractController
             $response->headers->set('X-Accel-Buffering', 'no');
 
             return $response;
+
+        // --- Non-Streaming Response ---
         } else {
-            // Non-streaming response
             $responses = [];
+            // Usually only one model in $finalModels here, but loop supports multiple if needed without templates
+            foreach ($finalModels as $modelIdStr) {
+                 $modelEntityForHistory = $this->modelRepository->findByModelId($modelIdStr);
+                 // Re-check eligibility in case logic changes
+                 if (!$modelEntityForHistory || !$modelEntityForHistory->isEnabled()) {
+                     $responses[$modelIdStr] = ['error' => "Model '{$modelIdStr}' is not available or disabled."];
+                     continue;
+                 }
+                 $modelDbIdForHistory = $modelEntityForHistory->getId();
 
-            // Process all models but use the same thread
-            foreach ($models as $modelId) {
-                $modelResponses = $openRouter->generateResponse($prompt, [$modelId], $thread);
+                 // Call with potentially null Template object and raw userInput
+                $modelApiResponses = $openRouter->generateResponse($selectedTemplate, $userInput, [$modelIdStr], $thread); // Pass $selectedTemplate (can be null)
 
-                if (!isset($modelResponses[$modelId])) {
+                if (!isset($modelApiResponses[$modelIdStr])) {
+                    $responses[$modelIdStr] = ['error' => 'Failed to get response from model.'];
                     continue;
                 }
+                $modelApiResponse = $modelApiResponses[$modelIdStr]; // Contains content, usage, id
 
-                $modelResponse = $modelResponses[$modelId];
-
-                // Create a ChatHistory entry for this model but with the same thread
                 $modelHistory = new ChatHistory();
-                $modelHistory->setThread($thread) // Using the same thread
-                    ->setPrompt($prompt)
+                $modelHistory->setThread($thread)
+                    ->setPrompt($userInput) // Save raw user input
                     ->setPromptId($promptId)
                     ->setResponse([
-                        'content' => $modelResponse['content'],
-                        'usage' => $modelResponse['usage'] ?? [
-                            'prompt_tokens' => 0,
-                            'completion_tokens' => 0,
-                            'total_tokens' => 0
-                        ]
+                        'content' => $modelApiResponse['content'] ?? 'Error: No content received',
+                        'usage' => $modelApiResponse['usage'] ?? ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0]
                     ])
-                    ->setModelId($modelId)
-                    ->setOpenRouterId($modelResponse['id']);
+                    ->setModelId($modelDbIdForHistory)
+                    ->setOpenRouterId($modelApiResponse['id'] ?? null)
+                    ->setUsedTemplate($selectedTemplate);
 
                 $em->persist($modelHistory);
-                $em->flush();
 
-                // Log before event dispatch
-                $this->logger->info('Dispatching OpenRouterRequestCompletedEvent', [
-                    'openRouterId' => $modelResponse['id']
-                ]);
-
-                // Dispatch event for cost tracking with just the requestId
-                $event = new OpenRouterRequestCompletedEvent($modelResponse['id'], $modelHistory->getId(), 'chat');
-                $this->eventDispatcher->dispatch($event, OpenRouterRequestCompletedEvent::NAME);
-
-                // Log after event dispatch
-                $this->logger->info('OpenRouterRequestCompletedEvent dispatched successfully');
-
-                $responses[$modelId] = [
-                    'content' => $modelResponse['content'],
-                    'usage' => $modelResponse['usage'] ?? [
-                        'prompt_tokens' => 0,
-                        'completion_tokens' => 0,
-                        'total_tokens' => 0
-                    ]
+                // Prepare response for the frontend *before* flushing and dispatching event
+                 $responses[$modelIdStr] = [
+                    'content' => $modelApiResponse['content'] ?? 'Error: No content received',
+                    'usage' => $modelApiResponse['usage'] ?? ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0]
                 ];
-            }
 
-            // Flush once after all entities are prepared
-            $em->flush();
+                 // Flush and Dispatch Event
+                 try {
+                     $em->flush(); // Flush to get modelHistory ID
+                     $openRouterRequestId = $modelApiResponse['id'] ?? null;
+                     if ($openRouterRequestId) {
+                         $event = new OpenRouterRequestCompletedEvent($openRouterRequestId, $modelHistory->getId(), 'chat');
+                         $this->eventDispatcher->dispatch($event, OpenRouterRequestCompletedEvent::NAME);
+                         $this->logger->info('OpenRouterRequestCompletedEvent dispatched successfully for non-streaming.', ['openRouterId' => $openRouterRequestId]);
+                     } else {
+                          $this->logger->warning('Cannot dispatch cost tracking event for non-streaming: OpenRouter ID missing.', ['model' => $modelIdStr]);
+                     }
+                 } catch (\Exception $e) {
+                      $this->logger->error("Error flushing/dispatching event for non-streaming model {$modelIdStr}: " . $e->getMessage(), ['exception' => $e]);
+                      $responses[$modelIdStr]['error'] = ($responses[$modelIdStr]['error'] ?? '') . ' Failed to record history/cost.';
+                 }
+            } // End foreach model loop
 
             return $this->json([
                 'responses' => $responses,
-                'threadId' => $thread->getThreadId(), // Return the same thread ID for all
+                'threadId' => $thread->getThreadId(),
                 'promptId' => $promptId,
-                'usage' => [
-                    'user' => $user->getThreads()->count(),
-                    'organization' => $organization->getUsageCount()
-                ]
             ]);
         }
     }
@@ -315,72 +406,78 @@ class ChatController extends AbstractController
     #[Route('/chat/history', methods: ['GET'])]
     public function history(): JsonResponse
     {
+        /** @var User $user */
         $user = $this->getUser();
-        $threads = $user->getThreads();
+        $threads = $user->getThreads(); // Assuming this fetches threads ordered correctly or we sort later
         $data = [];
 
         foreach ($threads as $thread) {
-            $histories = $thread->getChatHistories()->toArray();
+            $histories = $thread->getChatHistories()->toArray(); // Get all histories for the thread
 
             // Sort histories by creation date, oldest first
-            usort($histories, function($a, $b) {
-                return $a->getCreatedAt() <=> $b->getCreatedAt();
-            });
+            usort($histories, fn(ChatHistory $a, ChatHistory $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
 
-            if (!empty($histories)) {
-                $messages = [];
-                $currentPromptId = null;
-                $currentPromptResponses = [];
+            if (empty($histories)) continue; // Skip threads with no history
 
-                foreach ($histories as $history) {
-                    if ($currentPromptId !== $history->getPromptId()) {
-                        // If we have responses from previous prompt, add them
-                        if (!empty($currentPromptResponses)) {
-                            $messages[] = [
-                                'prompt' => $currentPromptResponses[0]['prompt'],
-                                'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
-                                'createdAt' => $currentPromptResponses[0]['createdAt'],
-                                'promptId' => $currentPromptId
-                            ];
-                        }
+            $messages = [];
+            $currentPromptId = null;
+            $currentPromptResponses = [];
+            $firstPromptText = null; // To store the text of the very first prompt
 
-                        // Start new group
-                        $currentPromptId = $history->getPromptId();
-                        $currentPromptResponses = [];
+            foreach ($histories as $history) {
+                 if ($firstPromptText === null) {
+                     $firstPromptText = $history->getPrompt(); // Capture the first prompt text
+                 }
+
+                if ($currentPromptId !== $history->getPromptId()) {
+                    // Finalize the previous prompt group if it exists
+                    if (!empty($currentPromptResponses)) {
+                        $messages[] = [
+                            'prompt' => $currentPromptResponses[0]['prompt'], // Text of the prompt
+                            'responses' => array_column($currentPromptResponses, 'response', 'modelId'), // Responses keyed by model ID string
+                            'createdAt' => $currentPromptResponses[0]['createdAt'], // Timestamp of the first response in group
+                            'promptId' => $currentPromptId
+                        ];
                     }
-
-                    $currentPromptResponses[] = [
-                        'prompt' => $history->getPrompt(),
-                        'response' => $history->getResponse(),
-                        'modelId' => $history->getModelId(),
-                        'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
-                    ];
+                    // Start a new group
+                    $currentPromptId = $history->getPromptId();
+                    $currentPromptResponses = [];
                 }
 
-                // Don't forget to add the last group
-                if (!empty($currentPromptResponses)) {
-                    $messages[] = [
-                        'prompt' => $currentPromptResponses[0]['prompt'],
-                        'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
-                        'createdAt' => $currentPromptResponses[0]['createdAt'],
-                        'promptId' => $currentPromptId
-                    ];
-                }
-
-                $data[] = [
-                    'id' => $thread->getId(),
-                    'title' => $messages[0]['prompt'], // Use first message as title
-                    'messages' => $messages,
-                    'threadId' => $thread->getThreadId(),
-                    'createdAt' => $thread->getCreatedAt()->format('Y-m-d H:i:s')
+                // Add current history details to the group
+                 $modelStringId = $this->modelRepository->find($history->getModelId())?->getModelId() ?? 'unknown_model'; // Get string ID
+                 $currentPromptResponses[] = [
+                    'prompt' => $history->getPrompt(),
+                    'response' => $history->getResponse(), // This contains ['content' => ..., 'usage' => ...]
+                    'modelId' => $modelStringId, // Use string model ID for frontend consistency
+                    'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
                 ];
             }
+
+            // Add the last processed group
+            if (!empty($currentPromptResponses)) {
+                $messages[] = [
+                    'prompt' => $currentPromptResponses[0]['prompt'],
+                    'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                    'createdAt' => $currentPromptResponses[0]['createdAt'],
+                    'promptId' => $currentPromptId
+                ];
+            }
+
+            // Use the first prompt's text for the thread title if available
+            $threadTitle = $firstPromptText ? substr($firstPromptText, 0, 100) : $thread->getTitle();
+
+            $data[] = [
+                'id' => $thread->getId(),
+                'title' => $threadTitle,
+                'messages' => $messages,
+                'threadId' => $thread->getThreadId(),
+                'createdAt' => $thread->getCreatedAt()->format('Y-m-d H:i:s')
+            ];
         }
 
-        // Sort by creation date, newest first
-        usort($data, function($a, $b) {
-            return strtotime($b['createdAt']) - strtotime($a['createdAt']);
-        });
+        // Sort threads by creation date, newest first (if not already ordered by repository)
+        usort($data, fn($a, $b) => strtotime($b['createdAt']) <=> strtotime($a['createdAt']));
 
         return $this->json($data);
     }
@@ -388,6 +485,7 @@ class ChatController extends AbstractController
     #[Route('/chat/thread/{threadId}', methods: ['GET'])]
     public function getThread(string $threadId, EntityManagerInterface $em): JsonResponse
     {
+        /** @var User $user */
         $user = $this->getUser();
         $thread = $em->getRepository(Thread::class)
             ->findOneBy(['threadId' => $threadId, 'user' => $user]);
@@ -400,16 +498,13 @@ class ChatController extends AbstractController
         $histories = $thread->getChatHistories()->toArray();
 
         // Sort histories by creation date, oldest first
-        usort($histories, function($a, $b) {
-            return $a->getCreatedAt() <=> $b->getCreatedAt();
-        });
+        usort($histories, fn(ChatHistory $a, ChatHistory $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
 
         $currentPromptId = null;
         $currentPromptResponses = [];
 
         foreach ($histories as $history) {
             if ($currentPromptId !== $history->getPromptId()) {
-                // If we have responses from previous prompt, add them
                 if (!empty($currentPromptResponses)) {
                     $messages[] = [
                         'prompt' => $currentPromptResponses[0]['prompt'],
@@ -418,21 +513,20 @@ class ChatController extends AbstractController
                         'promptId' => $currentPromptId
                     ];
                 }
-
-                // Start new group
                 $currentPromptId = $history->getPromptId();
                 $currentPromptResponses = [];
             }
 
-            $currentPromptResponses[] = [
+             $modelStringId = $this->modelRepository->find($history->getModelId())?->getModelId() ?? 'unknown_model';
+             $currentPromptResponses[] = [
                 'prompt' => $history->getPrompt(),
                 'response' => $history->getResponse(),
-                'modelId' => $history->getModelId(),
+                'modelId' => $modelStringId, // Use string model ID
                 'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
             ];
         }
 
-        // Don't forget to add the last group
+        // Add the last group
         if (!empty($currentPromptResponses)) {
             $messages[] = [
                 'prompt' => $currentPromptResponses[0]['prompt'],
@@ -451,10 +545,11 @@ class ChatController extends AbstractController
     #[Route('/chat/thread', methods: ['POST'])]
     public function createThread(EntityManagerInterface $em): JsonResponse
     {
+        /** @var User $user */
         $user = $this->getUser();
 
         $thread = new Thread();
-        $thread->setTitle('New Chat');
+        $thread->setTitle('New Chat'); // Default title
         $thread->setUser($user);
         $thread->setThreadId(uniqid('thread_', true));
 
@@ -469,43 +564,61 @@ class ChatController extends AbstractController
     #[Route('/chat/costs', methods: ['GET'])]
     public function getCosts(EntityManagerInterface $em): JsonResponse
     {
+        /** @var User $user */
         $user = $this->getUser();
 
         $qb = $em->createQueryBuilder();
-        $qb->select('t.threadId', 't.title', 't.createdAt as threadCreatedAt', 'COUNT(ch.id) as messageCount')
+        $qb->select('t.threadId', 't.title', 't.createdAt as threadCreatedAt', 'COUNT(DISTINCT ch.promptId) as messageCount') // Count distinct prompts
            ->from(Thread::class, 't')
-           ->leftJoin('t.chatHistories', 'ch')
+           ->leftJoin('t.chatHistories', 'ch') // Join needed for counting
            ->where('t.user = :user')
            ->setParameter('user', $user)
            ->groupBy('t.threadId', 't.title', 't.createdAt')
            ->orderBy('t.createdAt', 'DESC');
 
-        $threads = $qb->getQuery()->getResult();
+        $threadsData = $qb->getQuery()->getResult();
 
-        // Get costs for each thread
+        // Get costs for each thread more efficiently
+        $threadIds = array_column($threadsData, 'threadId');
+        $costs = [];
+        if (!empty($threadIds)) {
+            $costQb = $em->createQueryBuilder();
+            $costQb->select('arc.requestReference as threadId',
+                             'COALESCE(SUM(arc.totalCost), 0) as totalCost',
+                             'COALESCE(SUM(arc.tokensPrompt), 0) as totalPromptTokens',
+                             'COALESCE(SUM(arc.tokensCompletion), 0) as totalCompletionTokens')
+                   ->from('App\Entity\ApiRequestCost', 'arc')
+                   ->where('arc.requestReference IN (:threadIds)')
+                   ->andWhere('arc.requestType = :requestType')
+                   ->setParameter('threadIds', $threadIds)
+                   ->setParameter('requestType', 'chat')
+                   ->groupBy('arc.requestReference');
+            $costsResult = $costQb->getQuery()->getResult();
+            // Index costs by threadId for easy lookup
+            foreach ($costsResult as $costRow) {
+                $costs[$costRow['threadId']] = $costRow;
+            }
+        }
+
+
         $threadCosts = [];
-        foreach ($threads as $thread) {
-            // Get total costs and tokens for this thread
-            $stats = $em->createQueryBuilder()
-                ->select('COALESCE(SUM(arc.totalCost), 0) as totalCost')
-                ->addSelect('COALESCE(SUM(arc.tokensPrompt), 0) as totalPromptTokens')
-                ->addSelect('COALESCE(SUM(arc.tokensCompletion), 0) as totalCompletionTokens')
-                ->from('App\Entity\ApiRequestCost', 'arc')
-                ->where('arc.requestReference = :threadId')
-                ->andWhere('arc.requestType = :requestType')
-                ->setParameter('threadId', $thread['threadId'])
-                ->setParameter('requestType', 'chat')
-                ->getQuery()
-                ->getSingleResult();
+        foreach ($threadsData as $thread) {
+             $threadId = $thread['threadId'];
+             $costStats = $costs[$threadId] ?? [
+                 'totalCost' => 0,
+                 'totalPromptTokens' => 0,
+                 'totalCompletionTokens' => 0
+             ];
 
             $threadCosts[] = [
-                'threadId' => $thread['threadId'],
+                'threadId' => $threadId,
                 'title' => $thread['title'],
-                'messageCount' => (int)$thread['messageCount'],
-                'lastMessageDate' => $thread['threadCreatedAt']->format('Y-m-d H:i:s'),
-                'totalCost' => (float)$stats['totalCost'],
-                'totalTokens' => (int)($stats['totalPromptTokens'] + $stats['totalCompletionTokens'])
+                'messageCount' => (int)$thread['messageCount'], // Count of prompt/response pairs
+                'lastMessageDate' => $thread['threadCreatedAt']->format('Y-m-d H:i:s'), // This is thread creation, need last message date ideally
+                'totalCost' => (float)$costStats['totalCost'],
+                'totalTokens' => (int)($costStats['totalPromptTokens'] + $costStats['totalCompletionTokens'])
             ];
+             // TODO: Get actual last message date if needed, requires another query or different initial query
         }
 
         return $this->json($threadCosts);

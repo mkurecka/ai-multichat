@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\PromptTemplate; // Add import for PromptTemplate
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -31,6 +32,14 @@ class Organization
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[Groups(['organization:read'])]
     private ?User $user = null;
+
+    #[ORM\OneToMany(mappedBy: 'organization', targetEntity: PromptTemplate::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $promptTemplates;
+
+    public function __construct()
+    {
+        $this->promptTemplates = new ArrayCollection(); // Initialize the new collection
+    }
 
     public function getId(): ?int
     {
@@ -81,6 +90,36 @@ class Organization
     public function setUser(?User $user): self
     {
         $this->user = $user;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, PromptTemplate>
+     */
+    public function getPromptTemplates(): Collection
+    {
+        return $this->promptTemplates;
+    }
+
+    public function addPromptTemplate(PromptTemplate $promptTemplate): static
+    {
+        if (!$this->promptTemplates->contains($promptTemplate)) {
+            $this->promptTemplates->add($promptTemplate);
+            $promptTemplate->setOrganization($this);
+        }
+
+        return $this;
+    }
+
+    public function removePromptTemplate(PromptTemplate $promptTemplate): static
+    {
+        if ($this->promptTemplates->removeElement($promptTemplate)) {
+            // set the owning side to null (unless already changed)
+            if ($promptTemplate->getOrganization() === $this) {
+                $promptTemplate->setOrganization(null);
+            }
+        }
 
         return $this;
     }

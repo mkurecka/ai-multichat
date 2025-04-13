@@ -66,20 +66,20 @@ class JWTAuthenticator extends AbstractAuthenticator
                 throw new AuthenticationException('JWT token missing subject claim');
             }
             
+            // The 'sub' claim contains the googleId based on User::getUserIdentifier()
+            $googleId = $payload['sub'];
+
             return new SelfValidatingPassport(
-                new UserBadge($payload['sub'], function ($userIdentifier) use ($payload) {
-                    // Try to find by ID first (for existing tokens)
-                    $user = $this->userRepository->find($userIdentifier);
-                    
-                    // If not found and we have a googleId in the payload, try that
-                    if (!$user && isset($payload['googleId'])) {
-                        $user = $this->userRepository->findOneBy(['googleId' => $payload['googleId']]);
-                    }
-                    
+                new UserBadge($googleId, function ($userIdentifier) {
+                    // Look up the user directly by googleId, which is passed as $userIdentifier here
+                    $user = $this->userRepository->findOneBy(['googleId' => $userIdentifier]);
+
                     if (!$user) {
+                        // Log the googleId that was not found
+                        error_log('JWT Authentication: User not found for googleId: ' . $userIdentifier);
                         throw new AuthenticationException('User not found for token');
                     }
-                    
+
                     return $user;
                 })
             );

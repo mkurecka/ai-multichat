@@ -152,14 +152,12 @@ class ModelService
                 continue;
             }
 
-            $isNewModel = false;
             $model = $this->modelRepository->findByModelId($modelData['id']);
 
             if (!$model) {
                 $model = new Model();
-                $isNewModel = true;
                 // Enable new models by default
-                $model->setEnabled(true);
+                $model->setEnabled(false);
                 // Set streaming support based on API data
                 $model->setSupportsStreaming($modelData['supports_streaming'] ?? false);
             }

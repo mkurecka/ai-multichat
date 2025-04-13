@@ -7,6 +7,10 @@ security:
                 class: App\Entity\User
                 property: googleId
 
+    role_hierarchy:
+        ROLE_ORGANIZATION_ADMIN: ROLE_USER
+        ROLE_ADMIN: [ROLE_ORGANIZATION_ADMIN, ROLE_ALLOWED_TO_SWITCH] # Grant switch permission to ROLE_ADMIN
+
     firewalls:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
@@ -30,11 +34,13 @@ security:
                 target: connect_google
             access_denied_url: /login
             access_denied_handler: App\Security\AccessDeniedHandler
+            switch_user: true # Enable user impersonation
 
     access_control:
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google/check, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/google/callback, roles: PUBLIC_ACCESS } # Add rule for the new API callback
         # - { path: ^/app/callback, roles: PUBLIC_ACCESS } # Removed, no longer used
         - { path: ^/api/public, roles: PUBLIC_ACCESS }
         # - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS } # Removed: Must be protected by 'api' firewall

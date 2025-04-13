@@ -1,215 +1,119 @@
 {% extends 'base_app.html.twig' %}
 
-{% block body %}
-    {# Main chat controller wraps everything #}
-    {# Debug authentication status #}
+{# Remove the outer block body as it's handled by base_app.html.twig #}
+{# Remove the main chat controller div and its contents (header, sidebar, etc.) as they are now in base_app.html.twig #}
+
+{% block app_content %}
+    {# This block now only contains the chat-specific window area #}
+
+    {# Debug authentication status (can be kept if needed specifically here, or removed if handled globally) #}
     <script>
         console.log('Symfony authentication status:', {{ app.user ? 'true' : 'false' }});
         console.log('Symfony user:', {{ app.user ? ('"' ~ app.user.email ~ '"') : 'null' }});
     </script>
 
-    <div data-controller="chat"
-         data-chat-is-authenticated-value="{{ app.user ? 'true' : 'false' }}" {# User is already authenticated by Symfony #}
-         data-chat-user-email-value="{{ app.user ? app.user.email : '' }}" {# Pass user email from Symfony #}
-         data-chat-is-loading-value="true"
-         data-chat-models-value="[]"
-         data-chat-chat-history-value="[]"
-         data-chat-current-messages-value="[]"
-         data-chat-current-thread-id-value=""
-         data-chat-selected-model-ids-value="[]"
-         data-chat-chat-history-outlet="[data-controller='chat-history']" {# Connect outlet with name 'chat-history' #}
-         class="flex flex-col h-screen"> {# Ensure full height #}
+    {# Chat Window Area #}
+    <div class="flex-1 flex flex-col overflow-hidden min-h-0"> {# min-h-0 prevents flexbox overflow issues #}
 
-        {# Loading/Auth Indicators #}
-        <div data-chat-target="authLoadingIndicator" class="p-4 text-center">Verifying Authentication...</div>
-        <div data-chat-target="authRequiredMessage" class="p-4 text-center text-red-600" hidden>
-            <p>Authentication required. Please log in.</p>
-            <div class="mt-4 flex justify-center space-x-4 flex-wrap">
-                <button type="button" data-action="chat#checkAuth" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 m-1">Retry Authentication</button>
-                <button type="button" data-action="chat#debugToken" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 m-1">Debug Session</button>
-                <button type="button" data-action="chat#forceShowApp" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 m-1">Force Show App</button>
-                <a href="/login" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 inline-flex items-center m-1">Go to Login</a>
+        {# Model Selector #}
+        <div data-controller="model-selector"
+             data-model-selector-chat-outlet="[data-controller='chat']" {# Connect outlet #}
+             data-model-selector-models-value="{{ []|json_encode }}" {# Initial empty, updated by chat controller #}
+             data-model-selector-selected-ids-value="{{ []|json_encode }}"
+             data-model-selector-max-models-value="16" {# Example value, could be passed from backend #}
+             data-chat-target="modelSelectorContainer" {# Target for chat controller #}
+             class="bg-white border-b p-4 shadow-md z-10 flex-shrink-0"> {# Prevent shrinking #}
+
+            <div class="flex items-center justify-between mb-2">
+                 <h2 class="text-sm font-medium text-gray-700">Available Models</h2>
+                 <span data-model-selector-target="selectedCount" class="text-xs text-gray-500">0/16 selected</span>
             </div>
-        </div>
-        <div data-chat-target="loadingIndicator" class="fixed bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg z-50 flex items-center space-x-3 border border-blue-300" style="visibility: hidden;">
-             <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-             <span class="text-sm font-medium text-blue-600">Loading data...</span>
-             <button type="button" onclick="this.parentElement.style.visibility = 'hidden';" class="ml-2 text-gray-400 hover:text-gray-600">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                 </svg>
-             </button>
-        </div>
-
-        {# Header/Navbar (hidden until authenticated) #}
-        <header data-chat-target="headerNav" class="bg-white shadow-sm" hidden>
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16 items-center">
-                    <!-- Logo and App Name -->
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 flex items-center">
-                            <!-- App Logo -->
-                            <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white font-bold mr-2 app-logo">
-                                AI
-                            </div>
-                            <!-- App Name -->
-                            <span class="text-xl font-semibold text-gray-900">MultiChat</span>
-                        </div>
+            <div class="relative">
+                <div class="flex space-x-2">
+                    <div class="relative flex-grow">
+                        <input type="text"
+                               data-model-selector-target="searchInput"
+                               data-action="input->model-selector#search focus->model-selector#openDropdown"
+                               placeholder="Search models..."
+                               class="w-full px-3 py-2 pl-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                        {# Search Icon #}
+                        <svg class="absolute left-2 top-2.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     </div>
-
-                    <!-- User Menu -->
-                    <div class="flex items-center">
-                        <!-- User Email Display -->
-                        <span class="text-sm text-gray-700 mr-4 user-email" data-chat-target="userEmail"></span>
-
-                        <!-- Logout Button -->
-                        <button
-                            type="button"
-                            data-action="chat#logout"
-                            class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 logout-button"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                            Logout
-                        </button>
-                    </div>
+                    <button type="button"
+                            data-action="click->model-selector#openDropdown"
+                            class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        Models
+                    </button>
                 </div>
             </div>
-        </header>
-
-        {# Main App Container (hidden until authenticated) #}
-        <div data-chat-target="mainAppContainer" class="flex flex-1 overflow-hidden" hidden>
-
-            {# Sidebar (Chat History) #}
-            {# Note: Add classes for transition if sidebar toggle is re-implemented #}
-            <div data-controller="chat-history"
-                 data-chat-history-chat-outlet="[data-controller='chat']" {# Connect outlet #}
-                 data-chat-history-chat-history-value="{{ []|json_encode }}" {# Initial empty, updated by chat controller #}
-                 data-chat-history-current-thread-id-value=""
-                 class="w-64 bg-white shadow-md flex flex-col flex-shrink-0"> {# Fixed width for sidebar #}
-                 <div class="p-4 border-b">
-                     <button type="button" data-action="chat-history#startNewChat" data-chat-history-target="newChatButton" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
-                         New Chat
-                     </button>
-                 </div>
-                 <div data-chat-history-target="listContainer" class="flex-1 overflow-y-auto p-2 space-y-1">
-                     {# Session items will be rendered here by chat-history controller #}
-                     <p class="text-xs text-gray-500 p-2">Loading history...</p>
-                 </div>
+            {# Dropdown - Position relative to the main container #}
+            <div data-model-selector-target="dropdown" hidden class="absolute z-20 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-80 overflow-y-auto left-0 right-0">
+                <div class="flex justify-between items-center p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                    <h3 class="font-medium text-gray-700">Select Models</h3>
+                    <button type="button"
+                            data-action="click->model-selector#closeDropdown"
+                            class="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div data-model-selector-target="modelList" class="p-3">
+                    {# Model items rendered here by model-selector controller #}
+                </div>
+                <div data-model-selector-target="noResultsMessage" hidden class="text-sm text-gray-500 py-3 text-center font-medium">No models found</div>
+                <div class="p-2 border-t border-gray-200 sticky bottom-0 bg-white">
+                    <button type="button"
+                            data-action="click->model-selector#closeDropdown"
+                            class="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
+                        Done
+                    </button>
+                </div>
             </div>
+            {# Selected Chips #}
+            <div data-model-selector-target="selectedChipContainer" class="mt-2 flex flex-wrap gap-2">
+                 {# Selected chips rendered here by model-selector controller #}
+            </div>
+             <div data-model-selector-target="maxReachedMessage" hidden class="text-xs text-red-500 mt-1">Maximum models selected</div>
+        </div>
 
-            {# Main Content Area #}
-            <div class="flex-1 flex flex-col bg-gray-100 overflow-hidden">
+        {# Messages Area #}
+        <div data-chat-target="chatWindowMessages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            {# Messages will be appended here by chat controller's appendMessageToDOM #}
+            {# Initial placeholder message #}
+            <div class="text-center text-gray-400 p-8">
+                <p class="mb-2 text-lg">Select models and start chatting</p>
+                <p class="text-sm">Your conversation will appear here.</p>
+            </div>
+        </div>
 
-                {# Header (Assuming basic header from base_app.html.twig, or add specific header here) #}
-                {# Example: <header class="bg-white p-4 border-b shadow-sm"><h1 class="text-xl font-semibold">AI MultiChat</h1></header> #}
-
-                {# Chat Window Area #}
-                <div class="flex-1 flex flex-col overflow-hidden min-h-0"> {# min-h-0 prevents flexbox overflow issues #}
-
-                    {# Model Selector #}
-                    <div data-controller="model-selector"
-                         data-model-selector-chat-outlet="[data-controller='chat']" {# Connect outlet #}
-                         data-model-selector-models-value="{{ []|json_encode }}" {# Initial empty, updated by chat controller #}
-                         data-model-selector-selected-ids-value="{{ []|json_encode }}"
-                         data-model-selector-max-models-value="16" {# Example value, could be passed from backend #}
-                         data-chat-target="modelSelectorContainer" {# Target for chat controller #}
-                         class="bg-white border-b p-4 shadow-md z-10 flex-shrink-0"> {# Prevent shrinking #}
-
-                        <div class="flex items-center justify-between mb-2">
-                             <h2 class="text-sm font-medium text-gray-700">Available Models</h2>
-                             <span data-model-selector-target="selectedCount" class="text-xs text-gray-500">0/16 selected</span>
-                        </div>
-                        <div class="relative">
-                            <div class="flex space-x-2">
-                                <div class="relative flex-grow">
-                                    <input type="text"
-                                           data-model-selector-target="searchInput"
-                                           data-action="input->model-selector#search focus->model-selector#openDropdown"
-                                           placeholder="Search models..."
-                                           class="w-full px-3 py-2 pl-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                                    {# Search Icon #}
-                                    <svg class="absolute left-2 top-2.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                </div>
-                                <button type="button"
-                                        data-action="click->model-selector#openDropdown"
-                                        class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150 flex items-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                    Models
-                                </button>
-                            </div>
-                        </div>
-                        {# Dropdown - Position relative to the main container #}
-                        <div data-model-selector-target="dropdown" hidden class="absolute z-20 w-full mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-80 overflow-y-auto left-0 right-0">
-                            <div class="flex justify-between items-center p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
-                                <h3 class="font-medium text-gray-700">Select Models</h3>
-                                <button type="button"
-                                        data-action="click->model-selector#closeDropdown"
-                                        class="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div data-model-selector-target="modelList" class="p-3">
-                                {# Model items rendered here by model-selector controller #}
-                            </div>
-                            <div data-model-selector-target="noResultsMessage" hidden class="text-sm text-gray-500 py-3 text-center font-medium">No models found</div>
-                            <div class="p-2 border-t border-gray-200 sticky bottom-0 bg-white">
-                                <button type="button"
-                                        data-action="click->model-selector#closeDropdown"
-                                        class="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
-                                    Done
-                                </button>
-                            </div>
-                        </div>
-                        {# Selected Chips #}
-                        <div data-model-selector-target="selectedChipContainer" class="mt-2 flex flex-wrap gap-2">
-                             {# Selected chips rendered here by model-selector controller #}
-                        </div>
-                         <div data-model-selector-target="maxReachedMessage" hidden class="text-xs text-red-500 mt-1">Maximum models selected</div>
-                    </div>
-
-                    {# Messages Area #}
-                    <div data-chat-target="chatWindowMessages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                        {# Messages will be appended here by chat controller's appendMessageToDOM #}
-                        {# Initial placeholder message #}
-                        <div class="text-center text-gray-400 p-8">
-                            <p class="mb-2 text-lg">Select models and start chatting</p>
-                            <p class="text-sm">Your conversation will appear here.</p>
-                        </div>
-                    </div>
-
-                    {# Chat Input Area #}
-                    <div data-controller="chat-input"
-                         data-chat-input-chat-outlet="[data-controller='chat']" {# Connect outlet #}
-                         data-chat-input-disabled-value="true" {# Initially disabled #}
-                         data-chat-input-is-loading-value="false"
-                         data-chat-target="chatInputContainer" {# Target for chat controller #}
-                         class="p-4 border-t bg-white flex-shrink-0"> {# Prevent shrinking #}
-                        <form data-action="submit->chat-input#submit" class="flex items-end gap-2">
-                            <div class="flex-1">
-                                <textarea data-chat-input-target="textarea"
-                                          data-action="input->chat-input#onInput keydown->chat-input#keydown"
-                                          placeholder="Select at least one model to start chatting"
-                                          disabled
-                                          class="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 text-gray-500 transition-colors duration-150"
-                                          rows="1"></textarea> {# Start with 1 row, controller resizes #}
-                            </div>
-                            <button type="submit"
-                                    data-chat-input-target="submitButton"
-                                    disabled
-                                    class="p-3 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed transition-colors duration-150">
-                                {# Send Icon #}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                            </button>
-                        </form>
-                    </div>
-                </div> {# End Chat Window Area #}
-            </div> {# End Main Content Area #}
-        </div> {# End Main App Container #}
-    </div> {# End Chat Controller #}
+        {# Chat Input Area #}
+        <div data-controller="chat-input"
+             data-chat-input-chat-outlet="[data-controller='chat']" {# Connect outlet #}
+             data-chat-input-disabled-value="true" {# Initially disabled #}
+             data-chat-input-is-loading-value="false"
+             data-chat-target="chatInputContainer" {# Target for chat controller #}
+             class="p-4 border-t bg-white flex-shrink-0"> {# Prevent shrinking #}
+            <form data-action="submit->chat-input#submit" class="flex items-end gap-2">
+                <div class="flex-1">
+                    <textarea data-chat-input-target="textarea"
+                              data-action="input->chat-input#onInput keydown->chat-input#keydown"
+                              placeholder="Select at least one model to start chatting"
+                              disabled
+                              class="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 text-gray-500 transition-colors duration-150"
+                              rows="1"></textarea> {# Start with 1 row, controller resizes #}
+                </div>
+                <button type="submit"
+                        data-chat-input-target="submitButton"
+                        disabled
+                        class="p-3 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed transition-colors duration-150">
+                    {# Send Icon #}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                </button>
+            </form>
+        </div>
+    </div> {# End Chat Window Area #}
 {% endblock %}
