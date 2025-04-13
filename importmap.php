@@ -16,9 +16,9 @@ return [
         'path' => 'app.js',
         'entrypoint' => true,
     ],
-    'sortablejs' => [ // Add SortableJS
-        'path' => 'vendor/sortablejs.esm.js' // Path relative to assets directory
-    ],
+//    'sortablejs' => [ // Add SortableJS
+//        'path' => 'vendor/sortablejs.esm.js' // Path relative to assets directory
+//    ],
     '@hotwired/stimulus' => [
         'version' => '3.2.2',
     ],
