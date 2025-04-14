@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, sendChatMessage } from './services/api';
 import Layout from './components/Layout';
@@ -7,7 +6,7 @@ import './App.css';
 import axios from 'axios';
 import { MultiValue } from 'react-select';
 import { v4 as uuidv4 } from 'uuid';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import ChatPage from './components/pages/ChatPage';
 import PromptTemplatePage from './components/pages/PromptTemplatePage';
 import LoginPage from './components/pages/LoginPage';
@@ -73,6 +72,9 @@ function App() {
   const OAUTH_CALLBACK_PATH = '/auth/google/callback';
   const calculatedRedirectUri = window.location.origin + OAUTH_CALLBACK_PATH;
 
+  // Get the navigate function
+  const navigate = useNavigate();
+
   const processToken = useCallback((token: string | null) => {
     if (token) {
       try {
@@ -105,37 +107,71 @@ function App() {
   }, [processToken]);
 
   const handleGoogleLoginCallback = useCallback(async () => {
+    console.log("GoogleCallbackHandler: Entered handleGoogleLoginCallback"); // Log Entry
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    console.log(`GoogleCallbackHandler: Found code: ${code}`); // Log Code
 
+    // Add check: Only proceed if code exists, not already authenticated, and not already loading
     if (code && !authToken && !authLoading) {
+      console.log("GoogleCallbackHandler: Conditions met, proceeding with auth..."); // Log Proceeding
       setAuthLoading(true);
       setError(null);
+      
+      console.log("GoogleCallbackHandler: Calling backend handleGoogleCallback API..."); // Log API Call
       handleGoogleCallback(code, calculatedRedirectUri)
         .then(receivedToken => {
+          console.log(`GoogleCallbackHandler: Backend API returned token: ${receivedToken ? 'Yes' : 'No'}`); // Log Token Received
           processToken(receivedToken);
           if (!receivedToken) {
+            console.log("GoogleCallbackHandler: No token received, setting error."); // Log No Token
             setError("Login failed: No token received after Google callback.");
+            // Optionally navigate back to login on token failure
+            // console.log("GoogleCallbackHandler: Navigating to /login due to no token.");
+            // navigate('/login', { replace: true }); 
+          } else {
+            // Navigate to home page on success
+            console.log("GoogleCallbackHandler: Token received, navigating to /"); // Log Success Navigation
+            navigate('/', { replace: true });
           }
-          window.history.replaceState({}, document.title, window.location.pathname);
+          // Clean the URL *after* potential navigation - maybe remove this if router handles it
+          // console.log("GoogleCallbackHandler: Attempting to clean URL...");
+          // window.history.replaceState({}, document.title, window.location.pathname); 
         })
         .catch(err => {
-          console.error("Google callback handler failed:", err);
+          console.error("Google callback handler failed:", err); // Log Error
           setError(err instanceof Error ? err.message : 'Google login failed.');
           processToken(null);
-          window.history.replaceState({}, document.title, window.location.pathname);
+          // Navigate back to login on error
+          console.log("GoogleCallbackHandler: Error caught, navigating to /login."); // Log Error Navigation
+          navigate('/login', { replace: true }); 
+          // Clean the URL *after* potential navigation
+          // window.history.replaceState({}, document.title, window.location.pathname);
         })
         .finally(() => {
+          console.log("GoogleCallbackHandler: Auth process finished, setting authLoading to false."); // Log Finally
           setAuthLoading(false);
         });
+    } else {
+      console.log("GoogleCallbackHandler: Conditions not met or already handled.", { codeExists: !!code, authTokenExists: !!authToken, authLoading }); // Log Conditions Not Met
     }
-  }, [authToken, authLoading, processToken, calculatedRedirectUri]);
+  }, [authToken, authLoading, processToken, calculatedRedirectUri, navigate]);
 
   const GoogleCallbackHandler = () => {
+    console.log("GoogleCallbackHandler: Component rendering/rendered."); // Log Component Render
     useEffect(() => {
+      console.log("GoogleCallbackHandler: useEffect triggered."); // Log useEffect Trigger
       handleGoogleLoginCallback();
-    }, [handleGoogleLoginCallback]);
-    return <div>Processing login...</div>;
+    }, [handleGoogleLoginCallback]); // Dependency array looks correct
+
+    // Display loading message and any potential error
+    return (
+        <div>
+            Processing login...
+            {authLoading && <p>Loading...</p>}
+            {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+        </div>
+    );
   };
 
   // --- Add Back Handlers for Sidebar --- 
@@ -196,32 +232,30 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage googleClientId={GOOGLE_CLIENT_ID} redirectUri={calculatedRedirectUri} />} />
-        <Route path={OAUTH_CALLBACK_PATH} element={<GoogleCallbackHandler />} />
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <Layout 
-                userEmail={userInfo?.email || null} 
-                onLogout={handleLogout}
-                chatHistory={chatHistory}
-                activeThreadId={activeThreadId}
-                onNewChat={handleNewChat}
-                onSelectThread={handleSelectThread}
-              >
-              </Layout>
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<ChatPage models={models} activeThreadId={activeThreadId} />} />
-          <Route path="templates" element={<PromptTemplatePage models={models} />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/login" element={<LoginPage googleClientId={GOOGLE_CLIENT_ID} redirectUri={calculatedRedirectUri} />} />
+      <Route path={OAUTH_CALLBACK_PATH} element={<GoogleCallbackHandler />} />
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Layout 
+              userEmail={userInfo?.email || null} 
+              onLogout={handleLogout}
+              chatHistory={chatHistory}
+              activeThreadId={activeThreadId}
+              onNewChat={handleNewChat}
+              onSelectThread={handleSelectThread}
+            >
+            </Layout>
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<ChatPage models={models} activeThreadId={activeThreadId} />} />
+        <Route path="templates" element={<PromptTemplatePage models={models} />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

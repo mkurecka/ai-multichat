@@ -64,34 +64,35 @@ const Layout: React.FC<LayoutProps> = ({
       {/* Header */}
       <header className="layout-header bg-white shadow-sm flex-shrink-0"> {/* Standard Header */}
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Main flex container for header items */}
-            <div className="flex justify-between items-center h-16">
-                {/* Left Section: Logo & App Name Only */}
+            {/* Main flex container for header items - Align items, let center grow */}
+            <div className="flex items-center h-16 w-full">
+                {/* Left Section: Logo & App Name */}
                 <div className="flex-shrink-0 flex items-center">
                     <div className="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white font-bold mr-2">AI</div>
                     <span className="text-xl font-semibold text-gray-900">MultiChat</span>
                 </div>
 
-                {/* Center Section: Nav Links */}
-                {/* Removed the grouping div and adjusted margin/padding if needed */}
-                <nav className="flex items-baseline space-x-4"> {/* Adjusted margin if needed, e.g., mx-auto or rely on justify-between */}
-                   <Link
-                     to="/"
-                     className="text-gray-700 hover:bg-gray-200 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                   >
-                     Chat
-                   </Link>
-                   <Link
-                     to="/templates"
-                     className="text-gray-700 hover:bg-gray-200 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                   >
-                     Templates
-                   </Link>
-                   {/* Add other nav links here if needed */}
-                </nav>
+                {/* Center Section: Nav Links - Grows to fill space and centers content */}
+                <div className="flex-grow flex justify-center">
+                    <nav className="flex items-baseline space-x-4">
+                       <Link
+                         to="/"
+                         className="text-gray-700 hover:bg-gray-200 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                       >
+                         Chat
+                       </Link>
+                       <Link
+                         to="/templates"
+                         className="text-gray-700 hover:bg-gray-200 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                       >
+                         Templates
+                       </Link>
+                       {/* Add other nav links here if needed */}
+                    </nav>
+                </div>
 
-                {/* Right Section: User Menu */}
-                <div className="header-user-info flex items-center">
+                {/* Right Section: User Menu - No grow/shrink needed usually */}
+                <div className="flex-shrink-0 flex items-center"> {/* Use flex-shrink-0 just in case */}
                   <span className="text-sm text-gray-700 mr-4">{userEmail || 'User'}</span>
                   <button onClick={onLogout} className="logout-button inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Logout</button>
                 </div>
