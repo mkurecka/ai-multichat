@@ -1,0 +1,18 @@
+[
+  {
+    "threadId": "thread-xyz-789",
+    "title": "Brainstorming Session",
+    "messageCount": 2,
+    "lastMessageDate": "2025-04-11 10:30:00",
+    "totalCost": 0.00615,
+    "totalTokens": 155
+  },
+  {
+    "threadId": "thread-pqr-123",
+    "title": "Python Code Help",
+    "messageCount": 1,
+    "lastMessageDate": "2025-04-12 09:15:00",
+    "totalCost": 0.006555,
+    "totalTokens": 97
+  }
+]

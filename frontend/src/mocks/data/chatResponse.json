@@ -1,0 +1,15 @@
+{
+  "responses": {
+    "openai/gpt-4": {
+      "content": "This is a mocked response to your chat message. In a real scenario, this would be the AI's answer.",
+      "usage": {
+        "prompt_tokens": 25,
+        "completion_tokens": 30,
+        "total_tokens": 55
+      },
+      "error": null
+    }
+  },
+  "threadId": "thread-xyz-789",
+  "promptId": "user-generated-prompt-id-12345"
+}
