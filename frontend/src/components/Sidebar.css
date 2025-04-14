@@ -1,0 +1,64 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Fill parent height */
+  gap: 1rem; /* Space between button and list */
+}
+
+.new-chat-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #0d6efd; /* Blue color from screenshot */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: center;
+}
+
+.new-chat-button:hover {
+  background-color: #0b5ed7; /* Darker blue on hover */
+}
+
+.chat-history-list {
+  flex-grow: 1; /* Allow list to fill remaining space */
+  overflow-y: auto; /* Scroll if list is long */
+  border: 1px solid #dee2e6; /* Border around the list */
+  border-radius: 4px;
+}
+
+.no-history-message {
+  padding: 1rem;
+  color: #6c757d; /* Gray text */
+  text-align: center;
+}
+
+.chat-history-item {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid #e9ecef; /* Separator lines */
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Add ellipsis for long titles */
+  transition: background-color 0.15s;
+}
+
+.chat-history-item:last-child {
+  border-bottom: none;
+}
+
+.chat-history-item:hover {
+  background-color: #f8f9fa; /* Light background on hover */
+}
+
+/* Add styles for active chat item if needed */
+/*
+.chat-history-item.active {
+  background-color: #e9f5ff; 
+  font-weight: 500;
+}
+*/ 
