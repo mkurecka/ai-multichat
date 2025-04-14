@@ -6,8 +6,8 @@ export interface TemplateFormData {
     name: string;
     description?: string;
     scope: 'private' | 'organization';
-    associatedModelId: string; // Just the ID for the dropdown
-    messages: PromptTemplateMessage[]; // Array of messages
+    associatedModel?: { id: string }; // Send as object with id
+    messages: Omit<PromptTemplateMessage, 'id'>[]; // Array of messages without ID
 }
 
 interface TemplateFormProps {
@@ -96,16 +96,17 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ onSubmit, onCancel, initial
        return;
     }
 
-
+    // Use type assertion because we know the structure matches what onSubmit expects now
     const formData: TemplateFormData = {
         name,
         description: description || undefined, // Send undefined if empty
         scope,
-        associatedModelId,
-        messages: messages.map(({ id, ...msg }) => msg) // Ensure IDs are not sent when creating/updating
+        associatedModel: associatedModelId ? { id: associatedModelId } : undefined,
+        messages: messages.map(({ id, ...msg }) => msg)
     };
 
     try {
+      // No type assertion needed here anymore, should match
       await onSubmit(formData);
     } catch (error) {
         console.error("Form submission error propagated to parent:", error);
