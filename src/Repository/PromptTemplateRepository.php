@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\PromptTemplate;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -14,6 +15,19 @@ class PromptTemplateRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, PromptTemplate::class);
+    }
+
+    /**
+     * Count templates owned by a specific user
+     */
+    public function countByOwner(User $user): int
+    {
+        $qb = $this->createQueryBuilder('pt')
+            ->select('COUNT(pt.id)')
+            ->where('pt.owner = :user')
+            ->setParameter('user', $user);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
     //    /**

@@ -57,7 +57,7 @@ export interface ThreadHistoryResponse {
     threadId: string;
 }
 
-interface PromptTemplateMessage {
+export interface PromptTemplateMessage {
     id?: number; // Optional for creation/update
     role: 'system' | 'user' | 'assistant';
     content: string;
@@ -98,6 +98,70 @@ export interface ThreadCost {
     lastMessageDate: string;
     totalCost: number;
     totalTokens: number;
+}
+
+export interface UserOrganization {
+    id: number;
+    domain: string;
+    googleId: string;
+    usageCount: number;
+    templatesCount: number;
+}
+
+export interface UserUsage {
+    totalPrompts: number;
+    totalTokens: number;
+    totalCost: number;
+    formattedCost: string;
+    promptTokens: number;
+    completionTokens: number;
+    averageCostPerPrompt: number;
+    averageTokensPerPrompt: number;
+}
+
+export interface UserModelUsage {
+    modelId: string;
+    useCount: number;
+    modelCost: number;
+    modelTokens: number;
+}
+
+export interface UserConversation {
+    threadId: string;
+    title: string;
+    messageCount: number;
+    createdAt: string;
+    totalCost: number;
+    totalTokens: number;
+}
+
+export interface UserDailyActivity {
+    date: string;
+    requestCount: number;
+    dailyCost: number;
+    dailyTokens: number;
+}
+
+export interface UserProfile {
+    id: number;
+    email: string;
+    roles: string[];
+    googleId: string;
+    organization?: UserOrganization;
+    usage: UserUsage;
+    templates: {
+        privateCount: number;
+    };
+    conversations: {
+        count: number;
+    };
+    models: {
+        mostUsed: UserModelUsage[];
+    };
+    recentConversations: UserConversation[];
+    activity: {
+        daily: UserDailyActivity[];
+    };
 }
 
 // --- API Client Implementation ---
@@ -292,14 +356,20 @@ export const getPromptTemplate = async (id: number): Promise<PromptTemplate> => 
 };
 
 export const updatePromptTemplate = async (id: number, templateData: Partial<Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel?: { id: string } }>): Promise<PromptTemplate> => {
-    console.log(`Updating prompt template via API: PUT /prompt-templates/${id}`, templateData);
-    const response = await apiClient.put<PromptTemplate>(`/prompt-templates/${id}`, templateData);
+    console.log(`Updating prompt template via API: PATCH /prompt-templates/${id}`, templateData);
+    const response = await apiClient.patch<PromptTemplate>(`/prompt-templates/${id}`, templateData);
     return response.data;
 };
 
 export const deletePromptTemplate = async (id: number): Promise<void> => {
     console.log(`Deleting prompt template via API: DELETE /prompt-templates/${id}`);
     await apiClient.delete(`/prompt-templates/${id}`);
+};
+
+export const getUserProfile = async (): Promise<UserProfile> => {
+    console.log('Fetching user profile from API: GET /user/profile');
+    const response = await apiClient.get<UserProfile>('/user/profile');
+    return response.data;
 };
 
 // Function to create a new thread explicitly if needed

@@ -240,6 +240,91 @@ These endpoints handle chat interactions, model management, and history retrieva
 
 ---
 
+## User API Endpoints (`src/Controller/ApiUserController.php`)
+
+These endpoints provide information about the current authenticated user.
+
+**Base Path:** `/api/user`
+
+**Authentication:** Requires authenticated user (`ROLE_USER`).
+
+### 1. Get User Profile
+
+*   **Endpoint:** `GET /profile`
+*   **Description:** Retrieves comprehensive information about the current authenticated user, including basic profile data, organization details, usage statistics, and recent activity.
+*   **Request:** None.
+*   **Response:** `200 OK`
+    *   **Content-Type:** `application/json`
+    *   **Body:** User profile object with detailed information.
+        ```json
+        {
+          "id": "integer",
+          "email": "string",
+          "roles": ["ROLE_USER", "ROLE_ADMIN", ...],
+          "googleId": "string",
+          "organization": {
+            "id": "integer",
+            "domain": "string",
+            "googleId": "string",
+            "usageCount": "integer",
+            "templatesCount": "integer"
+          },
+          "usage": {
+            "totalPrompts": "integer",
+            "totalTokens": "integer",
+            "totalCost": "float",
+            "formattedCost": "string (e.g., '$0.1234')",
+            "promptTokens": "integer",
+            "completionTokens": "integer",
+            "averageCostPerPrompt": "float",
+            "averageTokensPerPrompt": "float"
+          },
+          "templates": {
+            "privateCount": "integer"
+          },
+          "conversations": {
+            "count": "integer"
+          },
+          "models": {
+            "mostUsed": [
+              {
+                "modelId": "string",
+                "useCount": "integer",
+                "modelCost": "float",
+                "modelTokens": "integer"
+              },
+              // ... up to 5 most used models
+            ]
+          },
+          "recentConversations": [
+            {
+              "threadId": "string",
+              "title": "string",
+              "messageCount": "integer",
+              "createdAt": "string (Y-m-d H:i:s)",
+              "totalCost": "float",
+              "totalTokens": "integer"
+            },
+            // ... up to 5 recent conversations
+          ],
+          "activity": {
+            "daily": [
+              {
+                "date": "string (Y-m-d)",
+                "requestCount": "integer",
+                "dailyCost": "float",
+                "dailyTokens": "integer"
+              },
+              // ... daily activity for the last 7 days
+            ]
+          }
+        }
+        ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: User is not authenticated.
+
+---
+
 ## Prompt Template API Endpoints (`src/Controller/ApiPromptTemplateController.php`)
 
 These endpoints allow for programmatic management (CRUD) of Prompt Templates.

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import TemplateForm, { TemplateFormData } from '../templates/TemplateForm'; // Corrected path
-import { getPromptTemplate, updatePromptTemplate, getModels, PromptTemplate, Model } from '../../services/api';
-// import LoadingSpinner from '../common/LoadingSpinner'; // Corrected path
+import TemplateForm, { TemplateFormData } from '../components/templates/TemplateForm';
+import { getPromptTemplate, updatePromptTemplate, getModels, PromptTemplate, Model } from '../services/api'; // Ensure PromptTemplateMessage is imported if needed elsewhere, though not directly here
+import LoadingSpinner from '../components/common/LoadingSpinner'; // Assuming you have a spinner component
 
-const TemplateEditor: React.FC = () => {
+const EditTemplatePage: React.FC = () => {
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const [initialData, setInitialData] = useState<PromptTemplate | null>(null);
@@ -68,6 +68,8 @@ const TemplateEditor: React.FC = () => {
       navigate('/templates'); // Navigate back to the list page on success
     } catch (err) {
       console.error('Failed to update template:', err);
+      // Set the error state in the form instead of here, let form display it
+      // setError(err instanceof Error ? err.message : 'Failed to update template. Please try again.');
       // Throw the error so the form's catch block can handle it
        throw err;
     } finally {
@@ -80,8 +82,7 @@ const TemplateEditor: React.FC = () => {
   };
 
   if (isLoading) {
-    // return <div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>;
-    return <div className="p-4">Loading...</div>; // Placeholder text
+    return <div className="flex justify-center items-center h-screen"><LoadingSpinner /></div>;
   }
 
   if (error && !initialData) { // Show general error only if we couldn't load initial data
@@ -89,21 +90,25 @@ const TemplateEditor: React.FC = () => {
   }
 
   if (!initialData) {
+     // This case should ideally be covered by the loading/error states,
+     // but it's a safeguard.
      return <div className="p-4 text-orange-600">Template data not available.</div>;
    }
 
+
   return (
     <div className="container mx-auto p-4">
-      {/* Renamed EditTemplatePage to TemplateEditor in the component definition */}
+      {/* You might want a heading or breadcrumbs here */}
       <TemplateForm
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         initialData={initialData}
         isSubmitting={isSubmitting}
         availableModels={availableModels}
+        // Error display is handled within TemplateForm now if submission fails
       />
     </div>
   );
 };
 
-export default TemplateEditor; 
+export default EditTemplatePage; 

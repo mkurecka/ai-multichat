@@ -99,11 +99,11 @@ const Layout: React.FC<LayoutProps> = ({
         </nav>
         
         {/* User Info and Logout */}
-        <div className="header-user-info">
+        <div className="header-user-info flex items-center space-x-4 mr-4"> {/* Added flex, spacing, and margin */}
           <span>{userEmail || 'User'}</span>
           <button 
             onClick={onLogout} 
-            className="logout-button"
+            className="logout-button bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors" // Added basic button styling
           >
             Logout
           </button>
@@ -142,4 +142,3 @@ const Layout: React.FC<LayoutProps> = ({
 };
 
 export default Layout;
-
