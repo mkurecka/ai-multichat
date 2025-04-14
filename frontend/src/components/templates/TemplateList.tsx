@@ -20,7 +20,16 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, onEdit, onDelete
         <li key={template.id} style={{ border: '1px solid #ccc', marginBottom: '10px', padding: '10px', borderRadius: '5px' }}>
           <h3>{template.name}</h3>
           {template.description && <p><small>{template.description}</small></p>}
-          <p style={{ whiteSpace: 'pre-wrap', background: '#f9f9f9', padding: '5px' }}>{template.text}</p>
+          {template.messages && template.messages.length > 0 && (
+            <div style={{ marginTop: '5px', background: '#f9f9f9', padding: '8px', borderRadius: '4px' }}>
+              <strong>Messages:</strong>
+              <ul style={{ listStyle: 'disc', marginLeft: '20px', marginTop: '5px' }}>
+                {template.messages.map((msg, index) => (
+                  <li key={index}><strong>{msg.role}:</strong> {msg.content}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div style={{ marginTop: '10px' }}>
             <button onClick={() => onEdit(template)} style={{ marginRight: '5px' }}>Edit</button>
             <button onClick={() => onDelete(template.id)} style={{ color: 'red' }}>Delete</button>

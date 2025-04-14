@@ -11,9 +11,11 @@
     "moduleResolution": "bundler",
     // Comment out allowImportingTsExtensions as it conflicts with noEmit: false
     // "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": false,
+    "noEmit": true,
     "noEmitOnError": false,
     "jsx": "react-jsx",
 

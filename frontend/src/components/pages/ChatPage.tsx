@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 // Import necessary API functions and types directly
 import {
     Model,
@@ -28,12 +28,19 @@ interface ModelOptionType {
 }
 
 // Define props expected from App Router
-interface ChatPageProps { 
+export interface ChatPageProps { // Export the interface
   models: Model[];
   activeThreadId: string | null; // Receive active thread ID from App
+  setActiveThreadId: Dispatch<SetStateAction<string | null>>; // Add setter from App
+  setChatHistory: Dispatch<SetStateAction<ChatThread[]>>; // Add setter for history
 }
 
-const ChatPage: React.FC<ChatPageProps> = ({ models, activeThreadId }) => { // Receive props
+const ChatPage: React.FC<ChatPageProps> = ({ 
+  models, 
+  activeThreadId, 
+  setActiveThreadId, // Receive setter
+  setChatHistory // Receive setter
+}) => { // Receive props
   // --- STATE MANAGEMENT WITHIN ChatPage --- 
   // Remove state managed by App:
   // const [models, setModels] = useState<Model[]>([]); // Prop now
@@ -97,7 +104,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ models, activeThreadId }) => { // R
     
     fetchThread();
     return () => { isMounted = false; };
-  }, [activeThreadId, models, handleLogout]); // Depend on activeThreadId prop and models prop
+  }, [activeThreadId, models]); // Removed handleLogout as it should come from context
 
   // --- REMOVE HANDLERS managed by App --- 
   // const handleSelectThread = useCallback(/* ... */); 
@@ -109,32 +116,83 @@ const ChatPage: React.FC<ChatPageProps> = ({ models, activeThreadId }) => { // R
     setSelectedModels(limitedSelection.map(option => option.model));
   }, []);
   const handleSendMessage = useCallback(async (message: string) => {
-      // This handler needs the activeThreadId from props now
-      // const currentThreadId = activeThreadId; // Use prop
-      // ... rest of implementation using props and internal state ...
-      
-      // Prepare API Request Data
-      const requestData: ChatRequest = { 
-          userInput: message.trim(),
-          promptId: uuidv4(),
-          threadId: activeThreadId, // Use the prop
-          models: selectedModels.map(m => m.id),
-      };
-      // ... (remove templateId logic if needed) ...
-      
-      try {
-          const response = await sendChatMessage(requestData);
-          // ... update activeThreadMessages state ...
-          if (!activeThreadId && response.threadId) {
-              // This case shouldn't happen if App manages activeThreadId
-              // Maybe need a callback prop to notify App of new thread ID?
-              console.warn("ChatPage received new threadId, but App manages activeThreadId");
-              // TODO: Determine how to update App's activeThreadId 
-          }
-      } catch (err) { /* ... error handling ... */ }
-      finally { setSendingMessage(false); }
-      
-  }, [activeThreadId, selectedModels, sendingMessage, handleLogout]); // Add activeThreadId prop to dependencies
+    if (!selectedModels.length || sendingMessage) return;
+
+    const userInput = message.trim();
+    if (!userInput) return;
+
+    const currentThreadId = activeThreadId; // Keep as string | null based on App state
+    const newPromptId = uuidv4();
+
+    // Add user message immediately to UI
+    const userMessageGroup: MessageGroup = {
+        prompt: userInput,
+        promptId: newPromptId,
+        responses: {}, // Initialize empty responses
+        createdAt: new Date().toISOString(), // Add createdAt timestamp
+    };
+    setActiveThreadMessages(prev => [...prev, userMessageGroup]);
+
+    setSendingMessage(true);
+    setError(null);
+
+    const requestData: ChatRequest = {
+        userInput: userInput,
+        promptId: newPromptId,
+        threadId: currentThreadId,
+        models: selectedModels.map(m => m.id),
+    };
+
+    try {
+        const response = await sendChatMessage(requestData);
+        console.log("ChatPage: Received response from sendChatMessage:", response);
+
+        // Update the message group with the actual responses (usage is inside each response)
+        setActiveThreadMessages(prev => prev.map(group => 
+            group.promptId === newPromptId 
+            ? { ...group, responses: response.responses /* Usage is inside response.responses */ } 
+            : group
+        ));
+
+        // If it was a new chat, update the activeThreadId and add to history
+        if (!currentThreadId && response.threadId) {
+            console.log(`ChatPage: New thread created (${response.threadId}), updating App state.`);
+            setActiveThreadId(response.threadId); 
+            
+            // Add new thread to history (use string ID from response)
+            const newThread: ChatThread = {
+              id: parseInt(response.threadId, 10), // Convert string ID to number
+              title: userInput.substring(0, 50) + (userInput.length > 50 ? '...' : ''),
+              messages: [], // Start with empty messages in history preview
+              threadId: response.threadId, // Keep threadId as string
+              createdAt: new Date().toISOString(), // Add createdAt
+            };
+            setChatHistory(prev => [newThread, ...prev]);
+        } else if (currentThreadId) {
+          // Update history title (use string ID for comparison with threadId field)
+          setChatHistory(prev => 
+            prev.map(thread => 
+              thread.threadId === currentThreadId // Compare string threadId 
+              ? { ...thread, title: userInput.substring(0, 50) + '...' } 
+              : thread
+            )
+          );
+        }
+
+    } catch (err) {
+        console.error("Failed to send message:", err);
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+            setError("Session expired. Please log in again.");
+            // handleLogout(); // Call context logout
+        } else {
+            setError(err instanceof Error ? err.message : 'Failed to send message');
+        }
+        // Remove the optimistic user message if sending failed?
+        setActiveThreadMessages(prev => prev.filter(group => group.promptId !== newPromptId));
+    } finally {
+        setSendingMessage(false);
+    }
+}, [activeThreadId, selectedModels, sendingMessage, setActiveThreadId, setChatHistory]); // Added setters to dependencies
 
 
   // --- RENDER LOGIC --- 

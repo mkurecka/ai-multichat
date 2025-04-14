@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Dispatch, SetStateAction, useRef } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, sendChatMessage } from './services/api';
+import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, sendChatMessage, PromptTemplate, getAllPromptTemplates } from './services/api';
 import Layout from './components/Layout';
 import './App.css';
 import axios from 'axios';
 import { MultiValue } from 'react-select';
 import { v4 as uuidv4 } from 'uuid';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import ChatPage from './components/pages/ChatPage';
-import PromptTemplatePage from './components/pages/PromptTemplatePage';
+import ChatPage, { ChatPageProps } from './components/pages/ChatPage';
+import PromptTemplatePage, { PromptTemplatePageProps } from './components/pages/PromptTemplatePage';
 import LoginPage from './components/pages/LoginPage';
+import TemplateEditor from './components/pages/TemplateEditor';
 
 // --- Google Auth Config ---
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -44,7 +45,8 @@ interface ModelOptionType {
 }
 
 // --- Protected Route Component --- 
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+// Use React.PropsWithChildren for standard child prop typing
+const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
   const token = getAuthToken();
   const location = useLocation();
 
@@ -67,7 +69,9 @@ function App() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   // Keep models state here if needed globally or by multiple pages via props/context
   const [models, setModels] = useState<Model[]>([]); 
-  const [loading, setLoading] = useState<boolean>(false); // Restore global loading potentially
+  const [loading, setLoading] = useState<boolean>(false);
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
+  const isFetchingInitialData = useRef(false);
 
   const OAUTH_CALLBACK_PATH = '/auth/google/callback';
   const calculatedRedirectUri = window.location.origin + OAUTH_CALLBACK_PATH;
@@ -104,6 +108,7 @@ function App() {
     setChatHistory([]);
     setActiveThreadId(null);
     setModels([]); 
+    setPromptTemplates([]); // Clear templates on logout
   }, [processToken]);
 
   const handleGoogleLoginCallback = useCallback(async () => {
@@ -191,17 +196,21 @@ function App() {
   // --- Restore Initial Data Fetching (Models & History) ---
    const fetchInitialData = useCallback(async () => {
      const currentToken = getAuthToken();
-     if (!currentToken || loading) return;
-     console.log("App: Fetching initial models and history...");
+     if (!currentToken || isFetchingInitialData.current) return;
+     
+     console.log("App: Fetching initial models, history, and templates...");
+     isFetchingInitialData.current = true;
      setLoading(true);
      setError(null);
      try {
-       const [fetchedModels, fetchedHistory] = await Promise.all([
+       const [fetchedModels, fetchedHistory, fetchedTemplates] = await Promise.all([
          getModels(),
          getChatHistory(),
+         getAllPromptTemplates(),
        ]);
        setModels(fetchedModels);
        setChatHistory(fetchedHistory);
+       setPromptTemplates(fetchedTemplates);
      } catch (err) {
        console.error("App: Failed to fetch initial data:", err);
        if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -212,6 +221,7 @@ function App() {
        }
      } finally {
        setLoading(false);
+       isFetchingInitialData.current = false;
      }
    }, [handleLogout]);
  
@@ -246,13 +256,25 @@ function App() {
               activeThreadId={activeThreadId}
               onNewChat={handleNewChat}
               onSelectThread={handleSelectThread}
-            >
-            </Layout>
+              promptTemplates={promptTemplates}
+              templatesLoading={loading}
+              templatesError={error}
+            />
           </ProtectedRoute>
         }
       >
-        <Route index element={<ChatPage models={models} activeThreadId={activeThreadId} />} />
-        <Route path="templates" element={<PromptTemplatePage models={models} />} />
+        <Route index element={<ChatPage 
+          models={models}
+          activeThreadId={activeThreadId}
+          setActiveThreadId={setActiveThreadId}
+          setChatHistory={setChatHistory}
+        />} />
+        <Route path="templates" element={<PromptTemplatePage 
+          models={models}
+          templates={promptTemplates}
+          setTemplates={setPromptTemplates}
+        />} />
+        <Route path="templates/:templateId" element={<TemplateEditor />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

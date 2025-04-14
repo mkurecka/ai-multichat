@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 import {
   PromptTemplate,
   Model,
@@ -7,46 +7,43 @@ import {
   updatePromptTemplate,
   deletePromptTemplate
 } from '../../services/api';
-import TemplateList from '../templates/TemplateList';
+// import TemplateList from '../templates/TemplateList'; // Remove import
 import TemplateForm from '../templates/TemplateForm';
-import { Link } from 'react-router-dom'; // For navigating back
+import { Link } from 'react-router-dom';
 
 // Define props expected from App Router
-interface PromptTemplatePageProps {
-  models: Model[]; // Expect models prop
+export interface PromptTemplatePageProps { 
+  models: Model[]; 
+  templates: PromptTemplate[]; 
+  setTemplates: Dispatch<SetStateAction<PromptTemplate[]>>; 
 }
 
-const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ 
+  models, 
+  templates, // Still needed for TemplateForm initialData potentially?
+  setTemplates
+}) => {
   const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null);
   const [showForm, setShowForm] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadTemplates = useCallback(async () => {
+  const refreshTemplates = async () => {
     setLoading(true);
     setError(null);
     try {
-      const fetchedTemplates = await getAllPromptTemplates(); // Use correct function
-      setTemplates(fetchedTemplates);
+      const fetchedTemplates = await getAllPromptTemplates(); 
+      setTemplates(fetchedTemplates); 
     } catch (err) {
       console.error("Failed to fetch templates:", err);
       setError(err instanceof Error ? err.message : 'Failed to load templates.');
-      // Handle potential 401 unauthorized error if necessary
-      // if (axios.isAxiosError(err) && err.response?.status === 401) {
-      //   handleLogout(); // Or redirect to login
-      // }
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
-
-  const handleCreateSubmit = async (formData: any /* Replace any with a specific form data interface */) => {
+  const handleCreateSubmit = async (formData: any) => {
     setSubmitting(true);
     setError(null);
     try {
@@ -63,7 +60,7 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
       await createPromptTemplate(templateData as any); // Use type assertion carefully or refine types
       setShowForm(false);
       setEditingTemplate(null);
-      await loadTemplates(); // Refresh list
+      await refreshTemplates(); // Refresh list by updating parent state
     } catch (err) {
        console.error("Failed to create template:", err);
        setError(err instanceof Error ? err.message : 'Failed to create template.');
@@ -72,7 +69,7 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
     }
   };
 
-  const handleUpdateSubmit = async (id: number, formData: any /* Replace any */) => {
+  const handleUpdateSubmit = async (id: number, formData: any) => {
      setSubmitting(true);
      setError(null);
      try {
@@ -88,7 +85,7 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
        await updatePromptTemplate(id, templateData as any); // Use type assertion carefully or refine types
        setShowForm(false);
        setEditingTemplate(null);
-       await loadTemplates(); // Refresh list
+       await refreshTemplates(); // Refresh list by updating parent state
      } catch (err) {
         console.error("Failed to update template:", err);
         setError(err instanceof Error ? err.message : 'Failed to update template.');
@@ -103,15 +100,18 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
     window.scrollTo(0, 0); // Scroll to top to see form
   };
 
-  const handleDelete = async (id: number /* ID is now number */) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this template?')) {
       setError(null);
+      setLoading(true); // Use loading state for delete operation
       try {
         await deletePromptTemplate(id); // Use number ID
-        await loadTemplates();
+        await refreshTemplates(); // Refresh list by updating parent state
       } catch (err) {
           console.error("Failed to delete template:", err);
           setError(err instanceof Error ? err.message : 'Failed to delete template.');
+      } finally {
+          setLoading(false);
       }
     }
   };
@@ -131,14 +131,13 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Prompt Templates</h1>
+        <h1>Prompt Templates Management</h1>
         <div>
            <Link to="/" style={{ marginRight: '10px' }}>Back to Chat</Link>
-           {/* <button onClick={handleLogout}>Logout</button> */}
         </div>
       </div>
 
-      {error && <p style={{ color: 'red', border: '1px solid red', padding: '10px', marginBottom: '15px' }}>Error: {error}</p>}
+      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
 
       {!showForm && (
         <button onClick={handleAddNew} style={{ marginBottom: '20px', padding: '10px 15px' }}>
@@ -148,8 +147,7 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
 
       {showForm && (
         <TemplateForm
-          onSubmit={handleCreateSubmit}
-          onUpdate={handleUpdateSubmit}
+          onSubmit={editingTemplate ? (formData) => handleUpdateSubmit(editingTemplate.id, formData) : handleCreateSubmit}
           onCancel={handleCancelForm}
           initialData={editingTemplate}
           isSubmitting={submitting}
@@ -157,13 +155,11 @@ const PromptTemplatePage: React.FC<PromptTemplatePageProps> = ({ models }) => {
         />
       )}
 
-      <TemplateList
-        templates={templates}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        loading={loading}
-        error={null} // Page-level error is handled above
-      />
+      {!showForm && (
+          <div style={{ marginTop: '20px', padding: '20px', border: '1px dashed #ccc', borderRadius: '5px', textAlign: 'center' }}>
+              <p>Select a template from the sidebar to view/edit it, or add a new one.</p>
+          </div>
+      )}
     </div>
   );
 };
