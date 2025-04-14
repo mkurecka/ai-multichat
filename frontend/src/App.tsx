@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, MessageGroup } from './services/api';
+import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, MessageGroup, sendChatMessage } from './services/api';
 import Layout from './components/Layout';
 import './App.css';
 import axios from 'axios';
 import { MultiValue } from 'react-select';
+import { v4 as uuidv4 } from 'uuid';
 
 // --- Google Auth Config ---
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -55,6 +56,8 @@ function App() {
   const [threadLoading, setThreadLoading] = useState<boolean>(false);
   const [threadError, setThreadError] = useState<string | null>(null);
 
+  const [sendingMessage, setSendingMessage] = useState<boolean>(false);
+
   const processToken = useCallback((token: string | null) => {
     if (token) {
       try {
@@ -93,6 +96,7 @@ function App() {
     setActiveThreadMessages([]);
     setThreadLoading(false);
     setThreadError(null);
+    setSendingMessage(false);
     // setCurrentView('chats'); // Removed
   }, [processToken]);
 
@@ -256,17 +260,86 @@ function App() {
     setSelectedModels(newSelectedModels);
   };
 
-  const handleSendMessage = (message: string) => {
-    console.log("Sending message:", message, "to models:", selectedModels.map(m => m.id));
-    // TODO: Implement API call logic here using selectedModels
-    // Needs to handle adding the new prompt/response to activeThreadMessages state
-    // or re-fetching if necessary
-  };
+  // --- Update handleSendMessage ---
+  const handleSendMessage = useCallback(async (message: string) => {
+    if (selectedModels.length === 0 || sendingMessage) return;
 
+    const userInput = message.trim();
+    if (!userInput) return;
+
+    // --- Configuration ---
+    const currentThreadId = activeThreadId;
+    const promptId = uuidv4();
+    const selectedModelIds = selectedModels.map(m => m.id); // <<< --- Get selected model IDs
+
+    console.log(`Sending message: "${userInput}" (PromptID: ${promptId}) to models:`, selectedModelIds, `Thread: ${currentThreadId || '(New)'}`);
+
+    // --- Optimistic UI Update ---
+    const optimisticUserMessageGroup: MessageGroup = {
+      prompt: userInput,
+      responses: {},
+      createdAt: new Date().toISOString(),
+      promptId: promptId
+    };
+    setActiveThreadMessages(prev => [...prev, optimisticUserMessageGroup]);
+    setSendingMessage(true);
+    setThreadError(null);
+
+    // --- Prepare API Request (Add models field) --- 
+    const requestData = {
+        userInput: userInput,
+        templateId: null,
+        promptId: promptId,
+        threadId: currentThreadId,
+        models: selectedModelIds // <<< --- Add the array of model IDs
+        // stream: false 
+    };
+
+    // Type assertion for clarity (optional, but good practice)
+    const typedRequestData: ChatRequest = requestData;
+
+    try {
+      // --- Call API --- 
+      const response = await sendChatMessage(typedRequestData);
+
+      // --- Update State with API Response --- 
+      setActiveThreadMessages(prev => {
+        return prev.map(group => {
+           if (group.promptId === promptId) {
+               return { ...group, responses: response.responses };
+           }
+           return group;
+        });
+      });
+
+      if (!currentThreadId && response.threadId) {
+        setActiveThreadId(response.threadId);
+        // TODO: Update chatHistory list
+        console.log(`New thread created with ID: ${response.threadId}`);
+      }
+
+    } catch (err) {
+      console.error('Failed to send chat message:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
+      setThreadError(errorMsg);
+      setActiveThreadMessages(prev => prev.filter(group => group.promptId !== promptId));
+
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        handleLogout();
+      }
+    } finally {
+      setSendingMessage(false);
+    }
+  }, [activeThreadId, selectedModels, sendingMessage, handleLogout]);
+
+  // --- Existing handleNewChat ---
   const handleNewChat = () => {
     console.log("Starting new chat...");
     setActiveThreadId(null); // Clear active thread selection
     setSelectedModels([]); // Clear selected models for a new chat
+    setActiveThreadMessages([]); // Clear messages
+    setThreadError(null); // Clear errors
+    setSendingMessage(false); // Ensure sending state is reset
   };
 
 
@@ -312,7 +385,7 @@ function App() {
       onSelectModel={handleSelectModel}
       onSendMessage={handleSendMessage}
       activeMessages={activeThreadMessages}
-      threadLoading={threadLoading}
+      threadLoading={threadLoading || sendingMessage}
       threadError={threadError}
       isNewChat={activeThreadId === null}
     />

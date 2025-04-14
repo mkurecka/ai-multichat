@@ -9,7 +9,6 @@ use App\Entity\Thread;
 use Psr\Log\LoggerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use App\Event\OpenRouterRequestCompletedEvent;
 use App\Service\PromptTemplateService;
 use App\Service\ContextService; // Re-add ContextService
 
@@ -87,9 +86,8 @@ class OpenRouterService
         try {
             $response = $this->client->request('GET', self::API_URL . '/generation', [
                 'headers' => [
-                    'Authorization' => "Bearer {$this->apiKey}",
-                    'X-Title' => 'AI MultiChat',
-                    'Content-Type' => 'application/json'
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'X-Title' => 'AI MultiChat'
                 ],
                 'query' => [
                     'id' => $generationId
@@ -97,13 +95,14 @@ class OpenRouterService
             ]);
 
             if ($response->getStatusCode() !== 200) {
+                $this->log('Error fetching generation data. Status: ' . $response->getStatusCode() . ' Response: ' . $response->getContent(false));
                 throw new HttpException($response->getStatusCode(), 'Failed to fetch generation data from OpenRouter');
             }
 
             $data = $response->toArray();
             return $data['data'] ?? [];
         } catch (\Exception $e) {
-            $this->log('OpenRouter API Error: ' . $e->getMessage());
+            $this->log('OpenRouter API Error in getGenerationData: ' . $e->getMessage());
             throw new HttpException(500, 'Failed to fetch generation data: ' . $e->getMessage());
         }
     }
