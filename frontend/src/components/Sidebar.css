@@ -56,9 +56,9 @@
 }
 
 /* Add styles for active chat item if needed */
-/*
+/* Uncomment and adjust as needed */
 .chat-history-item.active {
-  background-color: #e9f5ff; 
-  font-weight: 500;
-}
-*/ 
+  background-color: #e7f1ff; /* Example: Light blue background */
+  color: #0d6efd; /* Example: Blue text */
+  font-weight: 500; /* Example: Slightly bolder text */
+} 

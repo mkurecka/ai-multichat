@@ -1,11 +1,10 @@
 import axios from 'axios';
 
-// Import mock data
-// import mockModels from '../mocks/data/models.json'; // Removed mock import for models
-import mockChatHistory from '../mocks/data/chatHistory.json';
-import mockPromptTemplates from '../mocks/data/promptTemplates.json';
-import mockChatResponse from '../mocks/data/chatResponse.json';
-import mockChatCosts from '../mocks/data/chatCosts.json';
+// Remove mock data imports as they are no longer used
+// import mockChatHistory from '../mocks/data/chatHistory.json';
+// import mockPromptTemplates from '../mocks/data/promptTemplates.json';
+// import mockChatResponse from '../mocks/data/chatResponse.json';
+// import mockChatCosts from '../mocks/data/chatCosts.json';
 
 // --- Interfaces based on API Documentation ---
 
@@ -105,7 +104,8 @@ export interface ThreadCost {
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 console.log(`Using API Base URL: ${API_BASE_URL}`); // Log the URL being used
 
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
+// Explicitly remove the USE_MOCKS constant as it's no longer needed here
+// const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -139,9 +139,8 @@ apiClient.interceptors.request.use(
   }
 );
 
-
-// Function to simulate delay for mock responses
-const mockDelay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
+// Remove mock delay function
+// const mockDelay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- API Functions ---
 
@@ -159,77 +158,31 @@ export const getChatHistory = async (): Promise<ChatThread[]> => {
 };
 
 export const getThreadHistory = async (threadId: string): Promise<ThreadHistoryResponse> => {
-    if (USE_MOCKS) {
-        console.log(`Using mock data for getThreadHistory (threadId: ${threadId})`);
-        await mockDelay();
-        // Find the specific thread in the mock history
-        const thread = mockChatHistory.find(t => t.threadId === threadId);
-        if (!thread) {
-            throw new Error(`Mock thread with ID ${threadId} not found.`);
-        }
-        return { messages: JSON.parse(JSON.stringify(thread.messages)), threadId: thread.threadId };
-    }
+    console.log(`Fetching thread history from API: /chat/thread/${threadId}`);
     const response = await apiClient.get<ThreadHistoryResponse>(`/chat/thread/${threadId}`);
     return response.data;
 };
 
-
 export const sendChatMessage = async (data: ChatRequest): Promise<ChatResponse> => {
-    // Note: Mocking streaming responses is complex and not implemented here.
-    // This mock only covers the non-streaming case.
-    if (USE_MOCKS) {
-        console.log('Using mock data for sendChatMessage (non-streaming)');
-        await mockDelay(800);
-        // Return a slightly modified response based on input
-        const response = JSON.parse(JSON.stringify(mockChatResponse));
-        response.threadId = data.threadId || `new-mock-thread-${Date.now()}`;
-        response.promptId = data.promptId;
-        // Simulate response based on a known model from the template (if possible)
-        const template = mockPromptTemplates.find(t => t.id === data.templateId);
-        if (template && typeof template.associatedModel === 'object' && 'id' in template.associatedModel) {
-             const modelId = template.associatedModel.id;
-             // Ensure the response structure matches the model ID
-             if (!response.responses[modelId]) {
-                 const firstModelKey = Object.keys(response.responses)[0];
-                 if (firstModelKey) {
-                    response.responses[modelId] = response.responses[firstModelKey];
-                    delete response.responses[firstModelKey];
-                 }
-             }
-        }
-
-        return response;
-    }
-    // For actual API call, handle potential streaming differently if needed
-    if (data.stream) {
-        console.warn("Streaming not fully implemented in this basic client/mock setup.");
-        // Fallback to non-streaming or implement SSE handling
-    }
+    console.log('Sending chat message via API: POST /chat', data);
+    // Handle streaming vs non-streaming requests appropriately if needed
+    // For now, assuming non-streaming based on the previous structure
     const response = await apiClient.post<ChatResponse>('/chat', data);
     return response.data;
+    // Streaming would involve using fetch with appropriate headers and handling text/event-stream
 };
 
-
 export const getPromptTemplates = async (): Promise<PromptTemplate[]> => {
-    if (USE_MOCKS) {
-        console.log('Using mock data for getPromptTemplates');
-        await mockDelay();
-        return JSON.parse(JSON.stringify(mockPromptTemplates));
-    }
+    console.log('Fetching prompt templates from API: /prompt-templates');
     const response = await apiClient.get<PromptTemplate[]>('/prompt-templates');
     return response.data;
 };
 
 export const getChatCosts = async (): Promise<ThreadCost[]> => {
-    if (USE_MOCKS) {
-        console.log('Using mock data for getChatCosts');
-        await mockDelay();
-        return JSON.parse(JSON.stringify(mockChatCosts));
-    }
+    console.log('Fetching chat costs from API: /chat/costs');
     const response = await apiClient.get<ThreadCost[]>('/chat/costs');
     return response.data;
 };
-
 
 // --- Authentication ---
 
@@ -245,6 +198,7 @@ interface LoginResponse {
 export const loginUser = async (credentials: LoginCredentials): Promise<string | null> => {
     // Login should always hit the real API, regardless of USE_MOCKS
     try {
+        console.log('Attempting login via API: /login_check');
         const response = await apiClient.post<LoginResponse>('/login_check', credentials);
         const token = response.data.token;
         if (token) {
@@ -278,11 +232,12 @@ export const getAuthToken = (): string | null => {
 
 // Update function signature to accept redirectUri
 export const handleGoogleCallback = async (code: string, redirectUri: string): Promise<string | null> => {
-    // This function sends the code and redirectUri received from Google to our backend
-    console.log(`handleGoogleCallback: Sending code and redirectUri to /auth/google/callback`, { code, redirectUri }); // Log parameters
     try {
-        // Include redirectUri in the request body
-        const response = await apiClient.post<LoginResponse>('/auth/google/callback', { code, redirectUri });
+        console.log('Sending Google auth code to API: /auth/google/callback');
+        const response = await apiClient.post<LoginResponse>('/auth/google/callback', {
+            code: code,
+            redirectUri: redirectUri // Send the redirect URI used by the frontend
+        });
         const token = response.data.token;
         if (token) {
             localStorage.setItem('authToken', token);
@@ -291,21 +246,11 @@ export const handleGoogleCallback = async (code: string, redirectUri: string): P
         }
         return null;
     } catch (error) {
-        console.error("Google callback handling failed:", error);
-        localStorage.removeItem('authToken'); // Clear token on failure
-        delete apiClient.defaults.headers.common['Authorization'];
-        if (axios.isAxiosError(error)) {
-             if (error.response?.status === 401) {
-                throw new Error("Google authentication failed or user not authorized.");
-             }
-             if (error.response?.status === 400) {
-                throw new Error("Invalid request during Google callback (missing/bad code?).");
-             }
-        }
-        throw new Error("Google callback failed. Please try again.");
+        console.error('Google auth callback failed:', error);
+        localStorage.removeItem('authToken');
+        return null;
     }
 };
-
 
 // --- Add other API functions as needed (create/update/delete templates, etc.) ---
 // Example:
@@ -331,5 +276,35 @@ export const handleGoogleCallback = async (code: string, redirectUri: string): P
 //     const response = await apiClient.post<PromptTemplate>('/prompt-templates', templateData);
 //     return response.data;
 // }
+
+export const createPromptTemplate = async (templateData: Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel: { id: string } }): Promise<PromptTemplate> => {
+    console.log('Creating prompt template via API: POST /prompt-templates');
+    const response = await apiClient.post<PromptTemplate>('/prompt-templates', templateData);
+    return response.data;
+};
+
+export const getPromptTemplate = async (id: number): Promise<PromptTemplate> => {
+    console.log(`Fetching prompt template from API: GET /prompt-templates/${id}`);
+    const response = await apiClient.get<PromptTemplate>(`/prompt-templates/${id}`);
+    return response.data;
+};
+
+export const updatePromptTemplate = async (id: number, templateData: Partial<Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel?: { id: string } }>): Promise<PromptTemplate> => {
+    console.log(`Updating prompt template via API: PATCH /prompt-templates/${id}`);
+    const response = await apiClient.patch<PromptTemplate>(`/prompt-templates/${id}`, templateData);
+    return response.data;
+};
+
+export const deletePromptTemplate = async (id: number): Promise<void> => {
+    console.log(`Deleting prompt template via API: DELETE /prompt-templates/${id}`);
+    await apiClient.delete(`/prompt-templates/${id}`);
+};
+
+// Function to create a new thread explicitly if needed
+export const createNewThread = async (): Promise<{ threadId: string }> => {
+    console.log('Creating new thread via API: POST /chat/thread');
+    const response = await apiClient.post<{ threadId: string }>('/chat/thread');
+    return response.data;
+};
 
 export default apiClient;

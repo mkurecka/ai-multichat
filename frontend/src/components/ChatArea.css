@@ -233,4 +233,119 @@
 .model-select__option--is-selected {
     background-color: #0d6efd !important; /* Blue selected */
     color: white !important;
+}
+
+/* === Message Display Styles === */
+
+.loading-placeholder, .error-placeholder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.error-placeholder {
+    color: #dc3545; /* Red for errors */
+}
+
+.messages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem; /* Space between message groups */
+}
+
+.message-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* Space between user prompt and AI responses */
+}
+
+.message {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    line-height: 1.5;
+    max-width: 90%; /* Prevent messages from taking full width */
+}
+
+.user-message {
+    background-color: #e7f1ff; /* Light blue background for user */
+    color: #333;
+    align-self: flex-end; /* Align user messages to the right */
+    border-bottom-right-radius: 0; /* Tail effect */
+    margin-left: 10%; /* Push from left */
+}
+
+.ai-message {
+    background-color: #f1f3f5; /* Light gray background for AI */
+    color: #212529;
+    align-self: flex-start; /* Align AI messages to the left */
+    border-bottom-left-radius: 0; /* Tail effect */
+    margin-right: 10%; /* Push from right */
+}
+
+.message-role {
+    display: block;
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+    color: #495057;
+}
+
+.user-message .message-role {
+    color: #0b5ed7; /* Darker blue for user role */
+}
+
+.message-content {
+    white-space: pre-wrap; /* Preserve whitespace and wrap lines */
+}
+
+/* === Side-by-Side AI Responses === */
+
+.ai-responses-container {
+    display: flex; /* Arrange responses horizontally */
+    flex-wrap: wrap; /* Allow wrapping if too many responses */
+    gap: 1rem; /* Space between response blocks */
+    width: 100%; /* Take full width */
+    margin-top: 0.5rem; /* Small space below user prompt */
+}
+
+.ai-response-block {
+    flex: 1 1 300px; /* Grow, shrink, base width of 300px (adjust as needed) */
+    min-width: 250px; /* Minimum width before wrapping */
+    /* Override alignment from .ai-message */
+    align-self: stretch; /* Make blocks equal height in a row */
+    /* Remove margin push */
+    margin-right: 0;
+    /* Add back border-radius */
+    border-bottom-left-radius: 8px;
+    /* Add a light border for visual separation */
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Subtle shadow */
+    display: flex; /* Use flex within the block too */
+    flex-direction: column; /* Stack role/content/usage vertically */
+}
+
+.ai-response-block .message-content {
+    flex-grow: 1; /* Allow content to fill space */
+}
+
+.token-usage {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #dee2e6; /* Separator line */
+    text-align: right;
+}
+
+.response-error {
+    font-size: 0.8rem;
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.5rem;
 } 

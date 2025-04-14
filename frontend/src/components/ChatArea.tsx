@@ -1,7 +1,7 @@
 import React from 'react';
 import Select, { MultiValue } from 'react-select'; // Import react-select
 import './ChatArea.css'; // We'll create this for styling
-import { Model } from '../services/api'; // Import the Model type
+import { Model, MessageGroup } from '../services/api'; // Import the Model type and MessageGroup type
 
 // Define the option type for react-select
 interface ModelOptionType {
@@ -15,7 +15,11 @@ interface ChatAreaProps {
   selectedModels: Model[]; // Use the imported Model type
   onSelectModel: (selectedOptions: MultiValue<ModelOptionType>) => void; // Update handler type
   onSendMessage: (message: string) => void;
-  // Add props for messages, loading state, errors etc.
+  // Thread-specific props
+  messages: MessageGroup[];
+  isLoading: boolean;
+  error: string | null;
+  isNewChat: boolean; // To show initial placeholder
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -23,6 +27,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   selectedModels,
   onSelectModel,
   onSendMessage,
+  // Thread-specific props
+  messages,
+  isLoading,
+  error,
+  isNewChat
 }) => {
 
   // Placeholder state for message input
@@ -96,15 +105,59 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Message Display Area */}
       <div className="message-display-area">
-        {selectedCount === 0 ? (
+        {/* Loading State */} 
+        {isLoading && (
+          <div className="loading-placeholder">Loading messages...</div>
+        )}
+
+        {/* Error State */} 
+        {!isLoading && error && (
+          <div className="error-placeholder">Error: {error}</div>
+        )}
+
+        {/* Initial New Chat State */} 
+        {!isLoading && !error && isNewChat && (
              <div className="start-chatting-placeholder">
                  <h2>Select models and start chatting</h2>
                  <p>Your conversation will appear here.</p>
              </div>
-        ) : (
-          /* Placeholder for actual messages */
-          <p>Chat messages will go here...</p>
-          // Map through actual messages here
+        )}
+
+        {/* Display Messages State */} 
+        {!isLoading && !error && !isNewChat && messages.length === 0 && (
+             <div className="loading-placeholder">No messages in this chat yet.</div>
+        )}
+
+        {!isLoading && !error && !isNewChat && messages.length > 0 && (
+          <div className="messages-list">
+            {messages.map((group, index) => (
+              <div key={group.promptId || index} className="message-group">
+                 {/* User Prompt */} 
+                 <div className="message user-message">
+                    <span className="message-role">User:</span>
+                    <div className="message-content">{group.prompt}</div>
+                 </div>
+
+                 {/* === AI Responses Container (NEW) === */}
+                 <div className="ai-responses-container">
+                     {Object.entries(group.responses).map(([modelId, response]) => (
+                         <div key={modelId} className="message ai-message ai-response-block">
+                             <span className="message-role">{models.find(m => m.id === modelId)?.name || modelId}:</span>
+                             <div className="message-content">{response.content}</div>
+                             {response.usage && (
+                                 <div className="token-usage">
+                                     Tokens: {response.usage.total_tokens} (P: {response.usage.prompt_tokens} | C: {response.usage.completion_tokens})
+                                 </div>
+                             )}
+                             {response.error && (
+                                <div className="response-error">Error: {response.error}</div>
+                             )}
+                         </div>
+                     ))}
+                 </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -122,12 +175,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           placeholder={selectedCount > 0 ? "Type your message here... (Shift+Enter for new line)" : "Select a model first"}
           rows={3}
           className="message-input-textarea"
-          disabled={selectedCount === 0} // Disable input if no models are selected
+          disabled={selectedCount === 0 || isLoading} // Disable input if no models are selected or if loading
         />
         <button
             onClick={handleSend}
             className="send-button"
-            disabled={selectedCount === 0 || !messageInput.trim()} // Disable if no model or no text
+            disabled={selectedCount === 0 || !messageInput.trim() || isLoading} // Disable if no model or no text or if loading
         >
           Send
         </button>

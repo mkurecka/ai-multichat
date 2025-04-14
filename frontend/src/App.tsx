@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread } from './services/api';
+import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, MessageGroup } from './services/api';
 import Layout from './components/Layout';
 import './App.css';
 import axios from 'axios';
@@ -49,6 +49,12 @@ function App() {
   // const [currentView, setCurrentView] = useState<'models' | 'chats' | 'settings'>('chats'); // Removed: Using persistent chat layout
   const [chatHistory, setChatHistory] = useState<ChatThread[]>([]); // Keep chat history state
 
+  // --- NEW State for Active Thread ---
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [activeThreadMessages, setActiveThreadMessages] = useState<MessageGroup[]>([]);
+  const [threadLoading, setThreadLoading] = useState<boolean>(false);
+  const [threadError, setThreadError] = useState<string | null>(null);
+
   const processToken = useCallback((token: string | null) => {
     if (token) {
       try {
@@ -82,6 +88,11 @@ function App() {
     setSelectedModels([]); // Clear selected models on logout
     setChatHistory([]);
     setError(null);
+    // Reset active thread state on logout
+    setActiveThreadId(null);
+    setActiveThreadMessages([]);
+    setThreadLoading(false);
+    setThreadError(null);
     // setCurrentView('chats'); // Removed
   }, [processToken]);
 
@@ -114,7 +125,7 @@ function App() {
     }
   }, [handleLogout, loading]); // Added loading to dependencies
 
-  // Effect to handle Google callback and fetch initial data
+  // Effect to handle Google callback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
@@ -151,6 +162,76 @@ function App() {
     }
   }, [authToken, authLoading, fetchInitialData, models.length, chatHistory.length]); // Dependencies for data fetching
 
+  // --- NEW Handler for Selecting a Thread ---
+  const handleSelectThread = useCallback((threadId: string) => {
+    console.log("Selecting thread:", threadId);
+    if (threadId === activeThreadId) return; // Do nothing if already active
+
+    setActiveThreadId(threadId);
+    setActiveThreadMessages([]); // Clear previous messages
+    setThreadError(null); // Clear previous errors
+    setThreadLoading(true); // Set loading state for this thread
+  }, [activeThreadId]); // Depend on activeThreadId to prevent re-fetching same thread
+
+  // --- NEW Effect to Fetch Active Thread History ---
+  useEffect(() => {
+    if (!activeThreadId || !authToken) {
+      if (activeThreadId === null) {
+         setActiveThreadMessages([]);
+         setThreadLoading(false);
+         setThreadError(null);
+         // Don't clear selected models here, allow user to keep them for new chat
+      }
+      return;
+    }
+
+    let isMounted = true;
+    const fetchThread = async () => {
+      console.log(`Fetching history for thread: ${activeThreadId}`);
+      setThreadLoading(true);
+      setThreadError(null);
+      try {
+        const response = await getThreadHistory(activeThreadId);
+        if (isMounted) {
+          setActiveThreadMessages(response.messages);
+
+          // --- Pre-select models used in this thread --- 
+          const modelIdsInThread = new Set<string>();
+          response.messages.forEach(group => {
+              Object.keys(group.responses).forEach(modelId => {
+                  modelIdsInThread.add(modelId);
+              });
+          });
+          
+          const modelsToSelect = models.filter(model => modelIdsInThread.has(model.id));
+          setSelectedModels(modelsToSelect);
+          console.log("Pre-selected models for thread:", modelsToSelect.map(m => m.id));
+          // --------------------------------------------- 
+        }
+      } catch (err) {
+        console.error(`Failed to fetch history for thread ${activeThreadId}:`, err);
+        if (isMounted) {
+           if (axios.isAxiosError(err) && err.response?.status === 401) {
+               setThreadError("Session expired. Please log in again.");
+               handleLogout(); // Force logout if unauthorized
+           } else {
+               setThreadError(err instanceof Error ? err.message : 'Failed to load chat messages.');
+           }
+           setSelectedModels([]); // Clear selected models on error loading thread
+        }
+      } finally {
+        if (isMounted) {
+          setThreadLoading(false);
+        }
+      }
+    };
+
+    fetchThread();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeThreadId, authToken, handleLogout, models]);
 
   const handleGoogleLoginClick = () => {
     if (!GOOGLE_CLIENT_ID) {
@@ -170,21 +251,22 @@ function App() {
   // --- Update handleSelectModel --- 
   const handleSelectModel = (selectedOptions: MultiValue<ModelOptionType>) => {
     console.log("Selected Options:", selectedOptions);
-    // Limit selection to 16 models
     const limitedSelection = selectedOptions.slice(0, 16);
-    // Extract the full Model objects from the selected options
     const newSelectedModels = limitedSelection.map(option => option.model);
     setSelectedModels(newSelectedModels);
   };
 
   const handleSendMessage = (message: string) => {
     console.log("Sending message:", message, "to models:", selectedModels.map(m => m.id));
-    // Implement API call logic here using selectedModels
+    // TODO: Implement API call logic here using selectedModels
+    // Needs to handle adding the new prompt/response to activeThreadMessages state
+    // or re-fetching if necessary
   };
 
   const handleNewChat = () => {
     console.log("Starting new chat...");
-    // Implement logic to clear current chat state, generate new threadId etc.
+    setActiveThreadId(null); // Clear active thread selection
+    setSelectedModels([]); // Clear selected models for a new chat
   };
 
 
@@ -222,11 +304,17 @@ function App() {
       userEmail={identifierToPass}
       onLogout={handleLogout}
       chatHistory={chatHistory}
+      activeThreadId={activeThreadId}
+      onNewChat={handleNewChat}
+      onSelectThread={handleSelectThread}
       models={models}
       selectedModels={selectedModels}
       onSelectModel={handleSelectModel}
       onSendMessage={handleSendMessage}
-      onNewChat={handleNewChat}
+      activeMessages={activeThreadMessages}
+      threadLoading={threadLoading}
+      threadError={threadError}
+      isNewChat={activeThreadId === null}
     />
   );
 }
