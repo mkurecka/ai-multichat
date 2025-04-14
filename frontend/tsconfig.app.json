@@ -9,10 +9,12 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    // Comment out allowImportingTsExtensions as it conflicts with noEmit: false
+    // "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
-    "noEmit": true,
+    "noEmit": false,
+    "noEmitOnError": false,
     "jsx": "react-jsx",
 
     /* Linting */

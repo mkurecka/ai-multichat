@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Select, { MultiValue } from 'react-select'; // Import react-select
 import './ChatArea.css'; // We'll create this for styling
 import { Model, MessageGroup } from '../services/api'; // Import the Model type and MessageGroup type
@@ -34,8 +34,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isNewChat
 }) => {
 
+  // Ref for the scrollable message area
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   // Placeholder state for message input
   const [messageInput, setMessageInput] = React.useState('');
+
+  // Function to scroll to the bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollTo({ top: messagesEndRef.current.scrollHeight, behavior: 'smooth' });
+  };
+
+  // Effect to scroll down when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const handleSend = () => {
     if (messageInput.trim()) {
@@ -68,9 +81,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }));
 
   return (
-    <div className="chat-area">
+    <div className="chat-area flex flex-col h-full">
       {/* Model Selection Bar */}
-      <div className="model-selection-bar">
+      <div className="model-selection-bar flex-shrink-0">
         <div className="available-models-section">
             <h3>Available Models</h3>
             {/* Replace input/button with react-select */}
@@ -104,7 +117,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Message Display Area */}
-      <div className="message-display-area">
+      <div ref={messagesEndRef} className="message-display-area flex-grow overflow-y-auto p-4 space-y-4">
         {/* Loading State */} 
         {isLoading && (
           <div className="loading-placeholder">Loading messages...</div>
@@ -162,9 +175,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Message Input Area */}
-      <div className="message-input-area">
+      <div className="message-input-area mt-auto flex-shrink-0 p-4 border-t border-gray-200">
          {selectedCount === 0 && (
-            <div className="select-model-warning">
+            <div className="select-model-warning text-red-600 mb-2">
                 &#x26A0; Select at least one model to start chatting
             </div>
          )}
@@ -179,7 +192,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         />
         <button
             onClick={handleSend}
-            className="send-button"
+            className="send-button bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
             disabled={selectedCount === 0 || !messageInput.trim() || isLoading} // Disable if no model or no text or if loading
         >
           Send
