@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { AxiosRequestConfig } from 'axios';
 
 // Remove mock data imports as they are no longer used
 // import mockChatHistory from '../mocks/data/chatHistory.json';
@@ -36,7 +37,7 @@ interface ResponseDetail {
   error?: string | null;
 }
 
-interface MessageGroup {
+export interface MessageGroup {
   prompt: string;
   responses: { [modelId: string]: ResponseDetail };
   createdAt: string;
@@ -63,8 +64,8 @@ interface PromptTemplateMessage {
 }
 
 export interface PromptTemplate {
-    id: number;
-    name: string;
+    id: number; // Use number based on existing functions
+    name: string; // Assuming 'name' based on mock data? Or should this be 'title'? Check backend.
     description?: string;
     scope: 'private' | 'organization';
     associatedModel: Model | { id: string }; // Allow sending just ID for create/update
@@ -77,10 +78,11 @@ export interface PromptTemplate {
 
 export interface ChatRequest {
     userInput: string;
-    templateId: number;
+    templateId?: number; // Make optional if it can be omitted
     promptId: string; // Frontend generated unique ID
     threadId?: string | null;
     stream?: boolean;
+    models?: string[]; // Add optional models array
 }
 
 export interface ChatResponse {
@@ -172,8 +174,8 @@ export const sendChatMessage = async (data: ChatRequest): Promise<ChatResponse> 
     // Streaming would involve using fetch with appropriate headers and handling text/event-stream
 };
 
-export const getPromptTemplates = async (): Promise<PromptTemplate[]> => {
-    console.log('Fetching prompt templates from API: /prompt-templates');
+export const getAllPromptTemplates = async (): Promise<PromptTemplate[]> => {
+    console.log('Fetching all prompt templates from API: /prompt-templates');
     const response = await apiClient.get<PromptTemplate[]>('/prompt-templates');
     return response.data;
 };
@@ -278,20 +280,20 @@ export const handleGoogleCallback = async (code: string, redirectUri: string): P
 // }
 
 export const createPromptTemplate = async (templateData: Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel: { id: string } }): Promise<PromptTemplate> => {
-    console.log('Creating prompt template via API: POST /prompt-templates');
+    console.log('Creating prompt template via API: POST /prompt-templates', templateData);
     const response = await apiClient.post<PromptTemplate>('/prompt-templates', templateData);
     return response.data;
 };
 
 export const getPromptTemplate = async (id: number): Promise<PromptTemplate> => {
-    console.log(`Fetching prompt template from API: GET /prompt-templates/${id}`);
+    console.log(`Fetching prompt template by ID from API: /prompt-templates/${id}`);
     const response = await apiClient.get<PromptTemplate>(`/prompt-templates/${id}`);
     return response.data;
 };
 
 export const updatePromptTemplate = async (id: number, templateData: Partial<Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel?: { id: string } }>): Promise<PromptTemplate> => {
-    console.log(`Updating prompt template via API: PATCH /prompt-templates/${id}`);
-    const response = await apiClient.patch<PromptTemplate>(`/prompt-templates/${id}`, templateData);
+    console.log(`Updating prompt template via API: PUT /prompt-templates/${id}`, templateData);
+    const response = await apiClient.put<PromptTemplate>(`/prompt-templates/${id}`, templateData);
     return response.data;
 };
 

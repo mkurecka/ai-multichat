@@ -1,17 +1,23 @@
+import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, MessageGroup, sendChatMessage } from './services/api';
+import { getModels, Model, getAuthToken, logoutUser, handleGoogleCallback, API_BASE_URL, getChatHistory, ChatThread, getThreadHistory, ThreadHistoryResponse, sendChatMessage } from './services/api';
 import Layout from './components/Layout';
 import './App.css';
 import axios from 'axios';
 import { MultiValue } from 'react-select';
 import { v4 as uuidv4 } from 'uuid';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
+import ChatPage from './components/pages/ChatPage';
+import PromptTemplatePage from './components/pages/PromptTemplatePage';
+import LoginPage from './components/pages/LoginPage';
 
 // --- Google Auth Config ---
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const REDIRECT_URI = window.location.origin + window.location.pathname;
+const REDIRECT_URI_BASE = window.location.origin; // Base URI without path
 
-interface JwtPayload {
+// Export the interface
+export interface JwtPayload {
   username?: string;
   email?: string;
   sub?: string;
@@ -38,25 +44,34 @@ interface ModelOptionType {
   model: Model;
 }
 
+// --- Protected Route Component --- 
+const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const token = getAuthToken();
+  const location = useLocation();
+
+  if (!token) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  // TODO: Add token expiration check here
+  return children;
+};
+
 function App() {
-  const [models, setModels] = useState<Model[]>([]); // Keep models state
-  const [selectedModels, setSelectedModels] = useState<Model[]>([]); // State for selected models
-  const [loading, setLoading] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(false);
   const [isAuthCheckComplete, setIsAuthCheckComplete] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<JwtPayload | null>(null);
-  // const [currentView, setCurrentView] = useState<'models' | 'chats' | 'settings'>('chats'); // Removed: Using persistent chat layout
-  const [chatHistory, setChatHistory] = useState<ChatThread[]>([]); // Keep chat history state
+  const [error, setError] = useState<string | null>(null);
 
-  // --- NEW State for Active Thread ---
+  // --- Add Back Chat History / Active Thread State ---
+  const [chatHistory, setChatHistory] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [activeThreadMessages, setActiveThreadMessages] = useState<MessageGroup[]>([]);
-  const [threadLoading, setThreadLoading] = useState<boolean>(false);
-  const [threadError, setThreadError] = useState<string | null>(null);
+  // Keep models state here if needed globally or by multiple pages via props/context
+  const [models, setModels] = useState<Model[]>([]); 
+  const [loading, setLoading] = useState<boolean>(false); // Restore global loading potentially
 
-  const [sendingMessage, setSendingMessage] = useState<boolean>(false);
+  const OAUTH_CALLBACK_PATH = '/auth/google/callback';
+  const calculatedRedirectUri = window.location.origin + OAUTH_CALLBACK_PATH;
 
   const processToken = useCallback((token: string | null) => {
     if (token) {
@@ -65,6 +80,7 @@ function App() {
         setUserInfo(decoded);
         setAuthToken(token);
         console.log("Decoded JWT:", decoded);
+        localStorage.setItem('authToken', token);
       } catch (e) {
         console.error("Failed to decode JWT:", e);
         setUserInfo(null);
@@ -74,76 +90,33 @@ function App() {
     } else {
       setUserInfo(null);
       setAuthToken(null);
+      localStorage.removeItem('authToken');
     }
   }, []);
-
-  useEffect(() => {
-    const storedToken = getAuthToken();
-    processToken(storedToken);
-    setIsAuthCheckComplete(true);
-  }, [processToken]);
 
   const handleLogout = useCallback(() => {
     logoutUser();
     processToken(null);
-    window.history.replaceState({}, document.title, window.location.pathname);
-    setModels([]);
-    setSelectedModels([]); // Clear selected models on logout
-    setChatHistory([]);
     setError(null);
-    // Reset active thread state on logout
+    // Clear chat state on logout
+    setChatHistory([]);
     setActiveThreadId(null);
-    setActiveThreadMessages([]);
-    setThreadLoading(false);
-    setThreadError(null);
-    setSendingMessage(false);
-    // setCurrentView('chats'); // Removed
+    setModels([]); 
   }, [processToken]);
 
-  // Fetch ALL necessary initial data once authenticated
-  const fetchInitialData = useCallback(async () => {
-    const currentToken = getAuthToken();
-    if (!currentToken || loading) return; // Don't fetch if no token or already loading
-
-    setLoading(true);
-    setError(null);
-    try {
-      // Fetch models and history in parallel
-      const [fetchedModels, fetchedHistory] = await Promise.all([
-        getModels(),
-        getChatHistory(),
-      ]);
-      setModels(fetchedModels);
-      setChatHistory(fetchedHistory);
-      console.log("Initial data fetched:", { fetchedModels, fetchedHistory });
-    } catch (err) {
-      console.error("Failed to fetch initial data:", err);
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        setError("Session expired. Please log in again.");
-        handleLogout(); // Force logout
-      } else {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching data');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [handleLogout, loading]); // Added loading to dependencies
-
-  // Effect to handle Google callback
-  useEffect(() => {
+  const handleGoogleLoginCallback = useCallback(async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
 
     if (code && !authToken && !authLoading) {
       setAuthLoading(true);
       setError(null);
-      handleGoogleCallback(code, REDIRECT_URI)
+      handleGoogleCallback(code, calculatedRedirectUri)
         .then(receivedToken => {
           processToken(receivedToken);
           if (!receivedToken) {
             setError("Login failed: No token received after Google callback.");
           }
-          // No need to fetch here, the other effect will handle it when authToken updates
           window.history.replaceState({}, document.title, window.location.pathname);
         })
         .catch(err => {
@@ -156,239 +129,99 @@ function App() {
           setAuthLoading(false);
         });
     }
-  }, [authToken, authLoading, processToken]); // Dependencies for callback handling
+  }, [authToken, authLoading, processToken, calculatedRedirectUri]);
 
-  // Effect to fetch initial data when authenticated
-  useEffect(() => {
-    if (authToken && !authLoading && models.length === 0 && chatHistory.length === 0) {
-      console.log("Effect: Auth token present, fetching initial data...");
-      fetchInitialData();
-    }
-  }, [authToken, authLoading, fetchInitialData, models.length, chatHistory.length]); // Dependencies for data fetching
+  const GoogleCallbackHandler = () => {
+    useEffect(() => {
+      handleGoogleLoginCallback();
+    }, [handleGoogleLoginCallback]);
+    return <div>Processing login...</div>;
+  };
 
-  // --- NEW Handler for Selecting a Thread ---
+  // --- Add Back Handlers for Sidebar --- 
   const handleSelectThread = useCallback((threadId: string) => {
-    console.log("Selecting thread:", threadId);
-    if (threadId === activeThreadId) return; // Do nothing if already active
-
+    console.log("App: Selecting thread:", threadId);
+    if (threadId === activeThreadId) return;
     setActiveThreadId(threadId);
-    setActiveThreadMessages([]); // Clear previous messages
-    setThreadError(null); // Clear previous errors
-    setThreadLoading(true); // Set loading state for this thread
-  }, [activeThreadId]); // Depend on activeThreadId to prevent re-fetching same thread
+    // ChatPage will fetch messages based on this ID change (via context/prop)
+  }, [activeThreadId]);
 
-  // --- NEW Effect to Fetch Active Thread History ---
+  const handleNewChat = useCallback(() => {
+    console.log("App: Starting new chat...");
+    setActiveThreadId(null); 
+    // ChatPage will clear its state based on null activeThreadId
+  }, []);
+
+  // --- Restore Initial Data Fetching (Models & History) ---
+   const fetchInitialData = useCallback(async () => {
+     const currentToken = getAuthToken();
+     if (!currentToken || loading) return;
+     console.log("App: Fetching initial models and history...");
+     setLoading(true);
+     setError(null);
+     try {
+       const [fetchedModels, fetchedHistory] = await Promise.all([
+         getModels(),
+         getChatHistory(),
+       ]);
+       setModels(fetchedModels);
+       setChatHistory(fetchedHistory);
+     } catch (err) {
+       console.error("App: Failed to fetch initial data:", err);
+       if (axios.isAxiosError(err) && err.response?.status === 401) {
+         setError("Session expired. Please log in again.");
+         handleLogout();
+       } else {
+         setError(err instanceof Error ? err.message : 'An unknown error occurred fetching initial data');
+       }
+     } finally {
+       setLoading(false);
+     }
+   }, [handleLogout]);
+ 
+   useEffect(() => {
+     if (authToken && !authLoading) {
+       fetchInitialData();
+     }
+   }, [authToken, authLoading, fetchInitialData]);
+
   useEffect(() => {
-    if (!activeThreadId || !authToken) {
-      if (activeThreadId === null) {
-         setActiveThreadMessages([]);
-         setThreadLoading(false);
-         setThreadError(null);
-         // Don't clear selected models here, allow user to keep them for new chat
-      }
-      return;
-    }
+    const storedToken = getAuthToken();
+    processToken(storedToken);
+    setIsAuthCheckComplete(true);
+  }, [processToken]);
 
-    let isMounted = true;
-    const fetchThread = async () => {
-      console.log(`Fetching history for thread: ${activeThreadId}`);
-      setThreadLoading(true);
-      setThreadError(null);
-      try {
-        const response = await getThreadHistory(activeThreadId);
-        if (isMounted) {
-          setActiveThreadMessages(response.messages);
-
-          // --- Pre-select models used in this thread --- 
-          const modelIdsInThread = new Set<string>();
-          response.messages.forEach(group => {
-              Object.keys(group.responses).forEach(modelId => {
-                  modelIdsInThread.add(modelId);
-              });
-          });
-          
-          const modelsToSelect = models.filter(model => modelIdsInThread.has(model.id));
-          setSelectedModels(modelsToSelect);
-          console.log("Pre-selected models for thread:", modelsToSelect.map(m => m.id));
-          // --------------------------------------------- 
-        }
-      } catch (err) {
-        console.error(`Failed to fetch history for thread ${activeThreadId}:`, err);
-        if (isMounted) {
-           if (axios.isAxiosError(err) && err.response?.status === 401) {
-               setThreadError("Session expired. Please log in again.");
-               handleLogout(); // Force logout if unauthorized
-           } else {
-               setThreadError(err instanceof Error ? err.message : 'Failed to load chat messages.');
-           }
-           setSelectedModels([]); // Clear selected models on error loading thread
-        }
-      } finally {
-        if (isMounted) {
-          setThreadLoading(false);
-        }
-      }
-    };
-
-    fetchThread();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeThreadId, authToken, handleLogout, models]);
-
-  const handleGoogleLoginClick = () => {
-    if (!GOOGLE_CLIENT_ID) {
-      setError("Google Client ID is not configured in .env file (VITE_GOOGLE_CLIENT_ID).");
-      return;
-    }
-    const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: 'code',
-      scope: 'email profile openid',
-    });
-    window.location.href = `${googleAuthUrl}?${params.toString()}`;
-  };
-
-  // --- Update handleSelectModel --- 
-  const handleSelectModel = (selectedOptions: MultiValue<ModelOptionType>) => {
-    console.log("Selected Options:", selectedOptions);
-    const limitedSelection = selectedOptions.slice(0, 16);
-    const newSelectedModels = limitedSelection.map(option => option.model);
-    setSelectedModels(newSelectedModels);
-  };
-
-  // --- Update handleSendMessage ---
-  const handleSendMessage = useCallback(async (message: string) => {
-    if (selectedModels.length === 0 || sendingMessage) return;
-
-    const userInput = message.trim();
-    if (!userInput) return;
-
-    // --- Configuration ---
-    const currentThreadId = activeThreadId;
-    const promptId = uuidv4();
-    const selectedModelIds = selectedModels.map(m => m.id); // <<< --- Get selected model IDs
-
-    console.log(`Sending message: "${userInput}" (PromptID: ${promptId}) to models:`, selectedModelIds, `Thread: ${currentThreadId || '(New)'}`);
-
-    // --- Optimistic UI Update ---
-    const optimisticUserMessageGroup: MessageGroup = {
-      prompt: userInput,
-      responses: {},
-      createdAt: new Date().toISOString(),
-      promptId: promptId
-    };
-    setActiveThreadMessages(prev => [...prev, optimisticUserMessageGroup]);
-    setSendingMessage(true);
-    setThreadError(null);
-
-    // --- Prepare API Request (Add models field) --- 
-    const requestData = {
-        userInput: userInput,
-        templateId: null,
-        promptId: promptId,
-        threadId: currentThreadId,
-        models: selectedModelIds // <<< --- Add the array of model IDs
-        // stream: false 
-    };
-
-    // Type assertion for clarity (optional, but good practice)
-    const typedRequestData: ChatRequest = requestData;
-
-    try {
-      // --- Call API --- 
-      const response = await sendChatMessage(typedRequestData);
-
-      // --- Update State with API Response --- 
-      setActiveThreadMessages(prev => {
-        return prev.map(group => {
-           if (group.promptId === promptId) {
-               return { ...group, responses: response.responses };
-           }
-           return group;
-        });
-      });
-
-      if (!currentThreadId && response.threadId) {
-        setActiveThreadId(response.threadId);
-        // TODO: Update chatHistory list
-        console.log(`New thread created with ID: ${response.threadId}`);
-      }
-
-    } catch (err) {
-      console.error('Failed to send chat message:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Failed to send message. Please try again.';
-      setThreadError(errorMsg);
-      setActiveThreadMessages(prev => prev.filter(group => group.promptId !== promptId));
-
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        handleLogout();
-      }
-    } finally {
-      setSendingMessage(false);
-    }
-  }, [activeThreadId, selectedModels, sendingMessage, handleLogout]);
-
-  // --- Existing handleNewChat ---
-  const handleNewChat = () => {
-    console.log("Starting new chat...");
-    setActiveThreadId(null); // Clear active thread selection
-    setSelectedModels([]); // Clear selected models for a new chat
-    setActiveThreadMessages([]); // Clear messages
-    setThreadError(null); // Clear errors
-    setSendingMessage(false); // Ensure sending state is reset
-  };
-
-
-  // --- Render Logic ---
   if (!isAuthCheckComplete) {
-    return <div style={{ textAlign: 'center', marginTop: '50px' }}>Checking authentication...</div>;
-  }
-
-  if (!authToken) {
-    return (
-      <div style={{ textAlign: 'center', marginTop: '50px' }}>
-        <h1>AI Multichat Login</h1>
-        {authLoading && <p>Authenticating with Google...</p>}
-        {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-        {!authLoading && (
-          <button onClick={handleGoogleLoginClick} disabled={!GOOGLE_CLIENT_ID}>
-            Login with Google
-          </button>
-        )}
-        {!GOOGLE_CLIENT_ID && <p style={{ color: 'orange', marginTop: '10px' }}>Google Client ID not configured.</p>}
-      </div>
-    );
-  }
-
-  // Now Render the Layout with the new structure
-  const identifierToPass = userInfo?.email || userInfo?.username || userInfo?.sub || null;
-
-  // Show loading overlay if loading initial data
-  if (loading && models.length === 0 && chatHistory.length === 0) {
-    return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading initial data...</div>;
+    return <div>Loading Authentication...</div>;
   }
 
   return (
-    <Layout
-      userEmail={identifierToPass}
-      onLogout={handleLogout}
-      chatHistory={chatHistory}
-      activeThreadId={activeThreadId}
-      onNewChat={handleNewChat}
-      onSelectThread={handleSelectThread}
-      models={models}
-      selectedModels={selectedModels}
-      onSelectModel={handleSelectModel}
-      onSendMessage={handleSendMessage}
-      activeMessages={activeThreadMessages}
-      threadLoading={threadLoading || sendingMessage}
-      threadError={threadError}
-      isNewChat={activeThreadId === null}
-    />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage googleClientId={GOOGLE_CLIENT_ID} redirectUri={calculatedRedirectUri} />} />
+        <Route path={OAUTH_CALLBACK_PATH} element={<GoogleCallbackHandler />} />
+        <Route 
+          path="/" 
+          element={
+            <ProtectedRoute>
+              <Layout 
+                userEmail={userInfo?.email || null} 
+                onLogout={handleLogout}
+                chatHistory={chatHistory}
+                activeThreadId={activeThreadId}
+                onNewChat={handleNewChat}
+                onSelectThread={handleSelectThread}
+              >
+              </Layout>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<ChatPage models={models} activeThreadId={activeThreadId} />} />
+          <Route path="templates" element={<PromptTemplatePage models={models} />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
