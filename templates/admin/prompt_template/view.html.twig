@@ -10,7 +10,11 @@
                 <a href="{{ path('admin_prompt_template_index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Back to List
                 </a>
-                
+
+                <a href="{{ path('admin_prompt_template_edit', {'id': template.id}) }}" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                    Edit Template
+                </a>
+
                 {% include 'admin/components/_action_button.html.twig' with {
                     label: 'Delete Template',
                     action_url: path('admin_prompt_template_delete', {'id': template.id}),
@@ -20,10 +24,10 @@
                 } %}
             </div>
         </div>
-        
+
         {# Include flash messages component #}
         {% include 'admin/components/_flash_messages.html.twig' %}
-        
+
         <div class="bg-white shadow-md rounded-lg overflow-hidden p-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -51,7 +55,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div>
                     <h2 class="text-xl font-semibold mb-4">Relationships</h2>
                     <div class="space-y-4">
@@ -79,10 +83,10 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="bg-white shadow-md rounded-lg overflow-hidden p-6">
             <h2 class="text-xl font-semibold mb-4">Messages</h2>
-            
+
             {% if template.messages|length > 0 %}
                 <div class="space-y-4">
                     {% for message in template.messages %}

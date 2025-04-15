@@ -33,7 +33,7 @@ class OpenRouterService
         'mistral/mistral-medium' => 32000,
         'mistral/mistral-small' => 32000,
     ];
-    
+
     // Default token limit if model not found in the map
     private const DEFAULT_TOKEN_LIMIT = 4096;
     */
@@ -44,7 +44,7 @@ class OpenRouterService
         $logMessage = "[{$timestamp}] {$message}\n";
         file_put_contents(self::LOG_FILE, $logMessage, FILE_APPEND);
     }
-    
+
     public function __construct(
         private readonly HttpClientInterface $client,
         private readonly string $apiKey,
@@ -56,7 +56,7 @@ class OpenRouterService
     ) {
         $this->log('OpenRouterService initialized with API key: ' . substr($this->apiKey, 0, 4) . '...');
     }
-    
+
     /**
      * Get models from OpenRouter API
      */
@@ -64,17 +64,44 @@ class OpenRouterService
     {
         try {
             $response = $this->client->request('GET', self::API_URL . '/models');
-            
+
             if ($response->getStatusCode() !== 200) {
                 throw new HttpException($response->getStatusCode(), 'Failed to fetch models from OpenRouter');
             }
-            
+
             $data = $response->toArray();
             $this->log('OpenRouter API Response: ' . json_encode($data));
             return $data['data'] ?? [];
         } catch (\Exception $e) {
             $this->log('OpenRouter API Error: ' . $e->getMessage());
             throw new HttpException(500, 'Failed to fetch models: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get account credit balance from OpenRouter API
+     */
+    public function getAccountCredit(): float
+    {
+        try {
+            $response = $this->client->request('GET', self::API_URL . '/credits', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->apiKey,
+                    'X-Title' => 'AI MultiChat'
+                ]
+            ]);
+
+            if ($response->getStatusCode() !== 200) {
+                $this->log('Error fetching account credit. Status: ' . $response->getStatusCode() . ' Response: ' . $response->getContent(false));
+                throw new HttpException($response->getStatusCode(), 'Failed to fetch account credit from OpenRouter');
+            }
+
+            $data = $response->toArray();
+            $this->log('OpenRouter API Credit Response: ' . json_encode($data));
+            return $data['data']['total_credits'] - $data['data']['total_usage'] ?? 0.0;
+        } catch (\Exception $e) {
+            $this->log('OpenRouter API Error in getAccountCredit: ' . $e->getMessage());
+            return 0.0; // Return 0 instead of throwing exception to avoid breaking the dashboard
         }
     }
 
@@ -106,7 +133,7 @@ class OpenRouterService
             throw new HttpException(500, 'Failed to fetch generation data: ' . $e->getMessage());
         }
     }
-    
+
     private function processResponse(array $data, string $model, ?Thread $thread, bool $stream): array
     {
         $content = '';
@@ -138,7 +165,7 @@ class OpenRouterService
             'data' => $data
         ];
     }
-    
+
     /**
      * Generate response using a PromptTemplate (or basic history if template is null).
      *
@@ -206,9 +233,9 @@ class OpenRouterService
                 if ($stream && $modelEntity) {
                     $shouldStream = $modelEntity->isSupportsStreaming();
                 }
-                
+
                 $this->log('Streaming for model ' . $model . ': ' . ($shouldStream ? 'enabled' : 'disabled'));
-                
+
                 $response = $this->client->request('POST', self::API_URL . '/chat/completions', [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $this->apiKey,
@@ -222,7 +249,7 @@ class OpenRouterService
                         'stream' => $shouldStream
                     ]
                 ]);
-                
+
                 if ($shouldStream) {
                     $responses[$model] = [
                         'stream' => $response->toStream(),
@@ -250,10 +277,10 @@ class OpenRouterService
                 ];
             }
         }
-        
+
         return $responses;
     }
-    
+
     /**
      * Stream response using a PromptTemplate (or basic history if template is null).
      * Note: This will only stream for models that support streaming (supportsStreaming = true)
