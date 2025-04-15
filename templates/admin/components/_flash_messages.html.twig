@@ -1,0 +1,26 @@
+{#
+    Flash Messages Component
+    
+    Displays all flash messages from the session.
+    No parameters required.
+#}
+
+{% for label, messages in app.flashes %}
+    {% for message in messages %}
+        {% set alert_class = {
+            'success': 'bg-green-100 border-green-400 text-green-700',
+            'error': 'bg-red-100 border-red-400 text-red-700',
+            'warning': 'bg-yellow-100 border-yellow-400 text-yellow-700',
+            'info': 'bg-blue-100 border-blue-400 text-blue-700'
+        } %}
+        
+        {% set type = label in alert_class|keys ? label : 'info' %}
+        
+        <div class="{{ alert_class[type] }} px-4 py-3 rounded mb-4" role="alert">
+            <span class="block sm:inline">{{ message }}</span>
+            <button type="button" class="float-right" onclick="this.parentElement.style.display='none'">
+                <span class="text-{{ type|replace({'success': 'green', 'error': 'red', 'warning': 'yellow', 'info': 'blue'}) }}-500">&times;</span>
+            </button>
+        </div>
+    {% endfor %}
+{% endfor %}

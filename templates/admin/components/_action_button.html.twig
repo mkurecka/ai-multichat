@@ -1,0 +1,56 @@
+{#
+    Action Button Component
+    
+    Parameters:
+    - label: Button text (required)
+    - action_url: URL to submit the form to (required)
+    - csrf_token: CSRF token for form protection (required)
+    - method: HTTP method (optional, default: post)
+    - color: Button color (optional, default: blue)
+    - size: Button size (small, medium, large) (optional, default: medium)
+    - icon: Icon name (optional)
+    - confirm: Confirmation message (optional)
+    - extra_inputs: Array of additional form inputs (optional)
+#}
+
+{% set color_class = {
+    'blue': 'text-blue-600 hover:text-blue-900 hover:bg-blue-50',
+    'green': 'text-green-600 hover:text-green-900 hover:bg-green-50',
+    'red': 'text-red-600 hover:text-red-900 hover:bg-red-50',
+    'yellow': 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50',
+    'gray': 'text-gray-600 hover:text-gray-900 hover:bg-gray-50',
+    'indigo': 'text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50'
+} %}
+
+{% set size_class = {
+    'small': 'px-2 py-1 text-xs',
+    'medium': 'px-3 py-2 text-sm',
+    'large': 'px-4 py-2 text-base'
+} %}
+
+{% set method = method|default('post') %}
+{% set color = color|default('blue') %}
+{% set size = size|default('medium') %}
+
+<form method="{{ method|lower == 'get' ? 'get' : 'post' }}" action="{{ action_url }}" class="inline-block" {% if confirm is defined %}onsubmit="return confirm('{{ confirm }}')"{% endif %}>
+    {% if method|lower != 'get' and method|lower != 'post' %}
+        <input type="hidden" name="_method" value="{{ method|upper }}">
+    {% endif %}
+    
+    {% if csrf_token is defined and csrf_token is not empty %}
+        <input type="hidden" name="token" value="{{ csrf_token }}">
+    {% endif %}
+    
+    {% if extra_inputs is defined and extra_inputs is iterable %}
+        {% for name, value in extra_inputs %}
+            <input type="hidden" name="{{ name }}" value="{{ value }}">
+        {% endfor %}
+    {% endif %}
+    
+    <button type="submit" class="rounded {{ size_class[size] }} {{ color_class[color] }} transition-colors duration-200">
+        {% if icon is defined %}
+            <i class="fas fa-{{ icon }} mr-1"></i>
+        {% endif %}
+        {{ label }}
+    </button>
+</form>

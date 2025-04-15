@@ -5,7 +5,10 @@
 {% block body %}
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-2xl font-bold mb-6">Models</h1>
-        
+
+        {# Include flash messages component #}
+        {% include 'admin/components/_flash_messages.html.twig' %}
+
         <div class="bg-white shadow-md rounded-lg overflow-hidden">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -41,43 +44,38 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="form-check form-switch"
-                                     data-controller="model-toggle"
-                                     data-model-toggle-url-value="{{ path('admin_models_toggle_enabled') }}"
-                                     data-model-toggle-model-id-value="{{ model.id }}"
-                                     data-model-toggle-property-value="enabled">
-                                    <input class="form-check-input w-11 h-6 rounded-full appearance-none cursor-pointer bg-gray-300 checked:bg-blue-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" 
-                                           type="checkbox" 
-                                           role="switch"
-                                           data-model-toggle-target="toggle"
-                                           data-action="change->model-toggle#toggle"
-                                           {{ model.enabled ? 'checked' : '' }}>
-                                </div>
+                                {# Include toggle switch component for enabled status #}
+                                {% include 'admin/components/_toggle_switch.html.twig' with {
+                                    id: 'enabled-' ~ model.id,
+                                    property: 'enabled',
+                                    value: model.enabled,
+                                    action_url: path('admin_models_update', {'id': model.id}),
+                                    csrf_token: csrf_token('update-model-' ~ model.id),
+                                    color: 'blue'
+                                } %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="form-check form-switch"
-                                     data-controller="model-toggle"
-                                     data-model-toggle-url-value="{{ path('admin_models_toggle_streaming') }}"
-                                     data-model-toggle-model-id-value="{{ model.id }}"
-                                     data-model-toggle-property-value="streaming">
-                                    <input class="form-check-input w-11 h-6 rounded-full appearance-none cursor-pointer bg-gray-300 checked:bg-blue-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" 
-                                           type="checkbox" 
-                                           role="switch"
-                                           data-model-toggle-target="toggle"
-                                           data-action="change->model-toggle#toggle"
-                                           {{ model.supportsStreaming ? 'checked' : '' }}>
-                                </div>
+                                {# Include toggle switch component for streaming status #}
+                                {% include 'admin/components/_toggle_switch.html.twig' with {
+                                    id: 'streaming-' ~ model.id,
+                                    property: 'supportsStreaming',
+                                    value: model.supportsStreaming,
+                                    action_url: path('admin_models_update', {'id': model.id}),
+                                    csrf_token: csrf_token('update-model-' ~ model.id),
+                                    color: 'green'
+                                } %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                    data-controller="model-toggle"
-                                    data-model-toggle-model-id-value="{{ model.id }}"
-                                    data-model-toggle-enabled-value="{{ model.enabled ? '1' : '0' }}"
-                                    data-action="click->model-toggle#toggleEnabled"
-                                    class="text-{{ model.enabled ? 'red' : 'green' }}-600 hover:text-{{ model.enabled ? 'red' : 'green' }}-900"
-                                >
-                                    {{ model.enabled ? 'Disable' : 'Enable' }}
-                                </button>
+                                {% include 'admin/components/_action_button.html.twig' with {
+                                    label: model.enabled ? 'Disable' : 'Enable',
+                                    action_url: path('admin_models_update', {'id': model.id}),
+                                    csrf_token: csrf_token('update-model-' ~ model.id),
+                                    color: model.enabled ? 'red' : 'green',
+                                    extra_inputs: {
+                                        'property': 'enabled',
+                                        'value': model.enabled ? '0' : '1'
+                                    }
+                                } %}
                             </td>
                         </tr>
                     {% endfor %}
@@ -85,4 +83,4 @@
             </table>
         </div>
     </div>
-{% endblock %} 
+{% endblock %}

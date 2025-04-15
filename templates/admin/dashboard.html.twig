@@ -31,17 +31,21 @@
                             {% for userId, stats in usageStats %}
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">{{ stats.user.email }}</div>
+                                        <div class="text-sm font-medium text-gray-900">
+                                            <a href="{{ path('admin_user_detail', {'id': stats.user.id}) }}" class="text-blue-600 hover:text-blue-800 hover:underline">
+                                                {{ stats.user.email }}
+                                            </a>
+                                        </div>
                                         <div class="text-sm text-gray-500">ID: {{ stats.user.id }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">{{ stats.totalPrompts }}</div>
+                                        <div class="text-sm text-gray-900">{{ stats.totalPrompts|number_format }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">{{ stats.totalTokens }}</div>
+                                        <div class="text-sm text-gray-900">{{ stats.totalTokens|number_format }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900">{{ stats.totalCost }}</div>
+                                        <div class="text-sm text-gray-900">${{ stats.totalCost|number_format(4) }}</div>
                                     </td>
                                 </tr>
                             {% else %}
@@ -57,4 +61,4 @@
             </div>
         </div>
     </div>
-{% endblock %} 
+{% endblock %}

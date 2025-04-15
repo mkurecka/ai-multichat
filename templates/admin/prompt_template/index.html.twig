@@ -1,0 +1,100 @@
+{% extends 'base_admin.html.twig' %}
+
+{% block title %}Prompt Templates Admin{% endblock %}
+
+{% block body %}
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Prompt Templates</h1>
+            <div class="flex space-x-4">
+                <a href="{{ path('admin_prompt_template_stats') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    View Statistics
+                </a>
+            </div>
+        </div>
+        
+        {# Include flash messages component #}
+        {% include 'admin/components/_flash_messages.html.twig' %}
+        
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scope</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for template in templates %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ template.id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ template.name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-normal text-sm text-gray-500">
+                                {{ template.description|default('N/A')|u.truncate(50, '...') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {% include 'admin/components/_toggle_switch.html.twig' with {
+                                    id: 'scope-' ~ template.id,
+                                    property: 'scope',
+                                    value: template.scope == 'organization',
+                                    action_url: path('admin_prompt_template_toggle_status', {'id': template.id}),
+                                    csrf_token: csrf_token('toggle-template-' ~ template.id),
+                                    color: template.scope == 'organization' ? 'green' : 'blue',
+                                    label: template.scope|capitalize
+                                } %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ template.associatedModel.name|default('N/A') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ template.owner.email|default('N/A') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ template.organization.domain|default('N/A') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ template.createdAt|date('Y-m-d H:i') }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    {% include 'admin/components/_action_button.html.twig' with {
+                                        label: 'View',
+                                        action_url: path('admin_prompt_template_view', {'id': template.id}),
+                                        color: 'blue',
+                                        size: 'small'
+                                    } %}
+                                    
+                                    {% include 'admin/components/_action_button.html.twig' with {
+                                        label: 'Delete',
+                                        action_url: path('admin_prompt_template_delete', {'id': template.id}),
+                                        csrf_token: csrf_token('delete-template-' ~ template.id),
+                                        color: 'red',
+                                        size: 'small',
+                                        confirm: 'Are you sure you want to delete this template?'
+                                    } %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                No prompt templates found.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

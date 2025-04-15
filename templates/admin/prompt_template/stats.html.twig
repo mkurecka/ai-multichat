@@ -1,0 +1,110 @@
+{% extends 'base_admin.html.twig' %}
+
+{% block title %}Prompt Templates Statistics{% endblock %}
+
+{% block body %}
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Prompt Templates Statistics</h1>
+            <div class="flex space-x-4">
+                <a href="{{ path('admin_prompt_template_index') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Back to List
+                </a>
+            </div>
+        </div>
+        
+        {# Include flash messages component #}
+        {% include 'admin/components/_flash_messages.html.twig' %}
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                <h2 class="text-xl font-semibold mb-4 text-blue-600">Total Templates</h2>
+                <p class="text-4xl font-bold">{{ totalTemplates }}</p>
+            </div>
+            
+            <div class="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                <h2 class="text-xl font-semibold mb-4 text-blue-600">Private Templates</h2>
+                <p class="text-4xl font-bold">{{ privateTemplates }}</p>
+                <p class="text-sm text-gray-500 mt-2">{{ (privateTemplates / totalTemplates * 100)|round(1) }}% of total</p>
+            </div>
+            
+            <div class="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                <h2 class="text-xl font-semibold mb-4 text-green-600">Organization Templates</h2>
+                <p class="text-4xl font-bold">{{ organizationTemplates }}</p>
+                <p class="text-sm text-gray-500 mt-2">{{ (organizationTemplates / totalTemplates * 100)|round(1) }}% of total</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                <h2 class="text-xl font-semibold mb-4">Templates per Organization</h2>
+                
+                {% if templatesPerOrganization|length > 0 %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Templates</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for item in templatesPerOrganization %}
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {{ item.organization.domain|default('N/A') }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {{ item.count }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {{ (item.count / totalTemplates * 100)|round(1) }}%
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-gray-500">No organizations found.</p>
+                {% endif %}
+            </div>
+            
+            <div class="bg-white shadow-md rounded-lg overflow-hidden p-6">
+                <h2 class="text-xl font-semibold mb-4">Templates per Model</h2>
+                
+                {% if templatesPerModel|length > 0 %}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Templates</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for item in templatesPerModel %}
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {{ item.model.name|default('N/A') }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {{ item.count }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {{ (item.count / totalTemplates * 100)|round(1) }}%
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-gray-500">No models found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

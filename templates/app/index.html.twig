@@ -9,7 +9,6 @@
     {# Debug authentication status (can be kept if needed specifically here, or removed if handled globally) #}
     <script>
         console.log('Symfony authentication status:', {{ app.user ? 'true' : 'false' }});
-        console.log('Symfony user:', {{ app.user ? ('"' ~ app.user.email ~ '"') : 'null' }});
     </script>
 
     {# Chat Window Area #}

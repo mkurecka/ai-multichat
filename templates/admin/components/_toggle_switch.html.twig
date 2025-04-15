@@ -1,0 +1,62 @@
+{#
+    Toggle Switch Component
+    
+    Parameters:
+    - id: Unique identifier for the toggle (required)
+    - name: Name attribute for the form field (required)
+    - value: Current value (boolean, required)
+    - action_url: URL to submit the form to (required)
+    - csrf_token: CSRF token for form protection (required)
+    - property: Property name to update (required)
+    - label: Label text (optional)
+    - size: Size of the toggle (small, medium, large) (optional, default: medium)
+    - color: Color of the toggle when active (optional, default: blue)
+#}
+
+{% set size_class = {
+    'small': 'h-4 w-8',
+    'medium': 'h-6 w-11',
+    'large': 'h-7 w-14'
+} %}
+
+{% set dot_size_class = {
+    'small': 'h-3 w-3',
+    'medium': 'h-5 w-5',
+    'large': 'h-6 w-6'
+} %}
+
+{% set dot_translate_class = {
+    'small': 'translate-x-4',
+    'medium': 'translate-x-5',
+    'large': 'translate-x-7'
+} %}
+
+{% set color_class = {
+    'blue': 'bg-blue-600',
+    'green': 'bg-green-600',
+    'red': 'bg-red-600',
+    'purple': 'bg-purple-600',
+    'yellow': 'bg-yellow-500',
+    'indigo': 'bg-indigo-600'
+} %}
+
+{% set size = size|default('medium') %}
+{% set color = color|default('blue') %}
+
+<form method="post" action="{{ action_url }}" class="inline-block">
+    <input type="hidden" name="property" value="{{ property }}">
+    <input type="hidden" name="value" value="{{ value ? '0' : '1' }}">
+    <input type="hidden" name="token" value="{{ csrf_token }}">
+    
+    {% if label is defined %}
+        <label for="toggle-{{ id }}" class="mr-2 text-sm font-medium text-gray-700">{{ label }}</label>
+    {% endif %}
+    
+    <button type="submit" id="toggle-{{ id }}" 
+            class="relative inline-flex {{ size_class[size] }} flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-{{ color|replace({'bg-': ''}) }}-500 focus:ring-offset-2 {{ value ? color_class[color] : '' }}">
+        <span class="sr-only">{{ value ? 'Enabled' : 'Disabled' }}</span>
+        <span aria-hidden="true" 
+              class="pointer-events-none inline-block {{ dot_size_class[size] }} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{ value ? dot_translate_class[size] : 'translate-x-0' }}">
+        </span>
+    </button>
+</form>

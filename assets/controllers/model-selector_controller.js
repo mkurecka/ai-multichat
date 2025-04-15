@@ -81,12 +81,19 @@ export default class extends Controller {
         console.log('Received custom setSelectedModels event:', event.detail);
         const { selectedIds } = event.detail;
 
-        if (!selectedIds || selectedIds.length === 0) {
-            console.log('No models to select from custom event');
+        if (!selectedIds) {
+            console.log('Invalid selectedIds from custom event');
             return;
         }
 
-        // Use the same logic as chatSetSelectedModels
+        // If empty array is received, clear the selection
+        if (selectedIds.length === 0) {
+            console.log('Clearing model selection from custom event');
+            this.clearSelection();
+            return;
+        }
+
+        // Use the same logic as chatSetSelectedModels for non-empty arrays
         this.chatSetSelectedModels({ detail: { selectedIds } });
     }
 
@@ -124,9 +131,16 @@ export default class extends Controller {
     chatSetSelectedModels({ detail: { selectedIds } }) {
         console.log('Received selected IDs from chat controller:', selectedIds);
 
-        // If no models are selected, don't update the selection
-        if (!selectedIds || selectedIds.length === 0) {
-            console.log('No models to select');
+        // If selectedIds is undefined or null, return
+        if (!selectedIds) {
+            console.log('Invalid selectedIds from chat controller');
+            return;
+        }
+
+        // If empty array is received, clear the selection
+        if (selectedIds.length === 0) {
+            console.log('Clearing model selection from chat controller');
+            this.clearSelection();
             return;
         }
 
@@ -222,6 +236,29 @@ export default class extends Controller {
                 this.dropdownTarget.classList.remove('block');
             }
         }
+    }
+
+    // Method to clear all selected models
+    clearSelection() {
+        console.log('Clearing all selected models');
+        this.selectedIdsValue = [];
+
+        // Update the internal 'selected' state of modelsValue
+        this.modelsValue = this.modelsValue.map(model => ({
+            ...model,
+            selected: false
+        }));
+
+        // Force update the selectedIdsValue attribute to ensure it's reflected in the DOM
+        this.element.setAttribute('data-model-selector-selected-ids-value', JSON.stringify([]));
+
+        // Notify parent controller about the selection change
+        if (this.hasChatOutlet) {
+            console.log('Notifying chat controller about cleared model selection');
+            this.chatOutlet.handleModelSelectionChange({ detail: { selectedIds: [] } });
+        }
+
+        this.render(); // Re-render with cleared selections
     }
 
     clickOutside(event) {
