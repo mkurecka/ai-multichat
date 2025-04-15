@@ -863,6 +863,17 @@ export default class extends Controller {
                             usageElement.textContent = '';
                         }
 
+                        // Add copy buttons if they don't exist
+                        if (!placeholderElement.querySelector('.message-actions')) {
+                            const actionsDiv = document.createElement('div');
+                            actionsDiv.classList.add('message-actions', 'flex', 'space-x-2', 'mt-2');
+                            actionsDiv.innerHTML = `
+                                <button class="copy-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="click->chat#copyAsMarkdown" data-original-content="${finalContent}">Kopírovat jako Markdown</button>
+                                <button class="copy-html-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="click->chat#copyAsHtml">Kopírovat jako HTML</button>
+                            `;
+                            placeholderElement.appendChild(actionsDiv);
+                        }
+
                         // Add a class to indicate the response is complete
                         placeholderElement.classList.add('response-complete');
 
@@ -1141,6 +1152,54 @@ export default class extends Controller {
         this.chatWindowMessagesTarget.innerHTML = '';
     }
 
+    // Method to copy content as Markdown
+    copyAsMarkdown(event) {
+        const button = event.currentTarget;
+        const originalContent = button.dataset.originalContent;
+
+        if (originalContent) {
+            navigator.clipboard.writeText(originalContent)
+                .then(() => {
+                    this.showCopyFeedback(button, 'Markdown zkopírován!');
+                })
+                .catch(err => {
+                    console.error('Nepodařilo se zkopírovat text: ', err);
+                    this.showNotification('Nepodařilo se zkopírovat text', 'error');
+                });
+        }
+    }
+
+    // Method to copy content as HTML
+    copyAsHtml(event) {
+        const button = event.currentTarget;
+        const messageElement = button.closest('.message--assistant');
+        const contentElement = messageElement.querySelector('[data-role="content"]');
+
+        if (contentElement) {
+            const htmlContent = contentElement.innerHTML;
+            navigator.clipboard.writeText(htmlContent)
+                .then(() => {
+                    this.showCopyFeedback(button, 'HTML zkopírován!');
+                })
+                .catch(err => {
+                    console.error('Nepodařilo se zkopírovat HTML: ', err);
+                    this.showNotification('Nepodařilo se zkopírovat HTML', 'error');
+                });
+        }
+    }
+
+    // Helper method to show feedback after copying
+    showCopyFeedback(button, message) {
+        const originalText = button.textContent;
+        button.textContent = message;
+        button.classList.add('bg-green-200');
+
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('bg-green-200');
+        }, 2000);
+    }
+
     showNotification(message, type = 'warning', duration = 3000) {
         // Create a notification element
         const notification = document.createElement('div');
@@ -1298,6 +1357,10 @@ export default class extends Controller {
                     <div class="message-header font-semibold text-green-600">${modelName}</div>
                     <div class="message-content assistant-content" data-role="content">${parsedContent}</div>
                     ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
+                    <div class="message-actions flex space-x-2 mt-2">
+                        <button class="copy-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="click->chat#copyAsMarkdown" data-original-content="${message.content || ''}">Kopírovat jako Markdown</button>
+                        <button class="copy-html-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="click->chat#copyAsHtml">Kopírovat jako HTML</button>
+                    </div>
                 `;
             }).catch(error => {
                 console.error('Error loading marked library:', error);
@@ -1306,6 +1369,10 @@ export default class extends Controller {
                     <div class="message-header font-semibold text-green-600">${modelName}</div>
                     <div class="message-content assistant-content" data-role="content">${message.content || ''}</div>
                     ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
+                    <div class="message-actions flex space-x-2 mt-2">
+                        <button class="copy-markdown-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="click->chat#copyAsMarkdown" data-original-content="${message.content || ''}">Kopírovat jako Markdown</button>
+                        <button class="copy-html-btn px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" data-action="click->chat#copyAsHtml">Kopírovat jako HTML</button>
+                    </div>
                 `;
             });
 
