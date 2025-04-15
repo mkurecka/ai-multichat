@@ -16,19 +16,19 @@ class Organization
     #[ORM\Column]
     #[Groups(['organization:read'])]
     private ?int $id = null;
-    
+
     #[ORM\Column(length: 255)]
     #[Groups(['organization:read'])]
     private string $googleId;
-    
+
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['organization:read'])]
     private ?string $domain = null;
-    
+
     #[ORM\Column(type: "integer")]
     #[Groups(['organization:read'])]
     private int $usageCount = 0;
-    
+
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[Groups(['organization:read'])]
     private ?User $user = null;
@@ -57,7 +57,7 @@ class Organization
 
         return $this;
     }
-    
+
     public function getDomain(): ?string
     {
         return $this->domain;
@@ -69,7 +69,27 @@ class Organization
 
         return $this;
     }
-    
+
+    /**
+     * Get the organization's name (derived from domain)
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        // Use domain as the organization name
+        if ($this->domain) {
+            // Extract the domain name without the TLD
+            $parts = explode('.', $this->domain);
+            if (count($parts) >= 2) {
+                return ucfirst($parts[count($parts) - 2]);
+            }
+            return ucfirst($this->domain);
+        }
+
+        return 'Organization';
+    }
+
     public function getUsageCount(): int
     {
         return $this->usageCount;

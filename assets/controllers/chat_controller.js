@@ -15,6 +15,7 @@ import axios from 'axios'; // Import axios directly
 export default class extends Controller {
     static targets = [
         "modelSelectorContainer",
+        "templateSelectorContainer",
         "chatHistoryContainer",
         "chatWindowMessages",
         "chatInputContainer",
@@ -32,12 +33,13 @@ export default class extends Controller {
         currentMessages: Array,
         currentThreadId: String,
         selectedModelIds: Array,
+        selectedTemplateId: Number,
         isAuthenticated: Boolean,
         isLoading: Boolean,
         userEmail: String,
     };
 
-    static outlets = ['chat-history']; // This should match the data-chat-history-outlet attribute in the HTML
+    static outlets = ['chat-history', 'template-selector']; // This should match the data-chat-history-outlet and data-template-selector-outlet attributes in the HTML
 
     api = null; // To hold the configured Axios instance
     isRefreshingToken = false; // Flag to prevent multiple refresh attempts
@@ -114,6 +116,29 @@ export default class extends Controller {
 
         // Dispatch an event to notify the chat-history controller that the outlet is connected
         this.dispatch('outletConnected', { detail: { controller: 'chat' } });
+    }
+
+    // Add modelSelectorOutletConnected callback
+    modelSelectorOutletConnected(outlet) {
+        console.log('CALLBACK: modelSelectorOutletConnected fired.');
+        console.log('Model selector outlet connected:', outlet);
+
+        // If models data was loaded before the outlet connected, update the model selector
+        if (this.modelsValue && this.modelsValue.length > 0) {
+            console.log('Setting models in model selector from outletConnected callback. Models:', this.modelsValue.length);
+            outlet.modelsValue = this.modelsValue;
+            outlet.render(); // Trigger a render in the model selector
+        } else {
+            console.log('No models data available yet when outlet connected');
+
+            // Force a fetch of models
+            this.fetchModels().then(models => {
+                console.log(`Fetched ${models.length} models after outlet connected`);
+                this.modelsValue = models;
+                outlet.modelsValue = models;
+                outlet.render(); // Trigger a render in the model selector
+            });
+        }
     }
 
     // --- Private API Setup & Helpers ---
@@ -546,6 +571,143 @@ export default class extends Controller {
         this.dispatch('modelSelectionUpdated', { detail: { selectedIds: this.selectedModelIdsValue } });
     }
 
+    // Handle template selection from template-selector controller
+    templateSelected({ detail: { templateId, associatedModelId } }) {
+        console.log('Template selected:', templateId, 'with model:', associatedModelId);
+        this.selectedTemplateIdValue = templateId || 0;
+
+        // Store the associated model ID for later use if models aren't loaded yet
+        this._pendingAssociatedModelId = associatedModelId;
+
+        // If the template has an associated model, select it
+        if (associatedModelId) {
+            // Check if models are loaded
+            if (!this.modelsValue || this.modelsValue.length === 0) {
+                console.log('Models not loaded yet, fetching models first...');
+                // Fetch models first, then try to select the model
+                this.fetchModels().then(models => {
+                    console.log(`Fetched ${models.length} models after template selection`);
+                    this.modelsValue = models;
+                    // Now try to select the model
+                    this._selectAssociatedModel(associatedModelId);
+                });
+                return;
+            }
+
+            // Models are loaded, try to select the model
+            this._selectAssociatedModel(associatedModelId);
+        }
+    }
+
+    // Helper method to select the associated model
+    _selectAssociatedModel(associatedModelId) {
+        // Debug: Log all available models with detailed information
+        console.log('Available models:', this.modelsValue.map(m => ({
+            id: m.id,
+            modelId: m.modelId,
+            name: m.name,
+            modelIdType: typeof m.modelId,
+            modelIdLength: m.modelId ? m.modelId.length : 0
+        })));
+        console.log('Looking for model ID:', associatedModelId, 'type:', typeof associatedModelId, 'length:', associatedModelId ? associatedModelId.length : 0);
+
+        // Try to find the exact match first - with detailed logging
+        let model = null;
+        for (const m of this.modelsValue) {
+            console.log(`Comparing: '${m.modelId}' === '${associatedModelId}'`, m.modelId === associatedModelId);
+            if (m.modelId === associatedModelId) {
+                model = m;
+                break;
+            }
+        }
+
+        // If no exact match, try a more flexible match (e.g., for version differences)
+        if (!model) {
+            try {
+                // Try a more flexible approach - normalize both strings for comparison
+                console.log('Trying more flexible matching approaches...');
+
+                // Approach 1: Extract the base model name without version
+                if (associatedModelId && associatedModelId.includes('-')) {
+                    const baseModelId = associatedModelId.split('-').slice(0, -1).join('-');
+                    console.log('Trying to match with base model ID:', baseModelId);
+
+                    // Try to find a model that starts with the base model ID
+                    if (baseModelId) {
+                        for (const m of this.modelsValue) {
+                            if (m.modelId && m.modelId.startsWith(baseModelId)) {
+                                console.log(`Found match with base model ID: '${m.modelId}' starts with '${baseModelId}'`);
+                                model = m;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Approach 2: Remove all version numbers and compare
+                if (!model && associatedModelId) {
+                    // Remove all version numbers (like 3, 3.7, etc.)
+                    const normalizedSearchId = associatedModelId.replace(/[\d.]+/g, '');
+                    console.log('Normalized search ID (no versions):', normalizedSearchId);
+
+                    for (const m of this.modelsValue) {
+                        if (!m.modelId) continue;
+
+                        const normalizedModelId = m.modelId.replace(/[\d.]+/g, '');
+                        console.log(`Comparing normalized: '${normalizedModelId}' vs '${normalizedSearchId}'`);
+
+                        // Check if they're similar enough
+                        if (normalizedModelId === normalizedSearchId ||
+                            normalizedModelId.includes(normalizedSearchId) ||
+                            normalizedSearchId.includes(normalizedModelId)) {
+                            console.log(`Found match with normalized IDs: '${m.modelId}' matches '${associatedModelId}'`);
+                            model = m;
+                            break;
+                        }
+                    }
+                }
+
+                // Approach 3: Just look for a model with the same provider and similar name
+                if (!model && associatedModelId && associatedModelId.includes('/')) {
+                    const [provider, modelName] = associatedModelId.split('/');
+                    console.log(`Looking for any model from provider: '${provider}'`);
+
+                    for (const m of this.modelsValue) {
+                        if (m.modelId && m.modelId.startsWith(provider + '/')) {
+                            console.log(`Found model from same provider: '${m.modelId}'`);
+                            model = m;
+                            break;
+                        }
+                    }
+                }
+
+                if (model) {
+                    console.log('Found similar model:', model.modelId);
+                } else {
+                    console.log('No matching model found after all attempts');
+                }
+            } catch (error) {
+                console.error('Error while trying to match model:', error);
+            }
+        }
+
+        if (model) {
+            console.log('Selecting associated model:', model.name);
+            // Set the selected model
+            this.selectedModelIdsValue = [model.id]; // Use model.id (database ID)
+            // Notify the model selector about the change
+            // Create and dispatch a custom event that the model-selector is listening for
+            const event = new CustomEvent('chat:setSelectedModels', {
+                bubbles: true,
+                detail: { selectedIds: [model.modelId] }
+            });
+            document.dispatchEvent(event);
+        } else {
+            console.warn('Associated model not found in available models:', associatedModelId);
+        }
+    }
+
+
     async handleSendMessage({ detail: { prompt } }) {
         // Check if prompt is empty, no models selected, or already loading
         if (!prompt.trim()) {
@@ -565,7 +727,7 @@ export default class extends Controller {
             return;
         }
 
-        console.log('Sending message:', prompt, 'to models:', this.selectedModelIdsValue, 'thread:', this.currentThreadIdValue);
+        console.log('Sending message:', prompt, 'to models:', this.selectedModelIdsValue, 'thread:', this.currentThreadIdValue, 'template:', this.selectedTemplateIdValue);
         this.isLoadingValue = true;
         this.loadingIndicatorTarget.style.visibility = 'visible';
         this.dispatch('sendStart');
@@ -593,10 +755,11 @@ export default class extends Controller {
         try {
             // Use controller's api instance
             const response = await this.api.post('/chat', {
-                prompt,
+                userInput: prompt,
                 models: this.selectedModelIdsValue,
                 threadId: this.currentThreadIdValue || undefined,
                 promptId,
+                templateId: this.selectedTemplateIdValue || undefined,
                 stream: useStreaming // Pass stream flag
             });
 
@@ -642,10 +805,11 @@ export default class extends Controller {
                     // Include credentials for Symfony session cookies
                     credentials: 'include',
                     body: JSON.stringify({
-                        prompt: prompt,
+                        userInput: prompt,
                         models: [streamingModelId],
                         promptId: promptId,
                         threadId: this.currentThreadIdValue || undefined,
+                        templateId: this.selectedTemplateIdValue || undefined,
                         stream: true
                     }),
                     signal: signal
@@ -1124,8 +1288,10 @@ export default class extends Controller {
             this.currentThreadIdValue = threadId;
             this.currentMessagesValue = [];
             this.selectedModelIdsValue = [];
+            this.selectedTemplateIdValue = 0; // Reset template selection
             this.clearChatWindow();
             this.dispatch('setSelectedModels', { detail: { selectedIds: [] } });
+            this.dispatch('clearTemplate'); // Clear template selection
 
             // Refresh chat history only if authenticated
             if (this.isAuthenticatedValue) {

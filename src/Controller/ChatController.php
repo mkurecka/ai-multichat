@@ -49,7 +49,8 @@ class ChatController extends AbstractController
         $formattedModels = [];
         foreach ($dbModels as $model) {
             $formattedModels[] = [
-                'id' => $model->getModelId(), // Use modelId as the id for the frontend
+                'id' => $model->getId(), // Use database ID as the id for the frontend
+                'modelId' => $model->getModelId(), // Add modelId as a separate property
                 'name' => $model->getName(),
                 'description' => $model->getDescription(),
                 'provider' => $model->getProvider(),

@@ -65,7 +65,7 @@ export default class extends Controller {
                 console.log('No models loaded after timeout, fetching directly');
                 this.fetchModelsDirectly();
             }
-        }, 2000);
+        }, 1000);
     }
 
     disconnect() {
@@ -74,6 +74,41 @@ export default class extends Controller {
         this.element.removeEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
         document.removeEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
         console.log('Model selector disconnected');
+    }
+
+    // Fetch models directly from the API if they're not provided by the chat controller
+    async fetchModelsDirectly() {
+        console.log('Fetching models directly from API');
+        try {
+            const response = await fetch('/api/models', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Models fetched directly:', data);
+
+            if (data && Array.isArray(data)) {
+                this.modelsValue = data;
+                this.render();
+
+                // Check if we have a pending model selection from a template
+                if (this.hasChatOutlet && this.chatOutlet._pendingAssociatedModelId) {
+                    console.log('Found pending model selection, applying it now');
+                    this.chatOutlet._selectAssociatedModel(this.chatOutlet._pendingAssociatedModelId);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching models directly:', error);
+        }
     }
 
     // Handler for the custom event from the chat controller
@@ -181,6 +216,65 @@ export default class extends Controller {
             .join(', ');
 
         console.log(`Selected models: ${modelNames}`);
+    }
+
+    // Handle the setSelectedModels event from the chat controller
+    handleSetSelectedModels(event) {
+        console.log('Received setSelectedModels event:', event);
+        const { selectedIds } = event.detail || {};
+
+        if (!selectedIds) {
+            console.warn('No selectedIds in setSelectedModels event');
+            return;
+        }
+
+        console.log('Setting selected models from event:', selectedIds);
+
+        // Convert model IDs (strings) to model database IDs (numbers)
+        const modelDbIds = [];
+
+        // Debug: Log all available models
+        console.log('Available models in model selector:', this.modelsValue.map(m => ({ id: m.id, modelId: m.modelId, name: m.name })));
+
+        for (const modelId of selectedIds) {
+            // Try exact match first
+            let model = this.modelsValue.find(m => m.modelId === modelId);
+
+            // If no exact match, try a more flexible match
+            if (!model) {
+                try {
+                    // Try to match by base model name (without version)
+                    const baseModelId = modelId.split('-').slice(0, -1).join('-');
+                    console.log('Trying to match with base model ID:', baseModelId);
+
+                    // Try to find a model that starts with the base model ID
+                    // Make sure both modelId and baseModelId exist before using startsWith
+                    if (baseModelId) {
+                        model = this.modelsValue.find(m => m.modelId && m.modelId.startsWith(baseModelId));
+                    }
+
+                    if (model) {
+                        console.log('Found similar model:', model.modelId);
+                    }
+                } catch (error) {
+                    console.error('Error while trying to match model:', error);
+                }
+            }
+
+            if (model) {
+                modelDbIds.push(model.id);
+            } else {
+                console.warn(`Model with modelId ${modelId} not found`);
+            }
+        }
+
+        if (modelDbIds.length === 0) {
+            console.warn('No valid model IDs found');
+            return;
+        }
+
+        // Use the chatSetSelectedModels method to update the selection
+        this.chatSetSelectedModels({ detail: { selectedIds: modelDbIds } });
     }
 
     search() {

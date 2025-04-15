@@ -64,7 +64,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
-    
+
     public function getOrganization(): ?Organization
     {
         return $this->organization;
@@ -138,7 +138,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         return $this->googleId;
     }
-    
+
      /**
      * @see UserInterface
      */
@@ -155,6 +155,48 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmail(?string $email): void
     {
         $this->email = $email;
+    }
+
+    /**
+     * Get the user's name (derived from email)
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        // Extract name from email (before the @ symbol)
+        if ($this->email) {
+            $parts = explode('@', $this->email);
+            return $parts[0];
+        }
+
+        return 'User';
+    }
+
+    /**
+     * Get the user's first name (derived from email)
+     *
+     * @return string
+     */
+    public function getFirstName(): string
+    {
+        // Extract first part of name from email
+        $name = $this->getName();
+        $parts = explode('.', $name);
+        return ucfirst($parts[0]);
+    }
+
+    /**
+     * Get the user's last name (derived from email)
+     *
+     * @return string
+     */
+    public function getLastName(): string
+    {
+        // Extract last part of name from email
+        $name = $this->getName();
+        $parts = explode('.', $name);
+        return isset($parts[1]) ? ucfirst($parts[1]) : '';
     }
 
     public function setRoles(array $roles): void

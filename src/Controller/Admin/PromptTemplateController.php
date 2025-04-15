@@ -161,6 +161,66 @@ class PromptTemplateController extends AbstractController
         ]);
     }
 
+    #[Route('/create', name: 'admin_prompt_template_create', methods: ['GET', 'POST'])]
+    public function create(Request $request): Response
+    {
+        $promptTemplate = new PromptTemplate();
+
+        // Set default values
+        $promptTemplate->setScope(PromptTemplate::SCOPE_PRIVATE);
+
+        // Get the first available organization and user for default values
+        $organization = $this->organizationRepository->findOneBy([]);
+        $user = $this->userRepository->findOneBy([]);
+
+        if ($organization) {
+            $promptTemplate->setOrganization($organization);
+        }
+
+        if ($user) {
+            $promptTemplate->setOwner($user);
+        }
+
+        $form = $this->createForm(AdminPromptTemplateType::class, $promptTemplate);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            try {
+                // Set timestamps
+                $now = new \DateTime();
+                $promptTemplate->setCreatedAt($now);
+                $promptTemplate->setUpdatedAt($now);
+
+                // Set timestamps for messages
+                foreach ($promptTemplate->getMessages() as $message) {
+                    $message->setTemplate($promptTemplate);
+                    $message->setCreatedAt($now);
+                    $message->setUpdatedAt($now);
+                    $this->entityManager->persist($message);
+                }
+
+                $this->entityManager->persist($promptTemplate);
+                $this->entityManager->flush();
+
+                $this->addFlash('success', 'Prompt template created successfully');
+
+                return $this->redirectToRoute('admin_prompt_template_index');
+            } catch (\Exception $e) {
+                $this->logger->error('Error creating template', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                $this->addFlash('error', 'An error occurred while creating the template');
+            }
+        }
+
+        return $this->render('admin/prompt_template/create.html.twig', [
+            'form' => $form,
+            'template' => $promptTemplate
+        ]);
+    }
+
     #[Route('/stats', name: 'admin_prompt_template_stats', methods: ['GET'])]
     public function stats(): Response
     {

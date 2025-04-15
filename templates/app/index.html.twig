@@ -14,6 +14,69 @@
     {# Chat Window Area #}
     <div class="flex-1 flex flex-col overflow-hidden min-h-0"> {# min-h-0 prevents flexbox overflow issues #}
 
+        {# Template Selector #}
+        <div data-controller="template-selector"
+             data-template-selector-chat-outlet="[data-controller='chat']" {# Connect outlet #}
+             data-template-selector-templates-value="{{ []|json_encode }}" {# Initial empty, updated by controller #}
+             data-template-selector-selected-template-id-value="0"
+             data-template-selector-search-term-value=""
+             data-template-selector-is-open-value="false"
+             data-chat-target="templateSelectorContainer" {# Target for chat controller #}
+             class="bg-white border-b p-4 shadow-md z-20 flex-shrink-0 relative">
+            <div class="flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-medium text-gray-700">Templates</h3>
+                    <span data-template-selector-target="selectedCount" class="text-xs text-gray-500">0 selected</span>
+                </div>
+                <div class="relative">
+                    <div class="flex items-center border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all duration-150">
+                        <input type="text"
+                               data-template-selector-target="searchInput"
+                               data-action="input->template-selector#search keydown->template-selector#handleSearchKeydown focus->template-selector#openDropdown"
+                               placeholder="Search templates..."
+                               class="w-full px-3 py-2 text-sm border-none focus:outline-none focus:ring-0">
+                        <button type="button"
+                                data-action="click->template-selector#toggleDropdown"
+                                class="p-2 text-gray-500 hover:text-gray-700 focus:outline-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {# Dropdown #}
+            <div data-template-selector-target="dropdown" hidden class="absolute z-30 w-full bg-white border-2 border-blue-300 rounded-lg shadow-xl max-h-80 overflow-y-auto left-0 right-0 top-full mt-1">
+                <div class="flex justify-between items-center p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                    <h3 class="font-medium text-gray-700">Select Template</h3>
+                    <button type="button"
+                            data-action="click->template-selector#closeDropdown"
+                            class="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div data-template-selector-target="templateList" class="p-3">
+                    {# Template items rendered here by template-selector controller #}
+                </div>
+                <div data-template-selector-target="noTemplatesMessage" hidden class="text-sm text-gray-500 py-3 text-center font-medium">No templates found</div>
+                <div class="p-2 border-t border-gray-200 sticky bottom-0 bg-white">
+                    <button type="button"
+                            data-action="click->template-selector#closeDropdown"
+                            class="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
+                        Done
+                    </button>
+                </div>
+            </div>
+
+            {# Selected Template Chip #}
+            <div data-template-selector-target="selectedTemplateContainer" class="mt-2">
+                {# Selected template chip rendered here by template-selector controller #}
+            </div>
+        </div>
+
         {# Model Selector #}
         <div data-controller="model-selector"
              data-model-selector-chat-outlet="[data-controller='chat']" {# Connect outlet #}
@@ -21,6 +84,7 @@
              data-model-selector-selected-ids-value="{{ []|json_encode }}"
              data-model-selector-max-models-value="16" {# Example value, could be passed from backend #}
              data-chat-target="modelSelectorContainer" {# Target for chat controller #}
+             data-chat-model-selector-outlet=".model-selector" {# Make this an outlet for the chat controller #}
              class="bg-white border-b p-4 shadow-md z-10 flex-shrink-0"> {# Prevent shrinking #}
 
             <div class="flex items-center justify-between mb-2">
@@ -88,6 +152,8 @@
                 <p class="text-sm">Your conversation will appear here.</p>
             </div>
         </div>
+
+
 
         {# Chat Input Area #}
         <div data-controller="chat-input"
