@@ -141,7 +141,25 @@ export default class extends Controller {
                     // Check if the template says we're authenticated
                     if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
                         console.log('Template says user is authenticated, but API returned 401');
-                        this.showNotification('API returned 401 Unauthorized, but Symfony says you are authenticated. This is likely a session issue.', 'error', 8000);
+                        this.showNotification('Session authentication issue detected. Attempting to refresh...', 'warning', 5000);
+
+                        // Try to verify authentication again
+                        try {
+                            await this.verifyAuthentication();
+                            if (this.isAuthenticatedValue) {
+                                this.showNotification('Authentication refreshed successfully!', 'success', 3000);
+                                // If the original request was a GET, we could retry it here
+                                if (error.config.method.toLowerCase() === 'get') {
+                                    console.log('Retrying GET request after authentication refresh');
+                                    return this.api.request(error.config);
+                                }
+                            } else {
+                                this.handleUnauthenticated();
+                            }
+                        } catch (verifyError) {
+                            console.error('Failed to verify authentication:', verifyError);
+                            this.handleUnauthenticated();
+                        }
                     } else {
                         // For Symfony session auth, show the auth required message
                         this.handleUnauthenticated();
@@ -274,8 +292,32 @@ export default class extends Controller {
         }
 
         try {
-            console.log('Checking authentication from Symfony...');
-            console.log('Authentication value after check:', this.isAuthenticatedValue);
+            // Make a test API call to verify the session is working
+            try {
+                console.log('Making test API call to verify session...');
+                const response = await this.api.get('/models');
+                console.log('Test API call successful:', response.data);
+
+                // If we get here, the session is working
+                this.isAuthenticatedValue = true;
+                console.log('Session verified via API call');
+            } catch (apiError) {
+                console.error('Test API call failed:', apiError);
+
+                // If the template says we're authenticated but the API call fails,
+                // we might have a session issue
+                if (this.element.dataset.chatIsAuthenticatedValue === 'true') {
+                    console.warn('Template says authenticated but API call failed - possible session issue');
+                    // We'll still try to proceed with the template's authentication value
+                } else {
+                    // If the template doesn't say we're authenticated and the API call fails,
+                    // we're definitely not authenticated
+                    this.isAuthenticatedValue = false;
+                }
+            }
+
+            console.log('Authentication value after verification:', this.isAuthenticatedValue);
+
             // For Symfony session auth, we already have the authentication status from the template
             if (this.isAuthenticatedValue) {
                 console.log('User is authenticated via Symfony session');
@@ -305,7 +347,7 @@ export default class extends Controller {
                 console.log('Loading initial data...');
                 await this.loadInitialData();
             } else {
-                console.log('User is not authenticated according to Symfony');
+                console.log('User is not authenticated according to verification');
                 this.handleUnauthenticated();
             }
         } catch (error) {
@@ -469,9 +511,30 @@ export default class extends Controller {
             return history;
         } catch (error) {
             console.error('Error fetching chat history:', error);
-             if (axios.isAxiosError(error)) {
-                 console.error('API Status:', error.response?.status);
-                 console.error('API Response data:', error.response?.data);
+            if (axios.isAxiosError(error)) {
+                console.error('API Status:', error.response?.status);
+                console.error('API Response data:', error.response?.data);
+
+                // If we get a 401 Unauthorized, try to refresh authentication
+                if (error.response?.status === 401) {
+                    console.log('Authentication error when fetching history, checking session...');
+                    // Try to verify authentication again
+                    await this.verifyAuthentication();
+
+                    // If verification succeeded, try fetching history again
+                    if (this.isAuthenticatedValue) {
+                        console.log('Authentication verified, retrying history fetch...');
+                        try {
+                            const retryResponse = await this.api.get('/chat/history');
+                            console.log('Retry chat history response:', retryResponse.data);
+                            const retryHistory = retryResponse.data || [];
+                            console.log(`Retry received ${retryHistory.length} history items`);
+                            return retryHistory;
+                        } catch (retryError) {
+                            console.error('Retry error fetching chat history:', retryError);
+                        }
+                    }
+                }
             }
             return []; // Return empty array on error
         }
@@ -711,16 +774,21 @@ export default class extends Controller {
                     const contentElement = placeholderElement.querySelector('[data-role="content"]');
 
                     if (contentElement) {
-                        // Update the content element with the streaming content
-                        contentElement.textContent = content;
+                        // Import marked library for Markdown parsing
+                        import('marked').then(({ marked }) => {
+                            // Parse Markdown content to HTML
+                            const parsedContent = marked.parse(content);
+                            // Update the content element with the parsed Markdown
+                            contentElement.innerHTML = parsedContent;
+                        }).catch(error => {
+                            console.error('Error loading marked library:', error);
+                            // Fallback to plain text if marked fails to load
+                            contentElement.textContent = content;
+                        });
 
                         // Keep the placeholder attribute during streaming
                         // but add a class to indicate it's being streamed
                         placeholderElement.classList.add('streaming-active');
-
-                        // Format the content with Markdown if needed
-                        // This is optional and depends on your requirements
-                        // You might want to use a library like marked.js for this
 
                         // Update the message in the currentMessagesValue array
                         const messageIndex = this.currentMessagesValue.findIndex(msg =>
@@ -771,8 +839,17 @@ export default class extends Controller {
                         // Find the content element within the placeholder
                         const contentElement = placeholderElement.querySelector('[data-role="content"]');
                         if (contentElement) {
-                            // Update the content element with the final content
-                            contentElement.textContent = finalContent;
+                            // Import marked library for Markdown parsing
+                            import('marked').then(({ marked }) => {
+                                // Parse Markdown content to HTML
+                                const parsedContent = marked.parse(finalContent);
+                                // Update the content element with the parsed Markdown
+                                contentElement.innerHTML = parsedContent;
+                            }).catch(error => {
+                                console.error('Error loading marked library:', error);
+                                // Fallback to plain text if marked fails to load
+                                contentElement.textContent = finalContent;
+                            });
                         }
 
                         // Remove the placeholder attribute
@@ -1211,12 +1288,26 @@ export default class extends Controller {
             // Get model name
             const modelName = this.modelsValue.find(m => m.id === message.modelId)?.name || 'Assistant';
 
-            // Add assistant message content
-            assistantMessageElement.innerHTML = `
-                <div class="message-header font-semibold text-green-600">${modelName}</div>
-                <div class="message-content assistant-content" data-role="content">${message.content || ''}</div>
-                ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
-            `;
+            // Import marked library for Markdown parsing
+            import('marked').then(({ marked }) => {
+                // Parse Markdown content to HTML
+                const parsedContent = marked.parse(message.content || '');
+
+                // Add assistant message content with parsed Markdown
+                assistantMessageElement.innerHTML = `
+                    <div class="message-header font-semibold text-green-600">${modelName}</div>
+                    <div class="message-content assistant-content" data-role="content">${parsedContent}</div>
+                    ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
+                `;
+            }).catch(error => {
+                console.error('Error loading marked library:', error);
+                // Fallback to plain text if marked fails to load
+                assistantMessageElement.innerHTML = `
+                    <div class="message-header font-semibold text-green-600">${modelName}</div>
+                    <div class="message-content assistant-content" data-role="content">${message.content || ''}</div>
+                    ${message.usage ? `<div class="message-usage text-xs text-gray-500" data-role="usage">(Tokens: ${message.usage.total_tokens})</div>` : ''}
+                `;
+            });
 
             // Add the assistant message to the responses container
             assistantResponsesContainer.appendChild(assistantMessageElement);

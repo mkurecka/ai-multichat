@@ -34,4 +34,7 @@ return [
     '@symfony/stimulus-bridge' => [
         'version' => '4.0.0',
     ],
+    'marked' => [
+        'version' => '15.0.8',
+    ],
 ];

@@ -198,10 +198,29 @@ export default class extends Controller {
     async fetchHistoryDirectly() {
         console.log('Fetching history directly from chat-history controller');
         try {
-            const response = await fetch('/api/chat/history');
+            const response = await fetch('/api/chat/history', {
+                credentials: 'same-origin', // Include cookies for session authentication
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest' // Mark as AJAX request
+                }
+            });
+
             if (!response.ok) {
+                if (response.status === 401) {
+                    console.warn('Authentication required when fetching history directly');
+                    // Redirect to login if not authenticated
+                    if (this.hasChatOutlet) {
+                        this.chatOutlet.handleUnauthenticated();
+                    } else {
+                        // Fallback if chat outlet not available
+                        window.location.href = '/login';
+                    }
+                    return [];
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+
             const history = await response.json();
             console.log(`Fetched ${history.length} history items directly`);
             this.chatHistoryValue = history;
@@ -209,6 +228,16 @@ export default class extends Controller {
             return history;
         } catch (error) {
             console.error('Error fetching chat history directly:', error);
+            // Show error message in the history list
+            this.listContainerTarget.innerHTML = `
+                <div class="p-4 text-center text-red-600">
+                    <p>Failed to load chat history.</p>
+                    <button type="button" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            onclick="window.location.reload()">
+                        Retry
+                    </button>
+                </div>
+            `;
             return [];
         }
     }

@@ -23,23 +23,23 @@ class JWTAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        return $request->headers->has('Authorization') 
+        return $request->headers->has('Authorization')
             && str_starts_with($request->headers->get('Authorization'), 'Bearer ');
     }
 
     public function authenticate(Request $request): Passport
     {
         $authHeader = $request->headers->get('Authorization');
-        
+
         if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
             throw new AuthenticationException('Missing or invalid Authorization header');
         }
-        
+
         $token = str_replace('Bearer ', '', $authHeader);
 
         try {
             $payload = $this->jwtService->validateToken($token);
-    
+
             if (!$payload) {
                 // Check if token is expired by trying to decode it without verification
                 try {
@@ -49,7 +49,7 @@ class JWTAuthenticator extends AbstractAuthenticator
                         $payloadBase64 = $tokenParts[1];
                         $payloadJson = base64_decode(str_replace(['-', '_'], ['+', '/'], $payloadBase64));
                         $payloadData = json_decode($payloadJson, true);
-                        
+
                         if (isset($payloadData['exp']) && $payloadData['exp'] < time()) {
                             throw new AuthenticationException('JWT token has expired');
                         }
@@ -57,15 +57,15 @@ class JWTAuthenticator extends AbstractAuthenticator
                 } catch (\Exception $e) {
                     // Ignore any errors in this basic check
                 }
-                
+
                 // If we couldn't determine a specific reason, use a generic message
                 throw new AuthenticationException('Invalid JWT token');
             }
-    
+
             if (!isset($payload['sub'])) {
                 throw new AuthenticationException('JWT token missing subject claim');
             }
-            
+
             // The 'sub' claim contains the googleId based on User::getUserIdentifier()
             $googleId = $payload['sub'];
 
@@ -98,6 +98,16 @@ class JWTAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
-        return new JsonResponse(['message' => 'Authentication failed: ' . $exception->getMessage()], Response::HTTP_UNAUTHORIZED);
+        // Check if the request is an AJAX request
+        if ($request->isXmlHttpRequest()) {
+            return new JsonResponse([
+                'message' => 'Authentication failed: ' . $exception->getMessage(),
+                'code' => 'auth_failed',
+                'needsRefresh' => $exception->getMessage() === 'JWT token has expired'
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // For non-AJAX requests, redirect to login page
+        return null; // Let the security system handle it with the access denied handler
     }
 }

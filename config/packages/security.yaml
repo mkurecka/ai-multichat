@@ -20,10 +20,15 @@ security:
             stateless: false
             custom_authenticators:
                 - App\Security\JWTAuthenticator
+                - App\Security\TokenStorageApiAuthenticator
             # Add session authentication
             provider: app_user_provider
             # Allow session authentication to work alongside JWT
             context: main
+            # Add entry point to redirect to login page if authentication fails
+            entry_point: App\Security\AuthenticationEntryPoint
+            # Add access denied handler to handle 403 errors
+            access_denied_handler: App\Security\AccessDeniedHandler
         main:
             lazy: true
             provider: app_user_provider
@@ -41,14 +46,12 @@ security:
         - { path: ^/connect/google, roles: PUBLIC_ACCESS }
         - { path: ^/connect/google/check, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/google/callback, roles: PUBLIC_ACCESS } # Add rule for the new API callback
-        # - { path: ^/app/callback, roles: PUBLIC_ACCESS } # Removed, no longer used
         - { path: ^/api/public, roles: PUBLIC_ACCESS }
-        # - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS } # Removed: Must be protected by 'api' firewall
+        - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS } # Allow token refresh without authentication
         - { path: ^/index, roles: PUBLIC_ACCESS }
-        #- { path: ^/api, roles: ROLE_USER } # This now correctly covers /api/token/refresh
+        - { path: ^/api, roles: ROLE_USER } # Protect all other API routes
         - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/profile, roles: ROLE_USER }
-        #- { path: ^/app, roles: ROLE_USER }
         - { path: ^/$, roles: PUBLIC_ACCESS }
 
 when@test:

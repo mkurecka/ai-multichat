@@ -1713,3 +1713,106 @@ header .logout-button:hover {
     padding-right: 2rem;
   }
 }
+
+/* Markdown styling for assistant messages */
+.message-content.assistant-content {
+  line-height: 1.5;
+}
+
+.message-content.assistant-content h1 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.message-content.assistant-content h2 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.message-content.assistant-content h3 {
+  font-size: 1.125rem;
+  font-weight: bold;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.message-content.assistant-content p {
+  margin-bottom: 0.75rem;
+}
+
+.message-content.assistant-content ul,
+.message-content.assistant-content ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.message-content.assistant-content ul {
+  list-style-type: disc;
+}
+
+.message-content.assistant-content ol {
+  list-style-type: decimal;
+}
+
+.message-content.assistant-content li {
+  margin-bottom: 0.25rem;
+}
+
+.message-content.assistant-content pre {
+  background-color: #f3f4f6;
+  padding: 0.75rem;
+  border-radius: 0.25rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.message-content.assistant-content code {
+  font-family: monospace;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.message-content.assistant-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.message-content.assistant-content blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 0.75rem;
+  font-style: italic;
+}
+
+.message-content.assistant-content a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.message-content.assistant-content a:hover {
+  text-decoration: none;
+}
+
+.message-content.assistant-content table {
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+  width: 100%;
+}
+
+.message-content.assistant-content th,
+.message-content.assistant-content td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem;
+}
+
+.message-content.assistant-content th {
+  background-color: #f3f4f6;
+  font-weight: bold;
+}

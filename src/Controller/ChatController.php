@@ -412,74 +412,147 @@ class ChatController extends AbstractController
         $data = [];
 
         foreach ($threads as $thread) {
-            $histories = $thread->getChatHistories()->toArray(); // Get all histories for the thread
+            try {
+                $histories = $thread->getChatHistories()->toArray(); // Get all histories for the thread
 
-            // Sort histories by creation date, oldest first
-            usort($histories, fn(ChatHistory $a, ChatHistory $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
+                // Sort histories by creation date, oldest first
+                usort($histories, fn(ChatHistory $a, ChatHistory $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
 
-            if (empty($histories)) continue; // Skip threads with no history
+                if (empty($histories)) continue; // Skip threads with no history
 
-            $messages = [];
-            $currentPromptId = null;
-            $currentPromptResponses = [];
-            $firstPromptText = null; // To store the text of the very first prompt
+                $messages = [];
+                $currentPromptId = null;
+                $currentPromptResponses = [];
+                $firstPromptText = null; // To store the text of the very first prompt
 
-            foreach ($histories as $history) {
-                 if ($firstPromptText === null) {
-                     $firstPromptText = $history->getPrompt(); // Capture the first prompt text
-                 }
-
-                if ($currentPromptId !== $history->getPromptId()) {
-                    // Finalize the previous prompt group if it exists
-                    if (!empty($currentPromptResponses)) {
-                        $messages[] = [
-                            'prompt' => $currentPromptResponses[0]['prompt'], // Text of the prompt
-                            'responses' => array_column($currentPromptResponses, 'response', 'modelId'), // Responses keyed by model ID string
-                            'createdAt' => $currentPromptResponses[0]['createdAt'], // Timestamp of the first response in group
-                            'promptId' => $currentPromptId
-                        ];
+                foreach ($histories as $history) {
+                    if ($firstPromptText === null) {
+                        $firstPromptText = $history->getPrompt(); // Capture the first prompt text
                     }
-                    // Start a new group
-                    $currentPromptId = $history->getPromptId();
-                    $currentPromptResponses = [];
+
+                    if ($currentPromptId !== $history->getPromptId()) {
+                        // Finalize the previous prompt group if it exists
+                        if (!empty($currentPromptResponses)) {
+                            $messages[] = [
+                                'prompt' => $currentPromptResponses[0]['prompt'], // Text of the prompt
+                                'responses' => array_column($currentPromptResponses, 'response', 'modelId'), // Responses keyed by model ID string
+                                'createdAt' => $currentPromptResponses[0]['createdAt'], // Timestamp of the first response in group
+                                'promptId' => $currentPromptId
+                            ];
+                        }
+                        // Start a new group
+                        $currentPromptId = $history->getPromptId();
+                        $currentPromptResponses = [];
+                    }
+
+                    // Get model string ID
+                    $modelStringId = $this->modelRepository->find($history->getModelId())?->getModelId() ?? 'unknown_model';
+
+                    // Sanitize response data to ensure valid UTF-8
+                    $response = $history->getResponse();
+                    if (is_array($response)) {
+                        // Recursively sanitize all string values in the response array
+                        $response = $this->sanitizeArray($response);
+                    }
+
+                    // Add current history details to the group
+                    $currentPromptResponses[] = [
+                        'prompt' => $this->sanitizeString($history->getPrompt()),
+                        'response' => $response,
+                        'modelId' => $modelStringId, // Use string model ID for frontend consistency
+                        'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+                    ];
                 }
 
-                // Add current history details to the group
-                 $modelStringId = $this->modelRepository->find($history->getModelId())?->getModelId() ?? 'unknown_model'; // Get string ID
-                 $currentPromptResponses[] = [
-                    'prompt' => $history->getPrompt(),
-                    'response' => $history->getResponse(), // This contains ['content' => ..., 'usage' => ...]
-                    'modelId' => $modelStringId, // Use string model ID for frontend consistency
-                    'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+                // Add the last processed group
+                if (!empty($currentPromptResponses)) {
+                    $messages[] = [
+                        'prompt' => $currentPromptResponses[0]['prompt'],
+                        'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                        'createdAt' => $currentPromptResponses[0]['createdAt'],
+                        'promptId' => $currentPromptId
+                    ];
+                }
+
+                // Use the first prompt's text for the thread title if available
+                $threadTitle = $firstPromptText ? substr($this->sanitizeString($firstPromptText), 0, 100) : $thread->getTitle();
+
+                $data[] = [
+                    'id' => $thread->getId(),
+                    'title' => $threadTitle,
+                    'messages' => $messages,
+                    'threadId' => $thread->getThreadId(),
+                    'createdAt' => $thread->getCreatedAt()->format('Y-m-d H:i:s')
                 ];
+            } catch (\Exception $e) {
+                $this->logger->error('Error processing thread history: ' . $e->getMessage(), [
+                    'threadId' => $thread->getThreadId(),
+                    'exception' => $e
+                ]);
+                // Continue with next thread instead of failing the entire request
             }
-
-            // Add the last processed group
-            if (!empty($currentPromptResponses)) {
-                $messages[] = [
-                    'prompt' => $currentPromptResponses[0]['prompt'],
-                    'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
-                    'createdAt' => $currentPromptResponses[0]['createdAt'],
-                    'promptId' => $currentPromptId
-                ];
-            }
-
-            // Use the first prompt's text for the thread title if available
-            $threadTitle = $firstPromptText ? substr($firstPromptText, 0, 100) : $thread->getTitle();
-
-            $data[] = [
-                'id' => $thread->getId(),
-                'title' => $threadTitle,
-                'messages' => $messages,
-                'threadId' => $thread->getThreadId(),
-                'createdAt' => $thread->getCreatedAt()->format('Y-m-d H:i:s')
-            ];
         }
 
         // Sort threads by creation date, newest first (if not already ordered by repository)
         usort($data, fn($a, $b) => strtotime($b['createdAt']) <=> strtotime($a['createdAt']));
 
-        return $this->json($data);
+        return $this->json($data, 200, [], ['json_encode_options' => JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE]);
+    }
+
+    /**
+     * Sanitize a string to ensure valid UTF-8 encoding
+     */
+    private function sanitizeString(?string $str): string
+    {
+        if ($str === null) {
+            return '';
+        }
+
+        // First try to detect encoding
+        $encoding = mb_detect_encoding($str, ['UTF-8', 'ISO-8859-1', 'Windows-1252'], true);
+
+        // If we can detect the encoding, convert it to UTF-8
+        if ($encoding) {
+            $sanitized = mb_convert_encoding($str, 'UTF-8', $encoding);
+        } else {
+            // If we can't detect encoding, try to force UTF-8
+            $sanitized = mb_convert_encoding($str, 'UTF-8', 'UTF-8');
+        }
+
+        // If conversion failed, return an empty string
+        if ($sanitized === false) {
+            return '';
+        }
+
+        // Remove any invalid UTF-8 sequences
+        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+
+        return $sanitized;
+    }
+
+    /**
+     * Recursively sanitize all string values in an array
+     */
+    private function sanitizeArray($data)
+    {
+        if (is_string($data)) {
+            return $this->sanitizeString($data);
+        }
+
+        if (is_array($data)) {
+            $result = [];
+            foreach ($data as $key => $value) {
+                $result[$key] = $this->sanitizeArray($value);
+            }
+            return $result;
+        }
+
+        if (is_object($data) && method_exists($data, 'toArray')) {
+            return $this->sanitizeArray($data->toArray());
+        }
+
+        // For other types (int, bool, null, etc.), return as is
+        return $data;
     }
 
     #[Route('/chat/thread/{threadId}', methods: ['GET'])]
@@ -494,52 +567,73 @@ class ChatController extends AbstractController
             throw $this->createNotFoundException('Thread not found');
         }
 
-        $messages = [];
-        $histories = $thread->getChatHistories()->toArray();
+        try {
+            $messages = [];
+            $histories = $thread->getChatHistories()->toArray();
 
-        // Sort histories by creation date, oldest first
-        usort($histories, fn(ChatHistory $a, ChatHistory $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
+            // Sort histories by creation date, oldest first
+            usort($histories, fn(ChatHistory $a, ChatHistory $b) => $a->getCreatedAt() <=> $b->getCreatedAt());
 
-        $currentPromptId = null;
-        $currentPromptResponses = [];
+            $currentPromptId = null;
+            $currentPromptResponses = [];
 
-        foreach ($histories as $history) {
-            if ($currentPromptId !== $history->getPromptId()) {
-                if (!empty($currentPromptResponses)) {
-                    $messages[] = [
-                        'prompt' => $currentPromptResponses[0]['prompt'],
-                        'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
-                        'createdAt' => $currentPromptResponses[0]['createdAt'],
-                        'promptId' => $currentPromptId
-                    ];
+            foreach ($histories as $history) {
+                if ($currentPromptId !== $history->getPromptId()) {
+                    if (!empty($currentPromptResponses)) {
+                        $messages[] = [
+                            'prompt' => $currentPromptResponses[0]['prompt'],
+                            'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                            'createdAt' => $currentPromptResponses[0]['createdAt'],
+                            'promptId' => $currentPromptId
+                        ];
+                    }
+                    $currentPromptId = $history->getPromptId();
+                    $currentPromptResponses = [];
                 }
-                $currentPromptId = $history->getPromptId();
-                $currentPromptResponses = [];
+
+                $modelStringId = $this->modelRepository->find($history->getModelId())?->getModelId() ?? 'unknown_model';
+
+                // Sanitize response data to ensure valid UTF-8
+                $response = $history->getResponse();
+                if (is_array($response)) {
+                    // Recursively sanitize all string values in the response array
+                    $response = $this->sanitizeArray($response);
+                }
+
+                $currentPromptResponses[] = [
+                    'prompt' => $this->sanitizeString($history->getPrompt()),
+                    'response' => $response,
+                    'modelId' => $modelStringId, // Use string model ID
+                    'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+                ];
             }
 
-             $modelStringId = $this->modelRepository->find($history->getModelId())?->getModelId() ?? 'unknown_model';
-             $currentPromptResponses[] = [
-                'prompt' => $history->getPrompt(),
-                'response' => $history->getResponse(),
-                'modelId' => $modelStringId, // Use string model ID
-                'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
-            ];
-        }
+            // Add the last group
+            if (!empty($currentPromptResponses)) {
+                $messages[] = [
+                    'prompt' => $currentPromptResponses[0]['prompt'],
+                    'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
+                    'createdAt' => $currentPromptResponses[0]['createdAt'],
+                    'promptId' => $currentPromptId
+                ];
+            }
 
-        // Add the last group
-        if (!empty($currentPromptResponses)) {
-            $messages[] = [
-                'prompt' => $currentPromptResponses[0]['prompt'],
-                'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
-                'createdAt' => $currentPromptResponses[0]['createdAt'],
-                'promptId' => $currentPromptId
-            ];
-        }
+            return $this->json([
+                'messages' => $messages,
+                'threadId' => $thread->getThreadId()
+            ], 200, [], ['json_encode_options' => JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE]);
+        } catch (\Exception $e) {
+            $this->logger->error('Error processing thread data: ' . $e->getMessage(), [
+                'threadId' => $thread->getThreadId(),
+                'exception' => $e
+            ]);
 
-        return $this->json([
-            'messages' => $messages,
-            'threadId' => $thread->getThreadId()
-        ]);
+            // Return an error response instead of failing
+            return $this->json([
+                'error' => 'Failed to load chat history. Please try again.',
+                'threadId' => $thread->getThreadId()
+            ], 500, [], ['json_encode_options' => JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE]);
+        }
     }
 
     #[Route('/chat/thread', methods: ['POST'])]
