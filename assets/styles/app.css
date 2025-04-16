@@ -1861,3 +1861,22 @@ header .logout-button:hover {
   background-color: #f3f4f6;
   font-weight: bold;
 }
+
+/* Template mention styling */
+.template-mention {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background-color: #dbeafe; /* Light blue background */
+  color: #1e40af; /* Dark blue text */
+  border-radius: 0.375rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+  border-left: 3px solid #3b82f6; /* Blue accent */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

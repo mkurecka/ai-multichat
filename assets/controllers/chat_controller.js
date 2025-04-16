@@ -732,7 +732,27 @@ export default class extends Controller {
         this.loadingIndicatorTarget.style.visibility = 'visible';
         this.dispatch('sendStart');
 
-        const userMessage = { role: 'user', content: prompt, id: `msg_${Date.now()}`, threadId: this.currentThreadIdValue || null };
+        // Include templateId in the user message if a template is selected
+        const templateId = this.selectedTemplateIdValue || undefined;
+        let templateName = undefined;
+
+        // Get template name if a template is used
+        if (templateId) {
+            // Try to get template info from the template-selector outlet or cache
+            const templateInfo = this.getTemplateInfo(templateId);
+            if (templateInfo) {
+                templateName = templateInfo.name;
+            }
+        }
+
+        const userMessage = {
+            role: 'user',
+            content: prompt,
+            id: `msg_${Date.now()}`,
+            threadId: this.currentThreadIdValue || null,
+            templateId: templateId,
+            templateName: templateName
+        };
         this.appendMessageToDOM(userMessage);
         this.currentMessagesValue = [...this.currentMessagesValue, userMessage];
 
@@ -1117,6 +1137,9 @@ export default class extends Controller {
             // Assuming history.messages is the array needed by appendMessageToDOM
             this.currentMessagesValue = this.#flattenHistory(history.messages || []); // Adapt based on actual API response structure
 
+            // Preload template information for all templates used in the messages
+            await this.preloadTemplateInfo(this.currentMessagesValue);
+
             // Clear the chat window before adding new messages
             this.clearChatWindow();
 
@@ -1251,7 +1274,9 @@ export default class extends Controller {
                 content: group.prompt,
                 id: `user_${group.promptId || Date.now()}`, // Generate ID if missing
                 threadId: this.currentThreadIdValue,
-                promptId: group.promptId
+                promptId: group.promptId,
+                templateId: group.usedTemplateId || undefined, // Include template ID if available
+                templateName: group.usedTemplateName || undefined // Include template name if available
             });
             // Add assistant responses
             if (group.responses) {
@@ -1463,9 +1488,17 @@ export default class extends Controller {
             userMessageElement.dataset.role = 'user';
 
             // Add user message content
+            // Check if a template was used for this message
+            const templateId = this.selectedTemplateIdValue || message.templateId;
+            // Use the template name from the message if available, otherwise fetch it
+            let templateName = message.templateName;
+            const templateInfo = templateId ? (templateName ? { name: templateName } : this.getTemplateInfo(templateId)) : null;
+            const templateMention = templateInfo ? `<div class="template-mention text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-md mt-2 inline-block" data-template-id="${templateId}">🔖 Použita šablona: <strong>${templateInfo.name}</strong></div>` : '';
+
             userMessageElement.innerHTML = `
                 <div class="message-header font-semibold text-blue-600">User</div>
                 <div class="message-content" data-role="content">${message.content || ''}</div>
+                ${templateMention}
             `;
 
             // Add user message to the group
@@ -1580,5 +1613,117 @@ export default class extends Controller {
     disconnect() {
         console.log('Chat controller disconnected');
         // Cleanup? Remove EventSource listener if implemented.
+    }
+
+    // Helper method to get template information by ID
+    getTemplateInfo(templateId) {
+        // If templateId is undefined or null, return null
+        if (!templateId) {
+            return null;
+        }
+
+        // If we have a template-selector outlet, try to get the template from there
+        if (this.hasTemplateSelectorOutlet && this.templateSelectorOutlet.templatesValue) {
+            const template = this.templateSelectorOutlet.templatesValue.find(t => t.id === parseInt(templateId, 10));
+            if (template) {
+                return template;
+            }
+        }
+
+        // Check if we've already fetched this template
+        if (this._templateCache && this._templateCache[templateId]) {
+            return this._templateCache[templateId];
+        }
+
+        // Initialize template cache if it doesn't exist
+        if (!this._templateCache) {
+            this._templateCache = {};
+        }
+
+        // Fallback: If we don't have the template info, return a temporary object and fetch the template
+        const tempTemplate = { name: `Načítání šablony...` };
+        this._templateCache[templateId] = tempTemplate;
+
+        // Fetch the template info from the backend
+        this.fetchTemplateInfo(templateId).then(template => {
+            if (template) {
+                // Update the cache with the fetched template
+                this._templateCache[templateId] = template;
+
+                // Find and update any existing template mentions in the DOM
+                document.querySelectorAll(`.template-mention[data-template-id="${templateId}"]`).forEach(el => {
+                    el.innerHTML = `🔖 Použita šablona: <strong>${template.name}</strong>`;
+                });
+            }
+        }).catch(error => {
+            console.error(`Error fetching template info for ID ${templateId}:`, error);
+            // Update the cache with an error state
+            this._templateCache[templateId] = { name: `Šablona ${templateId}` };
+        });
+
+        return tempTemplate;
+    }
+
+    // Fetch template info from the backend
+    async fetchTemplateInfo(templateId) {
+        try {
+            const response = await this.api.get(`/api/prompt-templates/${templateId}`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching template ${templateId}:`, error);
+            return null;
+        }
+    }
+
+    // Preload template information for all templates used in messages
+    async preloadTemplateInfo(messages) {
+        // Extract unique template IDs from messages
+        const templateIds = new Set();
+        messages.forEach(message => {
+            if (message.templateId) {
+                templateIds.add(message.templateId);
+            }
+        });
+
+        // Initialize template cache if it doesn't exist
+        if (!this._templateCache) {
+            this._templateCache = {};
+        }
+
+        // Fetch template information for each template ID
+        const fetchPromises = [];
+        templateIds.forEach(templateId => {
+            // Skip if we already have this template in the cache
+            if (this._templateCache[templateId] && this._templateCache[templateId].name !== 'Načítání šablony...') {
+                return;
+            }
+
+            // Create a temporary entry in the cache
+            this._templateCache[templateId] = { name: 'Načítání šablony...' };
+
+            // Fetch the template information
+            const fetchPromise = this.fetchTemplateInfo(templateId).then(template => {
+                if (template) {
+                    // Update the cache with the fetched template
+                    this._templateCache[templateId] = template;
+                } else {
+                    // Update the cache with a generic name if fetch failed
+                    this._templateCache[templateId] = { name: `Šablona ${templateId}` };
+                }
+            }).catch(error => {
+                console.error(`Error preloading template ${templateId}:`, error);
+                // Update the cache with a generic name if fetch failed
+                this._templateCache[templateId] = { name: `Šablona ${templateId}` };
+            });
+
+            fetchPromises.push(fetchPromise);
+        });
+
+        // Wait for all fetch promises to complete
+        if (fetchPromises.length > 0) {
+            console.log(`Preloading ${fetchPromises.length} templates...`);
+            await Promise.all(fetchPromises);
+            console.log('Template preloading complete');
+        }
     }
 }

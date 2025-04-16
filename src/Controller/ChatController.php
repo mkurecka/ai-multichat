@@ -461,7 +461,9 @@ class ChatController extends AbstractController
                         'prompt' => $this->sanitizeString($history->getPrompt()),
                         'response' => $response,
                         'modelId' => $modelStringId, // Use string model ID for frontend consistency
-                        'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+                        'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s'),
+                        'usedTemplateId' => $history->getUsedTemplate() ? $history->getUsedTemplate()->getId() : null,
+                        'usedTemplateName' => $history->getUsedTemplate() ? $history->getUsedTemplate()->getName() : null
                     ];
                 }
 
@@ -471,7 +473,9 @@ class ChatController extends AbstractController
                         'prompt' => $currentPromptResponses[0]['prompt'],
                         'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
                         'createdAt' => $currentPromptResponses[0]['createdAt'],
-                        'promptId' => $currentPromptId
+                        'promptId' => $currentPromptId,
+                        'usedTemplateId' => $currentPromptResponses[0]['usedTemplateId'],
+                        'usedTemplateName' => $currentPromptResponses[0]['usedTemplateName']
                     ];
                 }
 
@@ -585,7 +589,9 @@ class ChatController extends AbstractController
                             'prompt' => $currentPromptResponses[0]['prompt'],
                             'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
                             'createdAt' => $currentPromptResponses[0]['createdAt'],
-                            'promptId' => $currentPromptId
+                            'promptId' => $currentPromptId,
+                            'usedTemplateId' => $currentPromptResponses[0]['usedTemplateId'],
+                            'usedTemplateName' => $currentPromptResponses[0]['usedTemplateName']
                         ];
                     }
                     $currentPromptId = $history->getPromptId();
@@ -605,7 +611,9 @@ class ChatController extends AbstractController
                     'prompt' => $this->sanitizeString($history->getPrompt()),
                     'response' => $response,
                     'modelId' => $modelStringId, // Use string model ID
-                    'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s')
+                    'createdAt' => $history->getCreatedAt()->format('Y-m-d H:i:s'),
+                    'usedTemplateId' => $history->getUsedTemplate() ? $history->getUsedTemplate()->getId() : null,
+                    'usedTemplateName' => $history->getUsedTemplate() ? $history->getUsedTemplate()->getName() : null
                 ];
             }
 
@@ -615,7 +623,9 @@ class ChatController extends AbstractController
                     'prompt' => $currentPromptResponses[0]['prompt'],
                     'responses' => array_column($currentPromptResponses, 'response', 'modelId'),
                     'createdAt' => $currentPromptResponses[0]['createdAt'],
-                    'promptId' => $currentPromptId
+                    'promptId' => $currentPromptId,
+                    'usedTemplateId' => $currentPromptResponses[0]['usedTemplateId'],
+                    'usedTemplateName' => $currentPromptResponses[0]['usedTemplateName']
                 ];
             }
 
