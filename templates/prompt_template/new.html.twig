@@ -1,104 +1,36 @@
-{% extends 'base_app.html.twig' %}
+{% extends 'base_settings.html.twig' %}
 
-{% block title %}New Prompt Template{% endblock %}
+{% block title %}Create New Prompt Template{% endblock %}
 
-{% block app_content %} {# Changed block name from content to app_content #}
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6">Create New Prompt Template</h1>
+{% block body_content %} {# Corrected block name #}
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8"> {# Added container #}
+    <h1 class="text-2xl font-semibold text-gray-900 mb-4">Create New Prompt Template</h1>
 
-        <div class="bg-white dark:bg-gray-800 shadow px-4 py-5 sm:rounded-lg sm:p-6">
-            {{ form_start(form, {'attr': {'class': 'space-y-6'}}) }}
-
-                {# Render form fields manually for better Tailwind styling control #}
-                <div>
-                    {{ form_label(form.name, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700 dark:text-gray-300'}}) }}
-                    {{ form_widget(form.name) }}
-                    {{ form_errors(form.name) }}
-                </div>
-
-                <div>
-                    {{ form_label(form.description, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700 dark:text-gray-300'}}) }}
-                    {{ form_widget(form.description) }}
-                    {{ form_errors(form.description) }}
-                </div>
-
-                {# Render the messages collection field with Stimulus controller attached to parent #}
-                <div {{ stimulus_controller('form-collection') }}>
-                    {# Render the prototype inside a template tag for JS access #}
-                    <template data-form-collection-target="prototype">
-                        {{ form_widget(form.messages.vars.prototype) }}
-                    </template>
-
-                    {{ form_label(form.messages) }} {# Use label defined in form type #}
-
-                    {# Manually create the container with the target attribute #}
-                    <div id="{{ form.messages.vars.id }}" data-form-collection-target="collectionContainer" class="space-y-4">
-                        {# Loop through existing items and render them explicitly #}
-                        {% for messageForm in form.messages %}
-                            {# Render the full row for each message using form_row or manually #}
-                            {# Using form_row might pull in default theme styling, adjust if needed #}
-                            <div class="form-collection-row border dark:border-gray-700 p-4 rounded-md relative bg-gray-50 dark:bg-gray-750">
-                                {{ form_row(messageForm.role) }}
-                                {{ form_row(messageForm.contentTemplate) }}
-                                {{ form_widget(messageForm.sortOrder) }} {# Hidden field #}
-                                <button type="button" data-action="form-collection#remove" class="absolute top-2 right-2 text-red-500 hover:text-red-700 p-1 bg-white dark:bg-gray-600 rounded-full shadow">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-                        {% endfor %}
-                    </div>
-
-                    {# Add button - Place it *after* the container but *inside* the controller scope #}
-                    <button type="button" data-action="form-collection#add" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                            Add Message
-                        </button>
-                    {# Removed duplicated closing div for form_widget #}
-                    {{ form_errors(form.messages) }}
-                    <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        Define the sequence of system, user, and assistant messages. Use {{ '{{user_input}}' }} for the user's current message. Drag to reorder.
-                        {# TODO: List available context variables dynamically from PromptTemplateService #}
-                    </div>
-                </div> {# End of stimulus_controller div #}
-
-                {# Start of associatedModel div #}
-                <div>
-                    {{ form_label(form.associatedModel, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700 dark:text-gray-300'}}) }}
-                    {{ form_widget(form.associatedModel) }}
-                    {{ form_errors(form.associatedModel) }}
-                </div>
-
-                {# Render scope only if the field exists in the form (i.e., user is admin) #}
-                {% if form.scope is defined %}
-                    <div>
-                        {{ form_label(form.scope, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'}}) }}
-                        <div class="flex flex-col space-y-2">
-                             {% for child in form.scope %}
-                                <label class="inline-flex items-center">
-                                    {{ form_widget(child, {'attr': {'class': 'form-radio h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600'}}) }}
-                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ form_label(child) }}</span>
-                                </label>
-                            {% endfor %}
-                        </div>
-                        {{ form_errors(form.scope) }}
-                    </div>
-                {% endif %}
-
-                {# Render the rest of the form fields (e.g., hidden fields, submit button) #}
-                {# {{ form_rest(form) }} #}
-
-                <div class="flex justify-end space-x-3">
-                     {# Cancel Button - Gray #}
-                     <a href="{{ path('app_prompt_template_index') }}" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 dark:hover:bg-gray-500">
-                        Cancel
-                    </a>
-                     {# Save Button - Blue #}
-                    <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Save Template
-                    </button>
-                </div>
-
-            {{ form_end(form) }}
-        </div>
+    {# TODO: Add section to display available user variables (needs Tailwind styling) #}
+    {# Example:
+    <div class="mb-3 p-3 border rounded bg-light">
+        <h5>Available Variables</h5>
+        {% if user_variables is defined and user_variables is not empty %}
+            <ul class="list-inline mb-0">
+                {% for variable in user_variables %}
+                    <li class="list-inline-item"><code class="user-select-all">{{ '{{' ~ variable.name ~ '}}' }}</code></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="mb-0 text-muted">No custom variables defined yet.</p>
+        {% endif %}
+         <small class="d-block mt-2">Use these in your message content.</small>
     </div>
+    #}
+
+    <div class="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6">
+        {{ include('prompt_template/_form.html.twig', {'button_label': 'Create Template'}) }}
+    </div>
+
+    <div class="mt-4">
+        <a href="{{ path('app_prompt_template_index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+            &larr; Back to list
+        </a>
+    </div>
+</div>
 {% endblock %}

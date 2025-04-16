@@ -1,0 +1,29 @@
+{% extends 'base_admin.html.twig' %}
+
+{% block title %}Create New Prompt Template for {{ organization.name }}{% endblock %}
+
+{% block body %}
+    <div class="container-fluid px-4">
+        <h1 class="mt-4">Create New Prompt Template</h1>
+        <ol class="breadcrumb mb-4">
+            <li class="breadcrumb-item"><a href="{{ path('admin_dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('admin_organization_index') }}">Organizations</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('admin_organization_show', {'id': organization.id}) }}">{{ organization.name }}</a></li>
+            <li class="breadcrumb-item active">New Prompt Template</li>
+        </ol>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-plus me-1"></i>
+                New Template Details
+            </div>
+            <div class="card-body">
+                {# TODO: Add section to display available organization variables #}
+
+                {{ include('admin/organization/_prompt_template_form.html.twig', {'button_label': 'Create Template'}) }}
+            </div>
+        </div>
+
+        <a href="{{ path('admin_organization_show', {'id': organization.id}) }}" class="btn btn-link">Back to Organization</a>
+    </div>
+{% endblock %}

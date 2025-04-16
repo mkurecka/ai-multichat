@@ -62,4 +62,16 @@ class ModelRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
-} 
+
+    /**
+     * Returns a QueryBuilder for finding enabled models, ordered by name.
+     * Used by form types (e.g., PromptTemplateType).
+     */
+    public function findEnabledModelsQueryBuilder(): \Doctrine\ORM\QueryBuilder
+    {
+        return $this->createQueryBuilder('m')
+            ->andWhere('m.enabled = :enabled')
+            ->setParameter('enabled', true)
+            ->orderBy('m.name', 'ASC'); // Or m.displayName if preferred
+    }
+}

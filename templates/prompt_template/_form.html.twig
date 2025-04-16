@@ -1,0 +1,95 @@
+{{ form_start(form, {'attr': {'class': 'space-y-6'}}) }}
+    <div class="space-y-4">
+        <div>
+            {{ form_label(form.name) }}
+            {{ form_widget(form.name) }}
+            {{ form_help(form.name) }}
+            {{ form_errors(form.name, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+        </div>
+
+        <div>
+            {{ form_label(form.description) }}
+            {{ form_widget(form.description) }}
+            {{ form_help(form.description) }}
+            {{ form_errors(form.description, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+        </div>
+
+        <div>
+            {{ form_label(form.associatedModel) }}
+            {{ form_widget(form.associatedModel) }}
+            {{ form_help(form.associatedModel) }}
+            {{ form_errors(form.associatedModel, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+        </div>
+    </div>
+
+    <div class="mt-8">
+        {{ form_label(form.messages) }}
+        {{ form_help(form.messages) }}
+
+        <div {{ stimulus_controller('form-collection', {
+            'collection': form.messages,
+            'addButton': { 'label': 'Add Message', 'class': 'mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200' },
+            'deleteButton': { 'label': 'Remove', 'class': 'inline-flex items-center px-2 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400 transition-colors duration-200' }
+        }) }}>
+            <div class="mt-2 space-y-4" data-form-collection-target="collectionContainer">
+                {% for messageField in form.messages %}
+                    <div class="form-collection-row bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm" data-form-collection-target="item">
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                            <div class="md:col-span-3">
+                                {{ form_label(messageField.role, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
+                                {{ form_widget(messageField.role) }}
+                                {{ form_errors(messageField.role, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+                            </div>
+                            <div class="md:col-span-9">
+                                {{ form_label(messageField.contentTemplate, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
+                                {{ form_widget(messageField.contentTemplate) }}
+                                {{ form_errors(messageField.contentTemplate, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+                                {{ form_widget(messageField.sortOrder) }}
+                            </div>
+                        </div>
+                        <div class="flex justify-end mt-2">
+                            <button type="button" data-action="form-collection#delete" class="inline-flex items-center px-2 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400 transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {# Prototype for adding new items - managed by Stimulus #}
+            <div data-form-collection-target="prototype" data-prototype="{{ form_widget(form.messages.vars.prototype)|e('html_attr') }}"></div>
+
+            <button type="button" data-action="form-collection#add" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Message
+            </button>
+        </div>
+
+        {% if app.user and app.user.variables is defined and app.user.variables|length > 0 %}
+            <div class="mt-4 p-4 bg-blue-50 rounded-md border border-blue-200">
+                <h3 class="text-sm font-medium text-blue-800">Available User Variables</h3>
+                <p class="text-sm text-blue-600 mt-1">You can use these variables in your template messages:</p>
+                <div class="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {% for variable in app.user.variables %}
+                        <div class="text-sm bg-white p-2 rounded border border-blue-100">
+                            <code class="font-mono text-blue-700">{{variable.name}}</code>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="pt-5 border-t border-gray-200">
+        <div class="flex justify-end">
+            <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
+                {{ button_label|default('Save Template') }}
+            </button>
+        </div>
+    </div>
+{{ form_end(form) }}

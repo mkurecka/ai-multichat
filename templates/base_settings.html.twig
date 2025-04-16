@@ -31,6 +31,9 @@
                          <a href="{{ path('app_variable_index') }}" class="{{ app.request.get('_route') starts with 'app_variable_' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                              My Variables
                          </a>
+                         <a href="{{ path('app_prompt_template_index') }}" class="{{ app.request.get('_route') starts with 'app_prompt_template_' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                             My Prompt Templates
+                         </a>
                          {# Add other settings links here, e.g., Profile #}
                      </div>
                 </div>

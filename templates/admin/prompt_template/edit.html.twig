@@ -42,14 +42,8 @@
 
                             <div>
                                 {{ form_label(form.scope, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700 mb-2'}}) }}
-                                <div class="flex flex-col space-y-2">
-                                    {% for child in form.scope %}
-                                        <label class="inline-flex items-center">
-                                            {{ form_widget(child, {'attr': {'class': 'form-radio h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'}}) }}
-                                            <span class="ml-2 text-sm text-gray-700">{{ form_label(child) }}</span>
-                                        </label>
-                                    {% endfor %}
-                                </div>
+                                {{ form_widget(form.scope) }}
+
                                 {{ form_errors(form.scope) }}
                             </div>
                         </div>
@@ -65,17 +59,8 @@
                                 {{ form_errors(form.associatedModel) }}
                             </div>
 
-                            <div>
-                                {{ form_label(form.owner, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
-                                {{ form_widget(form.owner) }}
-                                {{ form_errors(form.owner) }}
-                            </div>
+                            {# Removed rendering of non-existent form.owner and form.organization fields #}
 
-                            <div>
-                                {{ form_label(form.organization, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
-                                {{ form_widget(form.organization) }}
-                                {{ form_errors(form.organization) }}
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -124,7 +109,8 @@
                                 </ul>
 
                                 {# Display User Variables #}
-                                {% if userVariables is defined and userVariables|length > 0 %}
+                                {# Check if owner exists before accessing email #}
+                                {% if template.owner and userVariables is defined and userVariables|length > 0 %}
                                     <h4 class="font-medium mt-3 mb-1">User Variables ({{ template.owner.email }}):</h4>
                                     <ul class="list-disc pl-5 space-y-1 text-xs">
                                         {% for var in userVariables %}
@@ -134,8 +120,9 @@
                                 {% endif %}
 
                                 {# Display Organization Variables #}
-                                {% if organizationVariables is defined and organizationVariables|length > 0 %}
-                                    <h4 class="font-medium mt-3 mb-1">Organization Variables ({{ template.organization.domain }}):</h4>
+                                {# Check if organization exists before accessing domain #}
+                                {% if template.organization and organizationVariables is defined and organizationVariables|length > 0 %}
+                                    <h4 class="font-medium mt-3 mb-1">Organization Variables ({{ template.organization.domain|default('N/A') }}):</h4>
                                     <ul class="list-disc pl-5 space-y-1 text-xs">
                                         {% for var in organizationVariables %}
                                             <li><code>{{ '{{organization.' ~ var.name ~ '}}' }}</code></li>

@@ -34,22 +34,30 @@ class ApiPromptTemplateController extends AbstractController
         $currentUser = $this->getUser();
         $organization = $currentUser->getOrganization();
 
-        $templates = [];
-        // Fetch private templates owned by the user
-        $privateTemplates = $this->promptTemplateRepository->findBy([
-            'owner' => $currentUser,
-            'scope' => PromptTemplate::SCOPE_PRIVATE,
-        ]);
-        $templates = array_merge($templates, $privateTemplates);
+        // Use QueryBuilder to fetch templates the user can view
+        $qb = $this->promptTemplateRepository->createQueryBuilder('pt');
 
-        // Fetch organization templates if the user belongs to one
+        // Condition 1: Template is owned by the current user (owner is set, org is null)
+        // Note: We assume user-owned templates are implicitly private based on controller logic
+        $qb->where('pt.owner = :user')
+           ->setParameter('user', $currentUser);
+
+        // Condition 2: Template belongs to the user's organization AND scope is organization
         if ($organization) {
-            $organizationTemplates = $this->promptTemplateRepository->findBy([
-                'organization' => $organization,
-                'scope' => PromptTemplate::SCOPE_ORGANIZATION,
-            ]);
-            $templates = array_merge($templates, $organizationTemplates);
+            $qb->orWhere(
+                $qb->expr()->andX(
+                    $qb->expr()->eq('pt.organization', ':org'),
+                    $qb->expr()->eq('pt.scope', ':scopeOrg')
+                )
+            )
+            ->setParameter('org', $organization)
+            ->setParameter('scopeOrg', PromptTemplate::SCOPE_ORGANIZATION);
         }
+
+        // Order results, e.g., by name
+        $qb->orderBy('pt.name', 'ASC');
+
+        $templates = $qb->getQuery()->getResult();
 
         // Use serialization groups to control the output
         return $this->json($templates, Response::HTTP_OK, [], [

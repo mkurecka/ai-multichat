@@ -11,10 +11,12 @@ use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Timestampable\Traits\TimestampableEntity; // Import Timestampable trait
 use Symfony\Component\Serializer\Annotation\Groups; // Import Groups annotation
 use Symfony\Component\Validator\Constraints as Assert; // Import Assert for validation
+use Symfony\Component\Validator\Context\ExecutionContextInterface; // Add this use statement
 
 #[ORM\Entity(repositoryClass: PromptTemplateRepository::class)]
 #[ORM\Table(name: 'prompt_templates')] // Use plural table name
 #[ORM\HasLifecycleCallbacks] // Re-add annotation
+#[Assert\Callback([self::class, 'validateOwnerOrOrganization'])] // Add callback validation
 class PromptTemplate
 {
     use TimestampableEntity; // Use Timestampable trait for createdAt and updatedAt
@@ -50,14 +52,14 @@ class PromptTemplate
     private ?string $scope = self::SCOPE_PRIVATE; // Default to private
 
     #[ORM\ManyToOne(inversedBy: 'promptTemplates')]
-    #[ORM\JoinColumn(nullable: false)]
-    #[Assert\NotNull]
+    #[ORM\JoinColumn(nullable: true)] // Allow null
+    // #[Assert\NotNull] // Removed - validation handled by Callback
     #[Groups(['template:read'])] // This will include fields from User marked with 'user:read' if configured correctly
     private ?User $owner = null;
 
     #[ORM\ManyToOne(inversedBy: 'promptTemplates')]
-    #[ORM\JoinColumn(nullable: false)] // Assuming every template belongs to an organization
-    #[Assert\NotNull]
+    #[ORM\JoinColumn(nullable: true)] // Allow null
+    // #[Assert\NotNull] // Removed - validation handled by Callback
     #[Groups(['template:read'])] // This will include fields from Organization marked with 'organization:read'
     private ?Organization $organization = null;
 
@@ -190,5 +192,23 @@ class PromptTemplate
         }
 
         return $this;
+    }
+
+    /**
+     * Validation callback to ensure either owner or organization is set, but not both.
+     */
+    public static function validateOwnerOrOrganization(PromptTemplate $template, ExecutionContextInterface $context): void
+    {
+        if ($template->getOwner() === null && $template->getOrganization() === null) {
+            $context->buildViolation('A prompt template must belong to either a user (owner) or an organization.')
+                ->atPath('owner') // Or a more general path if preferred
+                ->addViolation();
+        }
+
+        if ($template->getOwner() !== null && $template->getOrganization() !== null) {
+            $context->buildViolation('A prompt template cannot belong to both a user (owner) and an organization.')
+                ->atPath('owner') // Or a more general path
+                ->addViolation();
+        }
     }
 }

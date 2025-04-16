@@ -78,9 +78,8 @@ export default class extends Controller {
         }
         const container = this.collectionContainerTarget;
 
-        // Determine the next index based on direct children of the container
-        // Filter out any non-element nodes like text nodes if necessary
-        const count = container.querySelectorAll(':scope > div[id^="prompt_template_messages_"]').length; // Count existing rows more specifically
+        // Determine the next index based on direct children of the container with the form-collection-row class
+        const count = container.querySelectorAll('.form-collection-row').length;
         console.log(`Current item count: ${count}`);
         // Replace '__name__' placeholder in the prototype HTML with the new index
         const newHtml = prototypeHtml.replace(/__name__/g, count);
@@ -89,6 +88,9 @@ export default class extends Controller {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = newHtml;
         const newItem = tempDiv.firstElementChild; // Assuming the prototype renders one main element
+
+        // Add the form-collection-row class and Tailwind styling to the new item
+        newItem.classList.add('form-collection-row', 'bg-gray-50', 'p-4', 'rounded-md', 'border', 'border-gray-200', 'shadow-sm');
 
         // Explicitly set the sortOrder on the new item *before* appending
         const sortOrderInput = newItem.querySelector('input[type="hidden"][id$="_sortOrder"]');
@@ -109,11 +111,15 @@ export default class extends Controller {
     remove(event) {
         event.preventDefault();
         // Find the closest parent div that represents the item row
-        // Use a class if possible, otherwise rely on structure or ID prefix
-        const item = event.target.closest('.form-collection-row'); // Relying on the class added in Twig
+        // Use the form-collection-row class we added
+        const item = event.target.closest('.form-collection-row');
         if (item) {
-            item.remove();
-            this.#updateIndices(); // Update indices after removing
+            // Add a fade-out animation before removing
+            item.classList.add('opacity-50', 'transition-opacity', 'duration-300');
+            setTimeout(() => {
+                item.remove();
+                this.#updateIndices(); // Update indices after removing
+            }, 300);
         }
     }
 
@@ -141,9 +147,9 @@ export default class extends Controller {
                 animation: 150,
                 // Target rows by the class we added in Twig
                 handle: '.form-collection-row',
-                ghostClass: 'sortable-ghost',  // Class for the drop placeholder
-                chosenClass: 'sortable-chosen', // Class for the chosen item
-                dragClass: 'sortable-drag',    // Class for the dragging item
+                ghostClass: 'bg-indigo-50 border-indigo-300',  // Class for the drop placeholder
+                chosenClass: 'ring-2 ring-indigo-500 ring-opacity-50', // Class for the chosen item
+                dragClass: 'opacity-75',    // Class for the dragging item
                 onEnd: () => {
                     // Update the sortOrder hidden fields after dragging ends
                     this.#updateIndices();

@@ -16,29 +16,31 @@ class PromptTemplateMessageType extends AbstractType
     {
         $builder
             ->add('role', ChoiceType::class, [
-                'label' => 'Role',
                 'choices' => [
-                    'System' => PromptTemplateMessage::ROLE_SYSTEM,
-                    'User' => PromptTemplateMessage::ROLE_USER,
-                    'Assistant' => PromptTemplateMessage::ROLE_ASSISTANT,
+                    'System' => 'system',
+                    'User' => 'user',
+                    'Assistant' => 'assistant',
                 ],
-                'attr' => ['class' => 'form-select rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white'],
-                'label_attr' => ['class' => 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'],
+                'label' => 'Role',
+                'label_attr' => ['class' => 'block text-sm font-medium text-gray-700'],
+                'attr' => ['class' => 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm'],
             ])
+            // Corrected field name to match entity property
             ->add('contentTemplate', TextareaType::class, [
-                'label' => 'Content Template',
+                'label' => 'Content',
+                'label_attr' => ['class' => 'block text-sm font-medium text-gray-700'],
                 'attr' => [
-                    'rows' => 5,
-                    'class' => 'form-textarea mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono',
-                    'placeholder' => 'Enter message content. Use {{ variable_name }} for variables.'
+                    'rows' => 3,
+                    'class' => 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
+                    'placeholder' => 'Enter message content. Use {{variable_name}} for variables.',
                 ],
-                 'label_attr' => ['class' => 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'],
+                'required' => true,
             ])
-            // Sort order will likely be handled by drag-and-drop in the UI,
-            // but we can include it as a hidden field for submission.
+             // Add sortOrder as a hidden field, managed by JS or default logic
             ->add('sortOrder', HiddenType::class, [
-                'attr' => ['class' => 'prompt-template-message-sort-order'] // Class for JS targeting
+                'attr' => ['class' => 'message-sort-order hidden'],
             ]);
+        ; // Keep the semicolon here
     }
 
     public function configureOptions(OptionsResolver $resolver): void
