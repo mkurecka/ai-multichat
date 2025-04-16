@@ -46,11 +46,9 @@ export default class extends Controller {
         this.boundKeyDown = this.handleKeyDown.bind(this);
         document.addEventListener('keydown', this.boundKeyDown);
 
-        // Add listener for the custom event from the chat controller
+        // Add listener for the global custom event from the chat controller
         this.boundHandleSetSelectedModels = this.handleSetSelectedModels.bind(this);
-        this.element.addEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
-
-        // Also add a global document listener to ensure we catch the event
+        // Only listen on document, as the event is dispatched globally
         document.addEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
 
         // Check if we have models from the chat controller
@@ -71,7 +69,7 @@ export default class extends Controller {
     disconnect() {
         document.removeEventListener('click', this.boundClickOutside);
         document.removeEventListener('keydown', this.boundKeyDown);
-        this.element.removeEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
+        // Remove listener only from document
         document.removeEventListener('chat:setSelectedModels', this.boundHandleSetSelectedModels);
         console.log('Model selector disconnected');
     }
@@ -384,28 +382,33 @@ export default class extends Controller {
     }
 
     toggleModel(event) {
-        const modelId = event.currentTarget.dataset.modelId;
-        if (!modelId) return;
+        // Convert dataset value (string) to number for consistent comparison
+        const modelIdNum = parseInt(event.currentTarget.dataset.modelId, 10);
+        if (isNaN(modelIdNum)) {
+            console.error('Invalid model ID in dataset:', event.currentTarget.dataset.modelId);
+            return;
+        }
 
-        const isSelected = this.selectedIdsValue.includes(modelId);
+        const isSelected = this.selectedIdsValue.includes(modelIdNum);
         const currentCount = this.selectedIdsValue.length;
 
         let newSelectedIds;
 
         if (isSelected) {
-            // Deselect
-            newSelectedIds = this.selectedIdsValue.filter(id => id !== modelId);
+            // Deselect - use number for comparison
+            newSelectedIds = this.selectedIdsValue.filter(id => id !== modelIdNum);
         } else {
             // Select - check limit
             if (currentCount >= this.maxModelsValue) {
-                console.warn(`Cannot select model ${modelId}, maximum (${this.maxModelsValue}) reached.`);
+                console.warn(`Cannot select model ${modelIdNum}, maximum (${this.maxModelsValue}) reached.`);
                 // Optionally show a message to the user
                 return; // Do nothing
             }
-            newSelectedIds = [...this.selectedIdsValue, modelId];
+            // Add number to the array
+            newSelectedIds = [...this.selectedIdsValue, modelIdNum];
         }
 
-        this.selectedIdsValue = newSelectedIds;
+        this.selectedIdsValue = newSelectedIds; // Now contains only numbers
 
         // Update the internal 'selected' state of modelsValue
         this.modelsValue = this.modelsValue.map(model => ({
@@ -424,7 +427,7 @@ export default class extends Controller {
         this.closeDropdown();
 
         // Log the selection
-        console.log(`Model ${modelId} ${isSelected ? 'deselected' : 'selected'}. Current selection:`, this.selectedIdsValue);
+        console.log(`Model ${modelIdNum} ${isSelected ? 'deselected' : 'selected'}. Current selection:`, this.selectedIdsValue);
     }
 
     // --- Rendering Functions ---

@@ -37,4 +37,13 @@ return [
     'marked' => [
         'version' => '15.0.8',
     ],
+    'services/api_service' => [
+        'path' => 'services/api_service.js',
+    ],
+    'services/streaming_service' => [
+        'path' => 'services/streaming_service.js',
+    ],
+    'services/message_service' => [
+        'path' => 'services/message_service.js',
+    ],
 ];

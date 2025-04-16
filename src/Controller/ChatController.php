@@ -224,6 +224,7 @@ class ChatController extends AbstractController
                 $finalUsage = $modelResponse['usage'] ?? ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
                 $chatHistory = null;
                 $historySaved = false;
+                $historyAttempted = false; // Track if we've attempted to save history
 
                 // Start the actual loop to process the stream
                 while (!feof($streamResource)) {
@@ -244,38 +245,50 @@ class ChatController extends AbstractController
                                 $this->logger->info('[DONE] received for stream.', ['model' => $modelIdString]);
                                 // Ensure history is saved if content exists
                                 if (!$historySaved && !empty($content)) {
-                                    // Get API messages from the OpenRouterService
-                                    $apiMessages = null;
-                                    if ($selectedTemplate) {
-                                        // If using a template, get the messages built by PromptTemplateService
-                                        $apiMessages = $this->openRouterService->getLastApiMessages();
-                                    } else {
-                                        // For basic chat without template
-                                        $apiMessages = $this->contextService->getHistoryMessages($thread);
-                                        // Add current user input
-                                        $apiMessages[] = [
-                                            'role' => 'user',
-                                            'content' => $userInput
-                                        ];
-                                    }
+                                    $historyAttempted = true; // Mark that we've attempted to save
+                                    $this->logger->info('Attempting to save ChatHistory on [DONE].', ['model' => $modelIdString]);
 
-                                    $chatHistory = new ChatHistory();
-                                    $chatHistory->setThread($thread)
-                                        ->setPrompt($userInput) // Save raw user input
-                                        ->setPromptId($promptId)
-                                        ->setResponse(['content' => $content, 'usage' => $finalUsage])
-                                        ->setModelId($modelDbId)
-                                        ->setOpenRouterId($openRouterId)
-                                        ->setUsedTemplate($selectedTemplate)
-                                        ->setApiMessages($apiMessages);
-                                    $em->persist($chatHistory);
-                                    try {
-                                        $em->flush();
-                                        $historySaved = true; // Mark as saved
-                                        $this->logger->info('ChatHistory saved on [DONE].', ['historyId' => $chatHistory->getId()]);
-                                    } catch (\Exception $e) {
-                                         $this->logger->error("Error flushing ChatHistory on [DONE]: " . $e->getMessage(), ['exception' => $e]);
+                                    // Check if a history entry with this promptId already exists
+                                    $existingHistory = $em->getRepository(ChatHistory::class)->findOneBy(['promptId' => $promptId]);
+                                    if ($existingHistory) {
+                                        $this->logger->info('Found existing ChatHistory with same promptId, skipping save on [DONE].', ['historyId' => $existingHistory->getId()]);
+                                        $historySaved = true;
+                                    } else {
+                                        // Get API messages from the OpenRouterService
+                                        $apiMessages = null;
+                                        if ($selectedTemplate) {
+                                            // If using a template, get the messages built by PromptTemplateService
+                                            $apiMessages = $this->openRouterService->getLastApiMessages();
+                                        } else {
+                                            // For basic chat without template
+                                            $apiMessages = $this->contextService->getHistoryMessages($thread);
+                                            // Add current user input
+                                            $apiMessages[] = [
+                                                'role' => 'user',
+                                                'content' => $userInput
+                                            ];
+                                        }
+
+                                        $chatHistory = new ChatHistory();
+                                        $chatHistory->setThread($thread)
+                                            ->setPrompt($userInput) // Save raw user input
+                                            ->setPromptId($promptId)
+                                            ->setResponse(['content' => $content, 'usage' => $finalUsage])
+                                            ->setModelId($modelDbId)
+                                            ->setOpenRouterId($openRouterId)
+                                            ->setUsedTemplate($selectedTemplate)
+                                            ->setApiMessages($apiMessages);
+                                        $em->persist($chatHistory);
+                                        try {
+                                            $em->flush();
+                                            $historySaved = true; // Mark as saved
+                                            $this->logger->info('ChatHistory saved on [DONE].', ['historyId' => $chatHistory->getId()]);
+                                        } catch (\Exception $e) {
+                                             $this->logger->error("Error flushing ChatHistory on [DONE]: " . $e->getMessage(), ['exception' => $e]);
+                                        }
                                     }
+                                } else if ($historySaved) {
+                                    $this->logger->info('ChatHistory already saved, skipping save on [DONE].', ['model' => $modelIdString]);
                                 }
                                 break 2; // Exit both loops
                             }
@@ -326,40 +339,55 @@ class ChatController extends AbstractController
 
                 // Final save attempt if not saved via [DONE] and content exists
                 if (!$historySaved && !empty($content)) {
-                    $this->logger->warning('[DONE] not received or history not saved, attempting final save.', ['model' => $modelIdString]);
+                    // Only attempt to save if we haven't already tried during [DONE] processing
+                    // This prevents duplicate saves when both code paths execute
+                    if (!$historyAttempted) {
+                        $this->logger->warning('[DONE] not received or history not saved, attempting final save.', ['model' => $modelIdString]);
 
-                    // Get API messages from the OpenRouterService
-                    $apiMessages = null;
-                    if ($selectedTemplate) {
-                        // If using a template, get the messages built by PromptTemplateService
-                        $apiMessages = $this->openRouterService->getLastApiMessages();
+                        // Check if a history entry with this promptId already exists
+                        $existingHistory = $em->getRepository(ChatHistory::class)->findOneBy(['promptId' => $promptId]);
+                        if ($existingHistory) {
+                            $this->logger->info('Found existing ChatHistory with same promptId, skipping save.', ['historyId' => $existingHistory->getId()]);
+                            $historySaved = true;
+                        } else {
+                            // Get API messages from the OpenRouterService
+                            $apiMessages = null;
+                            if ($selectedTemplate) {
+                                // If using a template, get the messages built by PromptTemplateService
+                                $apiMessages = $this->openRouterService->getLastApiMessages();
+                            } else {
+                                // For basic chat without template
+                                $apiMessages = $this->contextService->getHistoryMessages($thread);
+                                // Add current user input
+                                $apiMessages[] = [
+                                    'role' => 'user',
+                                    'content' => $userInput
+                                ];
+                            }
+
+                            $chatHistory = new ChatHistory();
+                            $chatHistory->setThread($thread)
+                                ->setPrompt($userInput) // Save raw user input
+                                ->setPromptId($promptId)
+                                ->setResponse(['content' => $content, 'usage' => $finalUsage])
+                                ->setModelId($modelDbId)
+                                ->setOpenRouterId($openRouterId)
+                                ->setUsedTemplate($selectedTemplate)
+                                ->setApiMessages($apiMessages);
+                            $em->persist($chatHistory);
+                            try {
+                                $em->flush();
+                                $historySaved = true; // Mark as saved
+                                $this->logger->info('ChatHistory saved after stream end.', ['historyId' => $chatHistory->getId()]);
+                            } catch (\Exception $e) {
+                                 $this->logger->error("Error flushing ChatHistory after stream end: " . $e->getMessage(), ['exception' => $e]);
+                            }
+                        }
                     } else {
-                        // For basic chat without template
-                        $apiMessages = $this->contextService->getHistoryMessages($thread);
-                        // Add current user input
-                        $apiMessages[] = [
-                            'role' => 'user',
-                            'content' => $userInput
-                        ];
+                        $this->logger->info('Skipping final save attempt because a save was already attempted during [DONE] processing.', ['model' => $modelIdString]);
                     }
-
-                    $chatHistory = new ChatHistory();
-                    $chatHistory->setThread($thread)
-                        ->setPrompt($userInput) // Save raw user input
-                        ->setPromptId($promptId)
-                        ->setResponse(['content' => $content, 'usage' => $finalUsage])
-                        ->setModelId($modelDbId)
-                        ->setOpenRouterId($openRouterId)
-                        ->setUsedTemplate($selectedTemplate)
-                        ->setApiMessages($apiMessages);
-                    $em->persist($chatHistory);
-                    try {
-                        $em->flush();
-                        $historySaved = true; // Mark as saved
-                        $this->logger->info('ChatHistory saved after stream end.', ['historyId' => $chatHistory->getId()]);
-                    } catch (\Exception $e) {
-                         $this->logger->error("Error flushing ChatHistory after stream end: " . $e->getMessage(), ['exception' => $e]);
-                    }
+                } else if ($historySaved) {
+                    $this->logger->info('ChatHistory already saved, skipping final save attempt.', ['model' => $modelIdString]);
                 }
 
                 // Dispatch event only if history was successfully saved and we have an ID
