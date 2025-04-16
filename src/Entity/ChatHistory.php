@@ -13,26 +13,29 @@ class ChatHistory
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
-    
+
     #[ORM\ManyToOne(targetEntity: Thread::class, inversedBy: "chatHistories")]
     #[ORM\JoinColumn(nullable: false)]
     private Thread $thread;
-    
+
     #[ORM\Column(type: "text")]
     private string $prompt;
-    
+
     #[ORM\Column(type: "string")]
     private string $promptId;
-    
+
     #[ORM\Column(type: "json")]
     private array $response;
-    
+
+    #[ORM\Column(type: "json", nullable: true)]
+    private ?array $apiMessages = null;
+
     #[ORM\Column(type: "string")]
     private string $modelId;
-    
+
     #[ORM\Column(type: "string", nullable: true)]
     private ?string $openRouterId = null;
-    
+
     #[ORM\Column(type: "datetime")]
     private DateTime $createdAt;
 
@@ -93,6 +96,17 @@ class ChatHistory
     public function setResponse(array $response): self
     {
         $this->response = $response;
+        return $this;
+    }
+
+    public function getApiMessages(): ?array
+    {
+        return $this->apiMessages;
+    }
+
+    public function setApiMessages(?array $apiMessages): self
+    {
+        $this->apiMessages = $apiMessages;
         return $this;
     }
 

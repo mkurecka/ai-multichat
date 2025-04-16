@@ -230,13 +230,32 @@ export default class extends Controller {
 
         console.log('Setting selected models from event:', selectedIds);
 
+        // If selectedIds is an array of strings that are numeric, convert them to numbers
+        const processedIds = selectedIds.map(id => {
+            if (typeof id === 'string' && !isNaN(id)) {
+                return parseInt(id, 10);
+            }
+            return id;
+        });
+
         // Convert model IDs (strings) to model database IDs (numbers)
         const modelDbIds = [];
 
         // Debug: Log all available models
         console.log('Available models in model selector:', this.modelsValue.map(m => ({ id: m.id, modelId: m.modelId, name: m.name })));
 
-        for (const modelId of selectedIds) {
+        // First, check if the processedIds are already database IDs
+        const areDbIds = processedIds.every(id => {
+            return this.modelsValue.some(m => m.id === id);
+        });
+
+        if (areDbIds) {
+            console.log('IDs are already database IDs, using them directly');
+            modelDbIds.push(...processedIds);
+        } else {
+            // For each selected model ID (which could be a string like 'anthropic/claude-3-opus')
+            // find the corresponding model in our list and get its database ID
+            for (const modelId of processedIds) {
             // Try exact match first
             let model = this.modelsValue.find(m => m.modelId === modelId);
 
@@ -265,6 +284,7 @@ export default class extends Controller {
                 modelDbIds.push(model.id);
             } else {
                 console.warn(`Model with modelId ${modelId} not found`);
+            }
             }
         }
 

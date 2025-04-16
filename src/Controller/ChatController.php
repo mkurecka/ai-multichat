@@ -11,6 +11,7 @@ use App\Repository\ModelRepository;
 use App\Repository\PromptTemplateRepository; // Import PromptTemplateRepository
 use App\Service\ModelService;
 use App\Service\OpenRouterService;
+use App\Service\ContextService;
 // use App\Service\PromptTemplateService; // Service for processing template text (currently handled by frontend)
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -35,7 +36,8 @@ class ChatController extends AbstractController
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
         private readonly ModelRepository $modelRepository,
-        private readonly PromptTemplateRepository $promptTemplateRepository // Inject PromptTemplateRepository
+        private readonly PromptTemplateRepository $promptTemplateRepository, // Inject PromptTemplateRepository
+        private readonly ContextService $contextService // Inject ContextService
         // private readonly PromptTemplateService $promptTemplateService // Inject if needed later
     ) {}
 
@@ -172,7 +174,22 @@ class ChatController extends AbstractController
         $modelDbId = null; // Model DB ID for history
         $modelIdString = $finalModels[0]; // Model string ID for API call
         $allowsStream = false;
-        $modelEntity = $this->modelRepository->findByModelId($modelIdString);
+
+        // Try to find the model by ID first (if it's a numeric database ID)
+        $modelEntity = null;
+        if (is_numeric($modelIdString)) {
+            $modelEntity = $this->modelRepository->find($modelIdString);
+            // If found by ID, use the modelId string for API calls
+            if ($modelEntity) {
+                $modelIdString = $modelEntity->getModelId();
+                $this->logger->info('Found model by database ID', ['id' => $modelIdString, 'modelId' => $modelEntity->getModelId()]);
+            }
+        }
+
+        // If not found by ID, try to find by modelId string
+        if (!$modelEntity) {
+            $modelEntity = $this->modelRepository->findByModelId($modelIdString);
+        }
 
         if (!$modelEntity || !$modelEntity->isEnabled()) {
              throw new HttpException(400, "The selected model '{$modelIdString}' is not available or disabled.");
@@ -227,6 +244,21 @@ class ChatController extends AbstractController
                                 $this->logger->info('[DONE] received for stream.', ['model' => $modelIdString]);
                                 // Ensure history is saved if content exists
                                 if (!$historySaved && !empty($content)) {
+                                    // Get API messages from the OpenRouterService
+                                    $apiMessages = null;
+                                    if ($selectedTemplate) {
+                                        // If using a template, get the messages built by PromptTemplateService
+                                        $apiMessages = $this->openRouterService->getLastApiMessages();
+                                    } else {
+                                        // For basic chat without template
+                                        $apiMessages = $this->contextService->getHistoryMessages($thread);
+                                        // Add current user input
+                                        $apiMessages[] = [
+                                            'role' => 'user',
+                                            'content' => $userInput
+                                        ];
+                                    }
+
                                     $chatHistory = new ChatHistory();
                                     $chatHistory->setThread($thread)
                                         ->setPrompt($userInput) // Save raw user input
@@ -234,7 +266,8 @@ class ChatController extends AbstractController
                                         ->setResponse(['content' => $content, 'usage' => $finalUsage])
                                         ->setModelId($modelDbId)
                                         ->setOpenRouterId($openRouterId)
-                                        ->setUsedTemplate($selectedTemplate);
+                                        ->setUsedTemplate($selectedTemplate)
+                                        ->setApiMessages($apiMessages);
                                     $em->persist($chatHistory);
                                     try {
                                         $em->flush();
@@ -294,6 +327,22 @@ class ChatController extends AbstractController
                 // Final save attempt if not saved via [DONE] and content exists
                 if (!$historySaved && !empty($content)) {
                     $this->logger->warning('[DONE] not received or history not saved, attempting final save.', ['model' => $modelIdString]);
+
+                    // Get API messages from the OpenRouterService
+                    $apiMessages = null;
+                    if ($selectedTemplate) {
+                        // If using a template, get the messages built by PromptTemplateService
+                        $apiMessages = $this->openRouterService->getLastApiMessages();
+                    } else {
+                        // For basic chat without template
+                        $apiMessages = $this->contextService->getHistoryMessages($thread);
+                        // Add current user input
+                        $apiMessages[] = [
+                            'role' => 'user',
+                            'content' => $userInput
+                        ];
+                    }
+
                     $chatHistory = new ChatHistory();
                     $chatHistory->setThread($thread)
                         ->setPrompt($userInput) // Save raw user input
@@ -301,7 +350,8 @@ class ChatController extends AbstractController
                         ->setResponse(['content' => $content, 'usage' => $finalUsage])
                         ->setModelId($modelDbId)
                         ->setOpenRouterId($openRouterId)
-                        ->setUsedTemplate($selectedTemplate);
+                        ->setUsedTemplate($selectedTemplate)
+                        ->setApiMessages($apiMessages);
                     $em->persist($chatHistory);
                     try {
                         $em->flush();
@@ -341,10 +391,27 @@ class ChatController extends AbstractController
             $responses = [];
             // Usually only one model in $finalModels here, but loop supports multiple if needed without templates
             foreach ($finalModels as $modelIdStr) {
-                 $modelEntityForHistory = $this->modelRepository->findByModelId($modelIdStr);
+                 // Try to find the model by ID first (if it's a numeric database ID)
+                 $modelEntityForHistory = null;
+                 $originalModelIdStr = $modelIdStr;
+
+                 if (is_numeric($modelIdStr)) {
+                     $modelEntityForHistory = $this->modelRepository->find($modelIdStr);
+                     // If found by ID, use the modelId string for API calls
+                     if ($modelEntityForHistory) {
+                         $modelIdStr = $modelEntityForHistory->getModelId();
+                         $this->logger->info('Found model by database ID', ['id' => $originalModelIdStr, 'modelId' => $modelIdStr]);
+                     }
+                 }
+
+                 // If not found by ID, try to find by modelId string
+                 if (!$modelEntityForHistory) {
+                     $modelEntityForHistory = $this->modelRepository->findByModelId($modelIdStr);
+                 }
+
                  // Re-check eligibility in case logic changes
                  if (!$modelEntityForHistory || !$modelEntityForHistory->isEnabled()) {
-                     $responses[$modelIdStr] = ['error' => "Model '{$modelIdStr}' is not available or disabled."];
+                     $responses[$originalModelIdStr] = ['error' => "Model '{$modelIdStr}' is not available or disabled."];
                      continue;
                  }
                  $modelDbIdForHistory = $modelEntityForHistory->getId();
@@ -353,10 +420,20 @@ class ChatController extends AbstractController
                 $modelApiResponses = $openRouter->generateResponse($selectedTemplate, $userInput, [$modelIdStr], $thread); // Pass $selectedTemplate (can be null)
 
                 if (!isset($modelApiResponses[$modelIdStr])) {
-                    $responses[$modelIdStr] = ['error' => 'Failed to get response from model.'];
+                    $responses[$originalModelIdStr] = ['error' => 'Failed to get response from model.'];
                     continue;
                 }
                 $modelApiResponse = $modelApiResponses[$modelIdStr]; // Contains content, usage, id
+
+                // Get the API messages that were sent to the model
+                $apiMessages = null;
+                if (isset($modelApiResponse['messages']) && is_array($modelApiResponse['messages'])) {
+                    // If the API response includes the messages that were sent
+                    $apiMessages = $modelApiResponse['messages'];
+                } else {
+                    // Try to get the last messages from the service
+                    $apiMessages = $this->openRouterService->getLastApiMessages();
+                }
 
                 $modelHistory = new ChatHistory();
                 $modelHistory->setThread($thread)
@@ -368,12 +445,13 @@ class ChatController extends AbstractController
                     ])
                     ->setModelId($modelDbIdForHistory)
                     ->setOpenRouterId($modelApiResponse['id'] ?? null)
-                    ->setUsedTemplate($selectedTemplate);
+                    ->setUsedTemplate($selectedTemplate)
+                    ->setApiMessages($apiMessages);
 
                 $em->persist($modelHistory);
 
                 // Prepare response for the frontend *before* flushing and dispatching event
-                 $responses[$modelIdStr] = [
+                 $responses[$originalModelIdStr] = [
                     'content' => $modelApiResponse['content'] ?? 'Error: No content received',
                     'usage' => $modelApiResponse['usage'] ?? ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0]
                 ];
@@ -391,7 +469,7 @@ class ChatController extends AbstractController
                      }
                  } catch (\Exception $e) {
                       $this->logger->error("Error flushing/dispatching event for non-streaming model {$modelIdStr}: " . $e->getMessage(), ['exception' => $e]);
-                      $responses[$modelIdStr]['error'] = ($responses[$modelIdStr]['error'] ?? '') . ' Failed to record history/cost.';
+                      $responses[$originalModelIdStr]['error'] = ($responses[$originalModelIdStr]['error'] ?? '') . ' Failed to record history/cost.';
                  }
             } // End foreach model loop
 

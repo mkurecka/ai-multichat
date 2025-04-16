@@ -1224,17 +1224,17 @@ export default class extends Controller {
                         modelSelectorController.setAttribute('data-model-selector-selected-ids-value', JSON.stringify(modelIdsInThread));
                     }
 
-                    // Try to access the Stimulus controller instance
+                    // Instead of trying to access the Stimulus controller directly,
+                    // dispatch a custom event that the model-selector controller can listen for
                     try {
-                        // This is a bit of a hack to access the Stimulus controller instance
-                        // It might not work in all versions of Stimulus
-                        const controllerInstance = window.Stimulus.getControllerForElementAndIdentifier(modelSelectorController, 'model-selector');
-                        if (controllerInstance) {
-                            console.log('Found Stimulus controller instance, calling chatSetSelectedModels directly');
-                            controllerInstance.chatSetSelectedModels({ detail: { selectedIds: modelIdsInThread } });
-                        }
+                        console.log('Dispatching custom event to model-selector controller');
+                        const event = new CustomEvent('chat:setSelectedModels', {
+                            bubbles: true,
+                            detail: { selectedIds: modelIdsInThread }
+                        });
+                        modelSelectorController.dispatchEvent(event);
                     } catch (error) {
-                        console.error('Error accessing Stimulus controller instance:', error);
+                        console.error('Error dispatching event to model-selector controller:', error);
                     }
                 }
 
@@ -1667,7 +1667,8 @@ export default class extends Controller {
     // Fetch template info from the backend
     async fetchTemplateInfo(templateId) {
         try {
-            const response = await this.api.get(`/api/prompt-templates/${templateId}`);
+            // Fix the double /api/ issue by using the correct path
+            const response = await this.api.get(`/prompt-templates/${templateId}`);
             return response.data;
         } catch (error) {
             console.error(`Error fetching template ${templateId}:`, error);

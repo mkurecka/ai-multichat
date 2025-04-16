@@ -240,7 +240,13 @@ export const sendChatMessage = async (data: ChatRequest): Promise<ChatResponse> 
 
 export const getAllPromptTemplates = async (): Promise<PromptTemplate[]> => {
     console.log('Fetching all prompt templates from API: /prompt-templates');
-    const response = await apiClient.get<PromptTemplate[]>('/prompt-templates');
+    // Fix the double /api/ issue by using the full URL without the baseURL
+    const response = await axios.get<PromptTemplate[]>(`${API_BASE_URL}/prompt-templates`, {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+        }
+    });
     return response.data;
 };
 
@@ -345,25 +351,49 @@ export const handleGoogleCallback = async (code: string, redirectUri: string): P
 
 export const createPromptTemplate = async (templateData: Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel: { id: string } }): Promise<PromptTemplate> => {
     console.log('Creating prompt template via API: POST /prompt-templates', templateData);
-    const response = await apiClient.post<PromptTemplate>('/prompt-templates', templateData);
+    // Fix the double /api/ issue by using the full URL without the baseURL
+    const response = await axios.post<PromptTemplate>(`${API_BASE_URL}/prompt-templates`, templateData, {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+        }
+    });
     return response.data;
 };
 
 export const getPromptTemplate = async (id: number): Promise<PromptTemplate> => {
     console.log(`Fetching prompt template by ID from API: /prompt-templates/${id}`);
-    const response = await apiClient.get<PromptTemplate>(`/prompt-templates/${id}`);
+    // Fix the double /api/ issue by using the full URL without the baseURL
+    const response = await axios.get<PromptTemplate>(`${API_BASE_URL}/prompt-templates/${id}`, {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+        }
+    });
     return response.data;
 };
 
 export const updatePromptTemplate = async (id: number, templateData: Partial<Omit<PromptTemplate, 'id' | 'owner' | 'organization' | 'createdAt' | 'updatedAt'> & { associatedModel?: { id: string } }>): Promise<PromptTemplate> => {
     console.log(`Updating prompt template via API: PATCH /prompt-templates/${id}`, templateData);
-    const response = await apiClient.patch<PromptTemplate>(`/prompt-templates/${id}`, templateData);
+    // Fix the double /api/ issue by using the full URL without the baseURL
+    const response = await axios.patch<PromptTemplate>(`${API_BASE_URL}/prompt-templates/${id}`, templateData, {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+        }
+    });
     return response.data;
 };
 
 export const deletePromptTemplate = async (id: number): Promise<void> => {
     console.log(`Deleting prompt template via API: DELETE /prompt-templates/${id}`);
-    await apiClient.delete(`/prompt-templates/${id}`);
+    // Fix the double /api/ issue by using the full URL without the baseURL
+    await axios.delete(`${API_BASE_URL}/prompt-templates/${id}`, {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+        }
+    });
 };
 
 export const getUserProfile = async (): Promise<UserProfile> => {

@@ -19,6 +19,12 @@ class OpenRouterService
     private const MAX_SUMMARY_AGE = 86400; // 24 hours in seconds
     private const LOG_FILE = __DIR__ . '/../../var/log/openrouter.log';
 
+    /**
+     * Store the last messages sent to the API
+     * @var array|null
+     */
+    private ?array $lastApiMessages = null;
+
     /* // Token limits might be handled elsewhere or within templates now
     // Model-specific token limits
     private const MODEL_TOKEN_LIMITS = [
@@ -222,6 +228,8 @@ class OpenRouterService
 
         $this->log('Built messages array via PromptTemplateService: ' . json_encode($messages));
 
+        // Store the messages for later retrieval
+        $this->lastApiMessages = $messages;
 
         foreach ($models as $model) {
             try {
@@ -295,6 +303,16 @@ class OpenRouterService
     {
         // Use the same generateResponse method with stream=true
         return $this->generateResponse($template, $userInput, $models, $thread, true); // Pass potentially null template
+    }
+
+    /**
+     * Get the last messages sent to the API
+     *
+     * @return array|null The last messages sent to the API or null if none available
+     */
+    public function getLastApiMessages(): ?array
+    {
+        return $this->lastApiMessages;
     }
 
     // Note: getModelTokenLimit method removed as token limits are not handled here anymore.
