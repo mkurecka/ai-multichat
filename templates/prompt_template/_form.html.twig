@@ -1,30 +1,42 @@
 {{ form_start(form, {'attr': {'class': 'space-y-6'}}) }}
-    <div class="space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-            {{ form_label(form.name) }}
-            {{ form_widget(form.name) }}
-            {{ form_help(form.name) }}
-            {{ form_errors(form.name, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+            <h2 class="text-xl font-semibold mb-4">Basic Information</h2>
+
+            <div class="space-y-4">
+                <div>
+                    {{ form_label(form.name, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
+                    {{ form_widget(form.name) }}
+                    {{ form_help(form.name) }}
+                    {{ form_errors(form.name, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+                </div>
+
+                <div>
+                    {{ form_label(form.description, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
+                    {{ form_widget(form.description) }}
+                    {{ form_help(form.description) }}
+                    {{ form_errors(form.description, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+                </div>
+            </div>
         </div>
 
         <div>
-            {{ form_label(form.description) }}
-            {{ form_widget(form.description) }}
-            {{ form_help(form.description) }}
-            {{ form_errors(form.description, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
-        </div>
+            <h2 class="text-xl font-semibold mb-4">Model Settings</h2>
 
-        <div>
-            {{ form_label(form.associatedModel) }}
-            {{ form_widget(form.associatedModel) }}
-            {{ form_help(form.associatedModel) }}
-            {{ form_errors(form.associatedModel, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+            <div class="space-y-4">
+                <div>
+                    {{ form_label(form.associatedModel, null, {'label_attr': {'class': 'block text-sm font-medium text-gray-700'}}) }}
+                    {{ form_widget(form.associatedModel) }}
+                    {{ form_help(form.associatedModel) }}
+                    {{ form_errors(form.associatedModel, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="mt-8">
-        {{ form_label(form.messages) }}
-        {{ form_help(form.messages) }}
+    <div class="mt-6">
+        <h2 class="text-xl font-semibold mb-4">Template Messages</h2>
+        {{ form_errors(form.messages, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
 
         <div {{ stimulus_controller('form-collection', {
             'collection': form.messages,
@@ -70,26 +82,55 @@
             </button>
         </div>
 
-        {% if app.user and app.user.variables is defined and app.user.variables|length > 0 %}
-            <div class="mt-4 p-4 bg-blue-50 rounded-md border border-blue-200">
-                <h3 class="text-sm font-medium text-blue-800">Available User Variables</h3>
-                <p class="text-sm text-blue-600 mt-1">You can use these variables in your template messages:</p>
-                <div class="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {% for variable in app.user.variables %}
-                        <div class="text-sm bg-white p-2 rounded border border-blue-100">
-                            <code class="font-mono text-blue-700">{{variable.name}}</code>
-                        </div>
-                    {% endfor %}
-                </div>
+        <div class="mt-2 text-sm text-gray-500">
+            <p class="mb-2">Define the sequence of system, user, and assistant messages. Use <code class="font-mono bg-gray-100 px-1 rounded">{{"{{user_input}}"}}</code> for the user's current message.</p>
+
+            <div class="mt-4">
+                <h4 class="font-medium mb-2">Available Variables:</h4>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li><code class="font-mono bg-gray-100 px-1 rounded">{{"{{user_input}}"}}</code> - Current user message</li>
+                    <li><code class="font-mono bg-gray-100 px-1 rounded">{{"{{user.name}}"}}</code> - User's full name</li>
+                    <li><code class="font-mono bg-gray-100 px-1 rounded">{{"{{user.firstName}}"}}</code> - User's first name</li>
+                    <li><code class="font-mono bg-gray-100 px-1 rounded">{{"{{user.lastName}}"}}</code> - User's last name</li>
+                    <li><code class="font-mono bg-gray-100 px-1 rounded">{{"{{current_date}}"}}</code> - Current date (YYYY-MM-DD)</li>
+                    <li><code class="font-mono bg-gray-100 px-1 rounded">{{"{{current_time}}"}}</code> - Current time</li>
+                </ul>
+
+                {# Display User Variables #}
+                {% if app.user and app.user.variables is defined and app.user.variables|length > 0 %}
+                    <h4 class="font-medium mt-3 mb-1">Your Custom Variables:</h4>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        {% for var in app.user.variables %}
+                            <li>
+                                <code class="font-mono bg-gray-100 px-1 rounded">{{"{{user." ~ var.name ~ "}}"}}</code>
+                                {% if var.description is defined and var.description %}
+                                    - <span class="text-gray-600">{{ var.description }}</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                        <p class="text-sm text-gray-600">You don't have any custom variables yet.</p>
+                        <a href="{{ path('app_variable_new')|default('#') }}" class="mt-2 inline-flex items-center text-sm text-blue-600 hover:text-blue-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            Create your first variable
+                        </a>
+                    </div>
+                {% endif %}
             </div>
-        {% endif %}
+        </div>
     </div>
 
-    <div class="pt-5 border-t border-gray-200">
-        <div class="flex justify-end">
-            <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
-                {{ button_label|default('Save Template') }}
-            </button>
-        </div>
+    <div class="flex justify-end space-x-3 mt-8">
+        <a href="{{ path('app_prompt_template_index') }}" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200">
+            Cancel
+        </a>
+
+        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
+            {{ button_label|default('Save Template') }}
+        </button>
     </div>
 {{ form_end(form) }}
