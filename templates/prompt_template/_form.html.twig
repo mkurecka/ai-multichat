@@ -17,6 +17,15 @@
                     {{ form_help(form.description) }}
                     {{ form_errors(form.description, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
                 </div>
+
+                {% if form.ownerType is defined %}
+                <div class="mt-4 p-4 bg-blue-50 rounded-md border border-blue-200">
+                    {{ form_label(form.ownerType, null, {'label_attr': {'class': 'block text-sm font-medium text-blue-700 mb-2'}}) }}
+                    {{ form_widget(form.ownerType) }}
+                    {{ form_help(form.ownerType) }}
+                    {{ form_errors(form.ownerType, {'attr': {'class': 'text-red-500 text-sm mt-1'}}) }}
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -40,7 +49,7 @@
 
         <div {{ stimulus_controller('form-collection', {
             'collection': form.messages,
-            'addButton': { 'label': 'Add Message', 'class': 'mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200' },
+            'addButton': { 'label': 'Add Message', 'class': 'mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200' },
             'deleteButton': { 'label': 'Remove', 'class': 'inline-flex items-center px-2 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400 transition-colors duration-200' }
         }) }}>
             <div class="mt-2 space-y-4" data-form-collection-target="collectionContainer">
@@ -74,7 +83,7 @@
             {# Prototype for adding new items - managed by Stimulus #}
             <div data-form-collection-target="prototype" data-prototype="{{ form_widget(form.messages.vars.prototype)|e('html_attr') }}" style="display: none;"></div>
 
-            <button type="button" data-action="form-collection#add" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200">
+            <button type="button" data-action="form-collection#add" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
@@ -109,7 +118,27 @@
                             </li>
                         {% endfor %}
                     </ul>
-                {% else %}
+                {% endif %}
+
+                {# Display Organization Variables if user belongs to an organization #}
+                {% if app.user and app.user.organization and app.user.organization.variables is defined and app.user.organization.variables|length > 0 %}
+                    <h4 class="font-medium mt-3 mb-1">Organization Variables:</h4>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        {% for var in app.user.organization.variables %}
+                            <li>
+                                <code class="font-mono bg-gray-100 px-1 rounded">{{"{{org." ~ var.name ~ "}}"}}</code>
+                                {% if var.description is defined and var.description %}
+                                    - <span class="text-gray-600">{{ var.description }}</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                {% endif %}
+
+                {# Display message if no variables at all #}
+                {% if (app.user.variables is not defined or app.user.variables|length == 0) and
+                      (app.user.organization is null or app.user.organization.variables is not defined or app.user.organization.variables|length == 0) %}
                     <div class="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
                         <p class="text-sm text-gray-600">You don't have any custom variables yet.</p>
                         <a href="{{ path('app_variable_new')|default('#') }}" class="mt-2 inline-flex items-center text-sm text-blue-600 hover:text-blue-800">
@@ -124,12 +153,8 @@
         </div>
     </div>
 
-    <div class="flex justify-end space-x-3 mt-8">
-        <a href="{{ path('app_prompt_template_index') }}" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200">
-            Cancel
-        </a>
-
-        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
+    <div class="flex justify-end mt-8">
+        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
             {{ button_label|default('Save Template') }}
         </button>
     </div>

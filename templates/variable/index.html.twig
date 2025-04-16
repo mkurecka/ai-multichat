@@ -1,11 +1,11 @@
 {% extends 'base_settings.html.twig' %} {# Extend the new settings base template #}
 
-{% block title %}My Variables{% endblock %}
+{% block title %}Variables{% endblock %}
 
 {% block body_content %} {# Use the block name from base_settings.html.twig #}
 <div class="container mx-auto px-4 py-8"> {# Use container classes like admin pages #}
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-semibold">My Variables</h1>
+        <h1 class="text-2xl font-semibold">Variables</h1>
         <a href="{{ path('app_variable_new') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Add New Variable
         </a>
@@ -19,35 +19,76 @@
         {% endfor %}
     {% endfor %}
 
-    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for variable in variables %}
+    {# User Variables Section #}
+    <div class="mb-8">
+        <h2 class="text-xl font-medium text-gray-900 mb-4">My Variables</h2>
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ variable.name }}</td>
-                        <td class="px-6 py-4 whitespace-pre-wrap text-sm text-gray-500 break-all">{{ variable.value|length > 100 ? variable.value|slice(0, 100) ~ '...' : variable.value }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <a href="{{ path('app_variable_edit', {'id': variable.id}) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</a>
-                            <form method="post" action="{{ path('app_variable_delete', {'id': variable.id}) }}" onsubmit="return confirm('Are you sure you want to delete this variable?');" class="inline">
-                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ variable.id) }}">
-                                <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
-                            </form>
-                        </td>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">You haven't created any variables yet.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for variable in user_variables %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ variable.name }}</td>
+                            <td class="px-6 py-4 whitespace-pre-wrap text-sm text-gray-500 break-all">{{ variable.value|length > 100 ? variable.value|slice(0, 100) ~ '...' : variable.value }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="{{ path('app_variable_edit', {'id': variable.id}) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</a>
+                                <form method="post" action="{{ path('app_variable_delete', {'id': variable.id}) }}" onsubmit="return confirm('Are you sure you want to delete this variable?');" class="inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ variable.id) }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">You haven't created any personal variables yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    {# Organization Variables Section - Only shown to organization admins #}
+    {% if is_org_admin and organization_variables is defined %}
+        <div>
+            <h2 class="text-xl font-medium text-gray-900 mb-4">Organization Variables</h2>
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for variable in organization_variables %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ variable.name }}</td>
+                                <td class="px-6 py-4 whitespace-pre-wrap text-sm text-gray-500 break-all">{{ variable.value|length > 100 ? variable.value|slice(0, 100) ~ '...' : variable.value }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <a href="{{ path('app_variable_edit', {'id': variable.id}) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</a>
+                                    <form method="post" action="{{ path('app_variable_delete', {'id': variable.id}) }}" onsubmit="return confirm('Are you sure you want to delete this organization variable?');" class="inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ variable.id) }}">
+                                        <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">No organization variables have been created yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
 </div>
 {% endblock %} {# End body_content block #}

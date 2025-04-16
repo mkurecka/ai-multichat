@@ -27,11 +27,19 @@ class VariableController extends AbstractController
             return $this->redirectToRoute('app_login'); // Or your login route
         }
 
-        // Fetch only variables belonging to the current user
+        // Fetch variables belonging to the current user
         $userVariables = $variableRepository->findBy(['user' => $user]);
 
+        // For organization admins, also fetch organization variables
+        $organizationVariables = [];
+        if ($this->isGranted('ROLE_ORGANIZATION_ADMIN') && $user->getOrganization()) {
+            $organizationVariables = $variableRepository->findBy(['organization' => $user->getOrganization()]);
+        }
+
         return $this->render('variable/index.html.twig', [
-            'variables' => $userVariables,
+            'user_variables' => $userVariables,
+            'organization_variables' => $organizationVariables,
+            'is_org_admin' => $this->isGranted('ROLE_ORGANIZATION_ADMIN'),
         ]);
     }
 
@@ -45,14 +53,36 @@ class VariableController extends AbstractController
         }
 
         $variable = new Variable();
-        $variable->setUser($user); // Associate with the current user
+        $variable->setUser($user); // Default to user association
 
-        $form = $this->createForm(VariableType::class, $variable);
+        // Determine if the user is an organization admin
+        $isOrgAdmin = $this->isGranted('ROLE_ORGANIZATION_ADMIN');
+        $organization = $user->getOrganization();
+        $ownerType = 'user'; // Default owner type
+
+        // Create form with appropriate options
+        $form = $this->createForm(VariableType::class, $variable, [
+            'owner_type' => $ownerType,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Ensure it's not accidentally assigned to an organization
-            $variable->setOrganization(null);
+            // Check if organization admin selected organization as owner
+            if ($isOrgAdmin && $organization && $form->has('ownerType')) {
+                $ownerType = $form->get('ownerType')->getData();
+
+                if ($ownerType === 'organization') {
+                    $variable->setUser(null);
+                    $variable->setOrganization($organization);
+                } else {
+                    $variable->setUser($user);
+                    $variable->setOrganization(null);
+                }
+            } else {
+                // Regular user - always set to user
+                $variable->setUser($user);
+                $variable->setOrganization(null);
+            }
 
             // Manually set timestamps before persisting
             $now = new \DateTimeImmutable();
@@ -73,6 +103,7 @@ class VariableController extends AbstractController
         return $this->render('variable/new.html.twig', [
             'variable' => $variable,
             'form' => $form,
+            'is_org_admin' => $isOrgAdmin,
         ]);
     }
 
@@ -81,20 +112,41 @@ class VariableController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
-        if (!$user || $variable->getUser() !== $user) {
-            // Deny access if the variable doesn't belong to the current user
-            $this->addFlash('error', 'You are not authorized to edit this variable.');
-            return $this->redirectToRoute('app_variable_index');
-            // Or throw $this->createAccessDeniedException('You cannot edit this variable.');
-        }
 
-        $form = $this->createForm(VariableType::class, $variable);
+        // Use the voter to check EDIT permission
+        $this->denyAccessUnlessGranted('EDIT', $variable);
+
+        // Determine if the user is an organization admin
+        $isOrgAdmin = $this->isGranted('ROLE_ORGANIZATION_ADMIN');
+        $organization = $user->getOrganization();
+
+        // Determine current owner type
+        $ownerType = $variable->getUser() ? 'user' : 'organization';
+
+        // Create form with appropriate options
+        $form = $this->createForm(VariableType::class, $variable, [
+            'owner_type' => $ownerType,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Ensure it remains associated with the user and not an organization
-            $variable->setUser($user);
-            $variable->setOrganization(null);
+            // Check if organization admin selected organization as owner
+            if ($isOrgAdmin && $organization && $form->has('ownerType')) {
+                $ownerType = $form->get('ownerType')->getData();
+
+                if ($ownerType === 'organization') {
+                    $variable->setUser(null);
+                    $variable->setOrganization($organization);
+                } else {
+                    $variable->setUser($user);
+                    $variable->setOrganization(null);
+                }
+            } else if ($variable->getUser() === $user) {
+                // Regular user editing their own variable - keep it that way
+                $variable->setUser($user);
+                $variable->setOrganization(null);
+            }
+            // If it's an org admin editing an org variable, we don't change the ownership
 
             $entityManager->flush();
 
@@ -106,19 +158,15 @@ class VariableController extends AbstractController
         return $this->render('variable/edit.html.twig', [
             'variable' => $variable,
             'form' => $form,
+            'is_org_admin' => $isOrgAdmin,
         ]);
     }
 
     #[Route('/{id}', name: 'app_variable_delete', methods: ['POST'])]
     public function delete(Request $request, Variable $variable, EntityManagerInterface $entityManager): Response
     {
-        /** @var User $user */
-        $user = $this->getUser();
-        if (!$user || $variable->getUser() !== $user) {
-            $this->addFlash('error', 'You are not authorized to delete this variable.');
-            return $this->redirectToRoute('app_variable_index');
-            // Or throw $this->createAccessDeniedException('You cannot delete this variable.');
-        }
+        // Use the voter to check DELETE permission
+        $this->denyAccessUnlessGranted('DELETE', $variable);
 
         if ($this->isCsrfTokenValid('delete'.$variable->getId(), $request->request->get('_token'))) {
             $entityManager->remove($variable);

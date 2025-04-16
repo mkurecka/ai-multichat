@@ -36,7 +36,17 @@ class ApiVariableController extends AbstractController
             return $this->json(['message' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $variables = $this->variableRepository->findBy(['user' => $user]);
+        // Get user variables
+        $userVariables = $this->variableRepository->findBy(['user' => $user]);
+
+        // Get organization variables if user belongs to an organization
+        $organizationVariables = [];
+        if ($user->getOrganization()) {
+            $organizationVariables = $this->variableRepository->findBy(['organization' => $user->getOrganization()]);
+        }
+
+        // Combine both sets of variables
+        $variables = array_merge($userVariables, $organizationVariables);
 
         // Use serialization groups defined in the entity
         $jsonContent = $this->serializer->serialize($variables, 'json', ['groups' => 'variable:read']);
@@ -63,9 +73,19 @@ class ApiVariableController extends AbstractController
                 ['groups' => 'variable:write']
             );
 
-            // Manually set the owner and ensure organization is null
-            $variable->setUser($user);
-            $variable->setOrganization(null);
+            // Check if request contains organization flag and user is an org admin
+            $data = json_decode($request->getContent(), true);
+            $forOrganization = $data['forOrganization'] ?? false;
+
+            if ($forOrganization && $this->isGranted('ROLE_ORGANIZATION_ADMIN') && $user->getOrganization()) {
+                // Set for organization
+                $variable->setUser(null);
+                $variable->setOrganization($user->getOrganization());
+            } else {
+                // Set for user
+                $variable->setUser($user);
+                $variable->setOrganization(null);
+            }
 
             // Manually set timestamps before validating/persisting
             $now = new \DateTimeImmutable();
@@ -106,12 +126,13 @@ class ApiVariableController extends AbstractController
     #[Route('/me/{id}', name: 'api_variable_update_mine', methods: ['PUT', 'PATCH'])]
     public function updateMyVariable(Request $request, Variable $variable): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-        if (!$user || $variable->getUser() !== $user) {
-            // Ensure the variable belongs to the current user
+        // Use the voter to check EDIT permission
+        if (!$this->isGranted('EDIT', $variable)) {
             return $this->json(['message' => 'Variable not found or access denied'], Response::HTTP_NOT_FOUND);
         }
+
+        /** @var User $user */
+        $user = $this->getUser();
 
         try {
             // Deserialize request data onto the existing Variable object
@@ -126,9 +147,20 @@ class ApiVariableController extends AbstractController
                 ]
             );
 
-            // Ensure it remains associated with the user and not an organization
-            $variable->setUser($user);
-            $variable->setOrganization(null);
+            // Check if request contains organization flag and user is an org admin
+            $data = json_decode($request->getContent(), true);
+            $forOrganization = $data['forOrganization'] ?? false;
+
+            if ($forOrganization && $this->isGranted('ROLE_ORGANIZATION_ADMIN') && $user->getOrganization()) {
+                // Set for organization
+                $variable->setUser(null);
+                $variable->setOrganization($user->getOrganization());
+            } else if ($variable->getUser() === $user) {
+                // Keep it as user variable
+                $variable->setUser($user);
+                $variable->setOrganization(null);
+            }
+            // If it's an org variable and user is org admin, don't change ownership
 
             // Validate the updated entity
             $errors = $this->validator->validate($variable);
@@ -157,10 +189,8 @@ class ApiVariableController extends AbstractController
     #[Route('/me/{id}', name: 'api_variable_delete_mine', methods: ['DELETE'])]
     public function deleteMyVariable(Variable $variable): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-        if (!$user || $variable->getUser() !== $user) {
-            // Ensure the variable belongs to the current user
+        // Use the voter to check DELETE permission
+        if (!$this->isGranted('DELETE', $variable)) {
             return $this->json(['message' => 'Variable not found or access denied'], Response::HTTP_NOT_FOUND);
         }
 

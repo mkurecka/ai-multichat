@@ -27,11 +27,19 @@ class PromptTemplateController extends AbstractController
             return $this->redirectToRoute('app_login');
         }
 
-        // Fetch only templates owned by the current user
+        // Fetch templates owned by the current user
         $userTemplates = $promptTemplateRepository->findBy(['owner' => $user]);
 
+        // For organization admins, also fetch organization templates
+        $organizationTemplates = [];
+        if ($this->isGranted('ROLE_ORGANIZATION_ADMIN') && $user->getOrganization()) {
+            $organizationTemplates = $promptTemplateRepository->findBy(['organization' => $user->getOrganization()]);
+        }
+
         return $this->render('prompt_template/index.html.twig', [
-            'prompt_templates' => $userTemplates,
+            'user_templates' => $userTemplates,
+            'organization_templates' => $organizationTemplates,
+            'is_org_admin' => $this->isGranted('ROLE_ORGANIZATION_ADMIN'),
         ]);
     }
 
@@ -45,21 +53,40 @@ class PromptTemplateController extends AbstractController
         }
 
         $template = new PromptTemplate();
-        $template->setOwner($user); // Associate with the current user
-        $template->setOrganization(null); // Ensure no organization is set
-        $template->setScope(PromptTemplate::SCOPE_PRIVATE); // User templates are always private
+        $template->setOwner($user); // Default to user association
+        $template->setScope(PromptTemplate::SCOPE_PRIVATE); // Default to private scope
 
-        // Optional: Pre-populate with one empty message row
-        // $template->addMessage(new PromptTemplateMessage());
+        // Determine if the user is an organization admin
+        $isOrgAdmin = $this->isGranted('ROLE_ORGANIZATION_ADMIN');
+        $organization = $user->getOrganization();
+        $ownerType = 'user'; // Default owner type
 
-        $form = $this->createForm(PromptTemplateType::class, $template);
+        // Create form with appropriate options
+        $form = $this->createForm(PromptTemplateType::class, $template, [
+            'is_org_admin' => $isOrgAdmin,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Ensure correct ownership and scope again just in case
-            $template->setOwner($user);
-            $template->setOrganization(null);
-            $template->setScope(PromptTemplate::SCOPE_PRIVATE);
+            // Check if organization admin selected organization as owner
+            if ($isOrgAdmin && $organization && $form->has('ownerType')) {
+                $ownerType = $form->get('ownerType')->getData();
+
+                if ($ownerType === 'organization') {
+                    $template->setOwner(null);
+                    $template->setOrganization($organization);
+                    $template->setScope(PromptTemplate::SCOPE_ORGANIZATION);
+                } else {
+                    $template->setOwner($user);
+                    $template->setOrganization(null);
+                    $template->setScope(PromptTemplate::SCOPE_PRIVATE);
+                }
+            } else {
+                // Regular user - always set to user
+                $template->setOwner($user);
+                $template->setOrganization(null);
+                $template->setScope(PromptTemplate::SCOPE_PRIVATE);
+            }
 
             // Set sort order for messages if using CollectionType JS
             $sortOrder = 0;
@@ -79,6 +106,7 @@ class PromptTemplateController extends AbstractController
         return $this->render('prompt_template/new.html.twig', [
             'prompt_template' => $template,
             'form' => $form,
+            'is_org_admin' => $isOrgAdmin,
         ]);
     }
 
@@ -91,14 +119,41 @@ class PromptTemplateController extends AbstractController
         /** @var User $user */
         $user = $this->getUser(); // Get user again for safety, though voter should handle it
 
-        $form = $this->createForm(PromptTemplateType::class, $template);
+        // Determine if the user is an organization admin
+        $isOrgAdmin = $this->isGranted('ROLE_ORGANIZATION_ADMIN');
+        $organization = $user->getOrganization();
+
+        // Determine current owner type
+        $ownerType = $template->getOwner() ? 'user' : 'organization';
+        $isOrgTemplate = $template->getOrganization() !== null;
+
+        // Create form with appropriate options
+        $form = $this->createForm(PromptTemplateType::class, $template, [
+            'is_org_admin' => $isOrgAdmin,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // Ensure ownership and scope remain correct for user templates
-            $template->setOwner($user);
-            $template->setOrganization(null);
-            $template->setScope(PromptTemplate::SCOPE_PRIVATE);
+            // Check if organization admin selected organization as owner
+            if ($isOrgAdmin && $organization && $form->has('ownerType')) {
+                $ownerType = $form->get('ownerType')->getData();
+
+                if ($ownerType === 'organization') {
+                    $template->setOwner(null);
+                    $template->setOrganization($organization);
+                    $template->setScope(PromptTemplate::SCOPE_ORGANIZATION);
+                } else {
+                    $template->setOwner($user);
+                    $template->setOrganization(null);
+                    $template->setScope(PromptTemplate::SCOPE_PRIVATE);
+                }
+            } else if ($template->getOwner() === $user) {
+                // Regular user editing their own template - keep it that way
+                $template->setOwner($user);
+                $template->setOrganization(null);
+                $template->setScope(PromptTemplate::SCOPE_PRIVATE);
+            }
+            // If it's an org admin editing an org template, we don't change the ownership
 
             // Update sort order for messages
             $sortOrder = 0;
@@ -117,6 +172,8 @@ class PromptTemplateController extends AbstractController
         return $this->render('prompt_template/edit.html.twig', [
             'prompt_template' => $template,
             'form' => $form,
+            'is_org_admin' => $isOrgAdmin,
+            'is_org_template' => $isOrgTemplate,
         ]);
     }
 

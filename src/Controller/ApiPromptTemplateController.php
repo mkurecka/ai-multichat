@@ -34,30 +34,25 @@ class ApiPromptTemplateController extends AbstractController
         $currentUser = $this->getUser();
         $organization = $currentUser->getOrganization();
 
-        // Use QueryBuilder to fetch templates the user can view
-        $qb = $this->promptTemplateRepository->createQueryBuilder('pt');
+        // Get user templates
+        $userTemplates = $this->promptTemplateRepository->findBy(['owner' => $currentUser]);
 
-        // Condition 1: Template is owned by the current user (owner is set, org is null)
-        // Note: We assume user-owned templates are implicitly private based on controller logic
-        $qb->where('pt.owner = :user')
-           ->setParameter('user', $currentUser);
-
-        // Condition 2: Template belongs to the user's organization AND scope is organization
+        // Get organization templates if user belongs to an organization
+        $organizationTemplates = [];
         if ($organization) {
-            $qb->orWhere(
-                $qb->expr()->andX(
-                    $qb->expr()->eq('pt.organization', ':org'),
-                    $qb->expr()->eq('pt.scope', ':scopeOrg')
-                )
-            )
-            ->setParameter('org', $organization)
-            ->setParameter('scopeOrg', PromptTemplate::SCOPE_ORGANIZATION);
+            $organizationTemplates = $this->promptTemplateRepository->findBy([
+                'organization' => $organization,
+                'scope' => PromptTemplate::SCOPE_ORGANIZATION
+            ]);
         }
 
-        // Order results, e.g., by name
-        $qb->orderBy('pt.name', 'ASC');
+        // Combine both sets of templates
+        $templates = array_merge($userTemplates, $organizationTemplates);
 
-        $templates = $qb->getQuery()->getResult();
+        // Sort templates by name
+        usort($templates, function($a, $b) {
+            return strcmp($a->getName(), $b->getName());
+        });
 
         // Use serialization groups to control the output
         return $this->json($templates, Response::HTTP_OK, [], [
@@ -86,10 +81,6 @@ class ApiPromptTemplateController extends AbstractController
         $currentUser = $this->getUser();
         $organization = $currentUser->getOrganization();
 
-        if (!$organization) {
-             return $this->json(['error' => 'User must belong to an organization to create templates.'], Response::HTTP_BAD_REQUEST);
-        }
-
         try {
             // Deserialize JSON into a new PromptTemplate object
             // Need to configure serializer to handle nested PromptTemplateMessage objects
@@ -100,13 +91,20 @@ class ApiPromptTemplateController extends AbstractController
                 [AbstractNormalizer::GROUPS => ['template:write']] // Use write group for deserialization
             );
 
-            // Set owner and organization
-            $promptTemplate->setOwner($currentUser);
-            $promptTemplate->setOrganization($organization);
+            // Check if request contains organization flag and user is an org admin
+            $data = json_decode($request->getContent(), true);
+            $forOrganization = $data['forOrganization'] ?? false;
 
-            // Set default scope if not provided or user lacks permission
-            if (!$this->isGranted('ROLE_ORGANIZATION_ADMIN') || $promptTemplate->getScope() === null) {
-                 $promptTemplate->setScope(PromptTemplate::SCOPE_PRIVATE);
+            if ($forOrganization && $this->isGranted('ROLE_ORGANIZATION_ADMIN') && $organization) {
+                // Set for organization
+                $promptTemplate->setOwner(null);
+                $promptTemplate->setOrganization($organization);
+                $promptTemplate->setScope(PromptTemplate::SCOPE_ORGANIZATION);
+            } else {
+                // Set for user
+                $promptTemplate->setOwner($currentUser);
+                $promptTemplate->setOrganization(null);
+                $promptTemplate->setScope(PromptTemplate::SCOPE_PRIVATE);
             }
              // Ensure messages link back to the template (might be handled by serializer/cascade)
              foreach ($promptTemplate->getMessages() as $message) {
@@ -164,11 +162,27 @@ class ApiPromptTemplateController extends AbstractController
                  return $this->json(['errors' => (string) $errors], Response::HTTP_BAD_REQUEST);
              }
 
-             // Handle scope change restrictions if necessary (e.g., non-admin cannot change scope)
-             if (!$this->isGranted('ROLE_ORGANIZATION_ADMIN') && $promptTemplate->getScope() !== PromptTemplate::SCOPE_PRIVATE) {
-                  // Check if scope was attempted to be changed from private by non-admin
-                  // This might need checking the original value before deserialization if complex rules apply
-                  $promptTemplate->setScope(PromptTemplate::SCOPE_PRIVATE); // Force back to private? Or deny?
+             // Check if request contains organization flag and user is an org admin
+             $data = json_decode($request->getContent(), true);
+             $forOrganization = $data['forOrganization'] ?? null;
+             $currentUser = $this->getUser();
+             $organization = $currentUser->getOrganization();
+
+             if ($forOrganization !== null && $this->isGranted('ROLE_ORGANIZATION_ADMIN') && $organization) {
+                 if ($forOrganization) {
+                     // Change to organization template
+                     $promptTemplate->setOwner(null);
+                     $promptTemplate->setOrganization($organization);
+                     $promptTemplate->setScope(PromptTemplate::SCOPE_ORGANIZATION);
+                 } else {
+                     // Change to user template
+                     $promptTemplate->setOwner($currentUser);
+                     $promptTemplate->setOrganization(null);
+                     $promptTemplate->setScope(PromptTemplate::SCOPE_PRIVATE);
+                 }
+             } else if (!$this->isGranted('ROLE_ORGANIZATION_ADMIN') && $promptTemplate->getScope() !== PromptTemplate::SCOPE_PRIVATE) {
+                 // Non-admin cannot change scope
+                 $promptTemplate->setScope(PromptTemplate::SCOPE_PRIVATE);
              }
 
              // Ensure messages link back (important if new messages were added in PATCH)
