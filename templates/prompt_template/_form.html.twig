@@ -72,7 +72,7 @@
             </div>
 
             {# Prototype for adding new items - managed by Stimulus #}
-            <div data-form-collection-target="prototype" data-prototype="{{ form_widget(form.messages.vars.prototype)|e('html_attr') }}"></div>
+            <div data-form-collection-target="prototype" data-prototype="{{ form_widget(form.messages.vars.prototype)|e('html_attr') }}" style="display: none;"></div>
 
             <button type="button" data-action="form-collection#add" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors duration-200">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

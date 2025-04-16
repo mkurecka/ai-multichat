@@ -55,18 +55,43 @@ export default class extends Controller {
     add(event) {
         event.preventDefault();
 
-        // Access the prototype HTML from the <template> target's innerHTML
-        if (!this.hasPrototypeTarget) {
-             console.error('Cannot add item: prototype target not found.');
-             alert('Error: Cannot add new message. Form configuration issue (template target).');
-             return;
+        // Try to get the prototype HTML from multiple sources
+        let prototypeHtml = null;
+
+        // First check if we have a prototype target
+        if (this.hasPrototypeTarget) {
+            // Try to get the prototype from the template innerHTML
+            if (this.prototypeTarget.tagName === 'TEMPLATE' && this.prototypeTarget.innerHTML) {
+                prototypeHtml = this.prototypeTarget.innerHTML;
+                console.log('Found prototype in template innerHTML');
+            }
+            // If not in innerHTML, try the data-prototype attribute
+            else if (this.prototypeTarget.getAttribute('data-prototype')) {
+                prototypeHtml = this.prototypeTarget.getAttribute('data-prototype');
+                console.log('Found prototype in data-prototype attribute');
+            }
+            // Look for a nearby element with data-prototype
+            else {
+                const prototypeElement = this.element.querySelector('[data-prototype]');
+                if (prototypeElement) {
+                    prototypeHtml = prototypeElement.getAttribute('data-prototype');
+                    console.log('Found prototype in nearby element');
+                }
+            }
+        } else {
+            // If no prototype target, look for any element with data-prototype
+            const prototypeElement = this.element.querySelector('[data-prototype]');
+            if (prototypeElement) {
+                prototypeHtml = prototypeElement.getAttribute('data-prototype');
+                console.log('Found prototype in element with data-prototype');
+            }
         }
-        const prototypeHtml = this.prototypeTarget.innerHTML;
-        console.log('Attempting to add item. Prototype HTML found:', prototypeHtml ? 'Yes' : 'No', prototypeHtml); // Log prototype HTML
+
+        console.log('Attempting to add item. Prototype HTML found:', prototypeHtml ? 'Yes' : 'No');
 
         if (!prototypeHtml) {
-            console.error('Cannot add item: prototype template element is empty.');
-            alert('Error: Cannot add new message. Form configuration issue (empty prototype).'); // User feedback
+            console.error('Cannot add item: prototype not found in any expected location');
+            alert('Error: Cannot add new message. Form configuration issue (prototype not found).');
             return;
         }
 
@@ -87,10 +112,86 @@ export default class extends Controller {
         // Create a temporary element to insert the new HTML
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = newHtml;
-        const newItem = tempDiv.firstElementChild; // Assuming the prototype renders one main element
 
-        // Add the form-collection-row class and Tailwind styling to the new item
-        newItem.classList.add('form-collection-row', 'bg-gray-50', 'p-4', 'rounded-md', 'border', 'border-gray-200', 'shadow-sm');
+        // Get the new item - handle both direct child and nested structure
+        let newItem = tempDiv.firstElementChild;
+
+        // If the new item doesn't have the expected structure, wrap it
+        if (!newItem || !newItem.classList.contains('form-collection-row')) {
+            // Create a wrapper with the proper structure
+            const wrapper = document.createElement('div');
+            wrapper.className = 'form-collection-row bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm';
+
+            // Create the grid structure for role and content
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'grid grid-cols-1 md:grid-cols-12 gap-4';
+
+            // Create columns for role and content
+            const roleCol = document.createElement('div');
+            roleCol.className = 'md:col-span-3';
+
+            const contentCol = document.createElement('div');
+            contentCol.className = 'md:col-span-9';
+
+            // Find and move the role field
+            const roleField = tempDiv.querySelector('[id$="_role"]')?.closest('.form-group, div');
+            if (roleField) {
+                roleCol.appendChild(roleField);
+            } else {
+                // If we can't find it specifically, just take the first part of the content
+                roleCol.innerHTML = tempDiv.innerHTML;
+                tempDiv.innerHTML = '';
+            }
+
+            // Find and move the content field
+            const contentField = tempDiv.querySelector('[id$="_contentTemplate"]')?.closest('.form-group, div');
+            if (contentField) {
+                contentCol.appendChild(contentField);
+            }
+
+            // Find and move the sort order field
+            const sortOrderField = tempDiv.querySelector('[id$="_sortOrder"]');
+            if (sortOrderField) {
+                contentCol.appendChild(sortOrderField);
+            }
+
+            // Add columns to the grid
+            gridDiv.appendChild(roleCol);
+            gridDiv.appendChild(contentCol);
+
+            // Add the grid to the wrapper
+            wrapper.appendChild(gridDiv);
+
+            // Create the remove button container
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'flex justify-end mt-2';
+
+            // Create the remove button
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'inline-flex items-center px-2 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400 transition-colors duration-200';
+            removeButton.dataset.action = 'form-collection#delete';
+
+            // Add the trash icon
+            removeButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Remove
+            `;
+
+            // Add the button to its container
+            buttonContainer.appendChild(removeButton);
+
+            // Add the button container to the wrapper
+            wrapper.appendChild(buttonContainer);
+
+            // Use the wrapper as our new item
+            newItem = wrapper;
+        } else {
+            // The item already has the right structure, just add our classes
+            newItem.classList.add('form-collection-row', 'bg-gray-50', 'p-4', 'rounded-md', 'border', 'border-gray-200', 'shadow-sm');
+        }
 
         // Explicitly set the sortOrder on the new item *before* appending
         const sortOrderInput = newItem.querySelector('input[type="hidden"][id$="_sortOrder"]');
