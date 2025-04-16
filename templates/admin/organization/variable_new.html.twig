@@ -1,0 +1,16 @@
+{% extends 'base_admin.html.twig' %}
+
+{% block title %}New Variable for {{ organization.name }}{% endblock %}
+
+{% block body %}
+<div class="container mx-auto px-4 py-8"> {# Use container classes #}
+    <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-semibold">Add New Variable to {{ organization.name }}</h1>
+        <a href="{{ path('admin_organization_show', {'id': organization.id}) }}" class="text-blue-600 hover:text-blue-800">&larr; Back to Organization</a>
+    </div>
+
+    <div class="bg-white shadow p-6 rounded-lg">
+        {{ include('admin/organization/_variable_form.html.twig', {'button_label': 'Create Variable'}) }}
+    </div>
+</div>
+{% endblock %}

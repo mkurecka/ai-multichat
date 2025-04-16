@@ -9,6 +9,7 @@ use App\Repository\PromptTemplateRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Repository\OrganizationRepository;
+use App\Repository\VariableRepository; // Add this
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,7 +30,8 @@ class PromptTemplateController extends AbstractController
         private readonly ModelRepository $modelRepository,
         private readonly UserRepository $userRepository,
         private readonly OrganizationRepository $organizationRepository,
-        private readonly EntityManagerInterface $entityManager
+        private readonly EntityManagerInterface $entityManager,
+        private readonly VariableRepository $variableRepository // Inject this
     ) {
         $this->logger = $logger;
     }
@@ -114,6 +116,16 @@ class PromptTemplateController extends AbstractController
     #[Route('/{id}/edit', name: 'admin_prompt_template_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, PromptTemplate $promptTemplate): Response
     {
+        // Fetch associated variables
+        $userVariables = [];
+        if ($promptTemplate->getOwner()) {
+            $userVariables = $this->variableRepository->findBy(['user' => $promptTemplate->getOwner()]);
+        }
+        $organizationVariables = [];
+        if ($promptTemplate->getOrganization()) {
+            $organizationVariables = $this->variableRepository->findBy(['organization' => $promptTemplate->getOrganization()]);
+        }
+
         $form = $this->createForm(AdminPromptTemplateType::class, $promptTemplate);
         $form->handleRequest($request);
 
@@ -157,7 +169,9 @@ class PromptTemplateController extends AbstractController
 
         return $this->render('admin/prompt_template/edit.html.twig', [
             'form' => $form,
-            'template' => $promptTemplate
+            'template' => $promptTemplate,
+            'userVariables' => $userVariables, // Pass variables
+            'organizationVariables' => $organizationVariables // Pass variables
         ]);
     }
 

@@ -9,8 +9,9 @@ use App\Entity\Thread;
 use Psr\Log\LoggerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use App\Repository\VariableRepository; // Add this
 use App\Service\PromptTemplateService;
-use App\Service\ContextService; // Re-add ContextService
+use App\Service\ContextService;
 
 class OpenRouterService
 {
@@ -58,7 +59,8 @@ class OpenRouterService
         private readonly LoggerInterface $logger,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly PromptTemplateService $promptTemplateService,
-        private readonly ContextService $contextService // Re-inject ContextService
+        private readonly ContextService $contextService, // Re-inject ContextService
+        private readonly VariableRepository $variableRepository // Inject VariableRepository
     ) {
         $this->log('OpenRouterService initialized with API key: ' . substr($this->apiKey, 0, 4) . '...');
     }
@@ -226,9 +228,9 @@ class OpenRouterService
              return $responses;
         }
 
-        $this->log('Built messages array via PromptTemplateService: ' . json_encode($messages));
+        $this->log('Built messages array: ' . json_encode($messages)); // Log the final messages from PromptTemplateService or basic build
 
-        // Store the messages for later retrieval
+        // Store the final messages for later retrieval (used by ChatController for history)
         $this->lastApiMessages = $messages;
 
         foreach ($models as $model) {

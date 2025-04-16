@@ -7,9 +7,10 @@ use App\Entity\PromptTemplateMessage;
 use App\Entity\Thread;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security; // Correct import for the service
+use App\Repository\VariableRepository; // Add this
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
-use Psr\Log\LoggerInterface; // Add Logger
+use Psr\Log\LoggerInterface;
 
 class PromptTemplateService
 {
@@ -31,8 +32,9 @@ class PromptTemplateService
 
     public function __construct(
         private readonly Security $security,
-        private readonly ContextService $contextService, // Inject ContextService
-        private readonly LoggerInterface $logger // Inject Logger
+        private readonly ContextService $contextService,
+        private readonly LoggerInterface $logger,
+        private readonly VariableRepository $variableRepository // Inject VariableRepository
     ) {
         // Initialize Twig Environment safely
         $loader = new ArrayLoader(); // Use ArrayLoader, templates will be added dynamically
@@ -63,48 +65,48 @@ class PromptTemplateService
         $organization = $user?->getOrganization();
         $finalApiMessages = [];
 
-        // 1. Prepare Base Context Data (Safe Variables)
-        $baseContextData = [
-            'user.name' => $user?->getName(), // Example: Adjust getter if needed
-            'user.firstName' => $user?->getFirstName(), // Example: Adjust getter if needed
-            'user.lastName' => $user?->getLastName(), // Example: Adjust getter if needed
-            'organization.name' => $organization?->getName(), // Example: Adjust getter if needed
-            'organization.domain' => $organization?->getDomain(), // Example: Adjust getter if needed
+        // 1. Prepare Nested Context Data for Twig
+        $twigContext = [
+            'user' => [],
+            'organization' => [],
             'current_date' => date('Y-m-d'),
-            // Ensure all keys from AVAILABLE_CONTEXT_VARIABLES are present, even if null
+            self::USER_INPUT_VARIABLE => $currentUserInput, // Keep user_input at top level
         ];
-        foreach (array_keys(self::AVAILABLE_CONTEXT_VARIABLES) as $key) {
-            if (!array_key_exists($key, $baseContextData)) {
-                 // Attempt to resolve dot notation for Twig ArrayLoader compatibility
-                 $keys = explode('.', $key);
-                 $value = $baseContextData;
-                 $exists = true;
-                 foreach ($keys as $subKey) {
-                     if (is_array($value) && array_key_exists($subKey, $value)) {
-                         $value = $value[$subKey];
-                     } elseif (is_object($value) && property_exists($value, $subKey)) {
-                         // This part might need refinement based on actual object structure if not simple getters
-                         // For now, we assume simple array structure or direct property access isn't the primary method here
-                         // $value = $value->$subKey;
-                         $exists = false; // Mark as not found if complex object path
-                         break;
-                     }
-                      else {
-                         $exists = false;
-                         break;
-                     }
-                 }
-                 // Add the key with null value if it wasn't resolved or doesn't exist
-                 if (!$exists) {
-                    $baseContextData[$key] = null;
-                 }
+
+        // Populate User data (standard + custom variables)
+        if ($user) {
+            $twigContext['user'] = [
+                'name' => $user->getName(),
+                'firstName' => $user->getFirstName(),
+                'lastName' => $user->getLastName(),
+                'email' => $user->getEmail(),
+                // Add other standard user fields if needed
+            ];
+            $userVars = $this->variableRepository->findBy(['user' => $user]);
+            foreach ($userVars as $var) {
+                // Add custom variables under the 'user' key
+                $twigContext['user'][$var->getName()] = $var->getValue();
             }
         }
-        // Add the user input variable separately, it's handled per message
-        $baseContextData[self::USER_INPUT_VARIABLE] = $currentUserInput;
+
+        // Populate Organization data (standard + custom variables)
+        if ($organization) {
+            $twigContext['organization'] = [
+                'name' => $organization->getName(),
+                'domain' => $organization->getDomain(),
+                // Add other standard org fields if needed
+            ];
+            $orgVars = $this->variableRepository->findBy(['organization' => $organization]);
+            foreach ($orgVars as $var) {
+                 // Add custom variables under the 'organization' key
+                $twigContext['organization'][$var->getName()] = $var->getValue();
+            }
+        }
+
+        $this->logger->debug('Context data prepared for Twig rendering', ['context_keys' => array_keys($twigContext)]);
 
 
-        // 2. Get Compressed History Messages (excluding the hardcoded email message)
+        // 2. Get Compressed History Messages
         // We assume ContextService::getHistoryMessages provides this correctly
         $historyMessages = $this->contextService->getHistoryMessages($thread); // Needs implementation/adjustment in ContextService
 
@@ -118,20 +120,15 @@ class PromptTemplateService
             $contentTemplate = $msg->getContentTemplate() ?? '';
             $role = $msg->getRole();
 
-            // Prepare context specific to this message (base + potentially user_input)
-            $messageContext = $baseContextData;
-
-            // Check if this message template contains the user input variable
-            $containsUserInput = str_contains($contentTemplate, '{{' . self::USER_INPUT_VARIABLE . '}}');
-
-            // Render the content using Twig
+            // Render the content using Twig with the nested context
             try {
                 // Dynamically add the template content to the loader
-                $templateName = 'msg_' . $msg->getId();
+                $templateName = 'msg_' . ($msg->getId() ?? uniqid()); // Use unique ID if message is new
                 $this->twig->getLoader()->setTemplate($templateName, $contentTemplate);
-                $processedContent = $this->twig->render($templateName, $messageContext);
+                // Pass the nested twigContext array
+                $processedContent = $this->twig->render($templateName, $twigContext);
             } catch (\Exception $e) {
-                $this->logger->error(sprintf('Twig processing error for template message ID %d: %s', $msg->getId(), $e->getMessage()), ['exception' => $e]);
+                $this->logger->error(sprintf('Twig processing error for template message ID %s: %s', $msg->getId() ?? 'new', $e->getMessage()), ['exception' => $e]);
                 $processedContent = '[Template Processing Error]'; // Fallback content
             }
 

@@ -122,6 +122,26 @@
                                     <li><code>{{ '{{organization.domain}}' }}</code> - Organization domain</li>
                                     <li><code>{{ '{{current_date}}' }}</code> - Current date (YYYY-MM-DD)</li>
                                 </ul>
+
+                                {# Display User Variables #}
+                                {% if userVariables is defined and userVariables|length > 0 %}
+                                    <h4 class="font-medium mt-3 mb-1">User Variables ({{ template.owner.email }}):</h4>
+                                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                                        {% for var in userVariables %}
+                                            <li><code>{{ '{{user.' ~ var.name ~ '}}' }}</code></li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+
+                                {# Display Organization Variables #}
+                                {% if organizationVariables is defined and organizationVariables|length > 0 %}
+                                    <h4 class="font-medium mt-3 mb-1">Organization Variables ({{ template.organization.domain }}):</h4>
+                                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                                        {% for var in organizationVariables %}
+                                            <li><code>{{ '{{organization.' ~ var.name ~ '}}' }}</code></li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

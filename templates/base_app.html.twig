@@ -58,8 +58,16 @@
                                 AI
                             </div>
                             <!-- App Name -->
-                            <span class="text-xl font-semibold text-gray-900">MultiChat</span>
+                            <a href="{{ path('app_home') }}" class="text-xl font-semibold text-gray-900">MultiChat</a> {# Make name a link to home #}
                         </div>
+                         {# Main App Navigation Links #}
+                         <div class="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8">
+                             {# Link to My Variables - similar style to base_settings #}
+                             <a href="{{ path('app_variable_index') }}" class="{{ app.request.get('_route') starts with 'app_variable_' ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                 My Variables
+                             </a>
+                             {# Add other main app links here if needed #}
+                         </div>
                     </div>
 
                     <!-- User Menu -->
@@ -96,7 +104,7 @@
                      <button type="button" data-action="chat-history#startNewChat" data-chat-history-target="newChatButton" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
                           New Chat
                       </button>
-                     {# Link to Prompt Templates #}
+                     {# Link to Prompt Templates (keep commented for now) #}
                     {# <a href="{{ path('app_prompt_template_index') }}" class="block w-full mt-2 px-4 py-2 text-sm text-center bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors duration-150">
                          Prompt Templates
                      </a>#}

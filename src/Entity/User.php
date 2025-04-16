@@ -2,7 +2,8 @@
 
 namespace App\Entity;
 
-use App\Entity\PromptTemplate; // Add import for PromptTemplate
+use App\Entity\PromptTemplate;
+use App\Entity\Variable; // Add import for Variable
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -42,10 +43,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(mappedBy: 'owner', targetEntity: PromptTemplate::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $promptTemplates;
 
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: Variable::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $variables;
+
     public function __construct()
     {
         $this->threads = new ArrayCollection();
-        $this->promptTemplates = new ArrayCollection(); // Initialize the new collection
+        $this->promptTemplates = new ArrayCollection();
+        $this->variables = new ArrayCollection(); // Initialize the new collection
     }
 
     public function getId(): ?int
@@ -228,6 +233,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             // set the owning side to null (unless already changed)
             if ($promptTemplate->getOwner() === $this) {
                 $promptTemplate->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Variable>
+     */
+    public function getVariables(): Collection
+    {
+        return $this->variables;
+    }
+
+    public function addVariable(Variable $variable): static
+    {
+        if (!$this->variables->contains($variable)) {
+            $this->variables->add($variable);
+            $variable->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeVariable(Variable $variable): static
+    {
+        if ($this->variables->removeElement($variable)) {
+            // set the owning side to null (unless already changed)
+            if ($variable->getUser() === $this) {
+                $variable->setUser(null);
             }
         }
 

@@ -4,9 +4,12 @@ namespace App\Controller;
 
 use App\Entity\Model;
 use App\Entity\User;
+use App\Entity\Variable;
+use App\Form\VariableType;
 use App\Repository\ApiRequestCostRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
+use App\Repository\VariableRepository; // Add this
 use App\Service\OpenRouterService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -113,9 +116,12 @@ class AdminController extends AbstractController
         ]);
     }
 
-    #[Route(path: '/users/{id}', name: 'admin_user_detail')]
-    public function userDetail(User $user): Response
+    #[Route(path: '/users/{id}', name: 'admin_user_detail', methods: ['GET'])] // Specify GET method
+    public function userDetail(User $user, VariableRepository $variableRepository): Response // Inject VariableRepository
     {
+        // Fetch user variables
+        $userVariables = $variableRepository->findBy(['user' => $user]);
+
         // Basic user stats
         $userStats = [
             'totalPrompts' => $this->apiRequestCostRepository->countByUser($user),
@@ -182,8 +188,107 @@ class AdminController extends AbstractController
             'userStats' => $userStats,
             'modelsUsage' => $modelsUsage,
             'modelDetails' => $modelDetails,
-            'timeUsage' => $timeUsage
+            'timeUsage' => $timeUsage,
+            'variables' => $userVariables, // Pass variables to template
         ]);
+    }
+
+    #[Route('/users/{userId}/variable/new', name: 'admin_user_variable_new', methods: ['GET', 'POST'])]
+    public function newUserVariable(
+        Request $request,
+        EntityManagerInterface $entityManager,
+        UserRepository $userRepository,
+        int $userId
+    ): Response {
+        $user = $userRepository->find($userId);
+        if (!$user) {
+            throw $this->createNotFoundException('User not found');
+        }
+
+        $variable = new Variable();
+        $variable->setUser($user); // Pre-associate with the user
+
+        $form = $this->createForm(VariableType::class, $variable);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            // Manually set timestamps before persisting
+            $now = new \DateTimeImmutable();
+            if ($variable->getCreatedAt() === null) {
+                 $variable->setCreatedAt($now);
+            }
+            if ($variable->getUpdatedAt() === null) {
+                 $variable->setUpdatedAt($now);
+            }
+            $entityManager->persist($variable);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Variable created successfully for user ' . $user->getEmail());
+
+            return $this->redirectToRoute('admin_user_detail', ['id' => $user->getId()], Response::HTTP_SEE_OTHER);
+        }
+
+        return $this->render('admin/user/variable_new.html.twig', [
+            'user' => $user,
+            'variable' => $variable,
+            'form' => $form,
+        ]);
+    }
+
+    #[Route('/users/{userId}/variable/{id}/edit', name: 'admin_user_variable_edit', methods: ['GET', 'POST'])]
+    public function editUserVariable(
+        Request $request,
+        Variable $variable, // ParamConverter fetches the Variable by {id}
+        EntityManagerInterface $entityManager,
+        UserRepository $userRepository,
+        int $userId // Still need userId for context and redirection
+    ): Response {
+        $user = $userRepository->find($userId);
+        if (!$user || $variable->getUser() !== $user) {
+            // Ensure the variable belongs to the specified user
+            throw $this->createNotFoundException('Variable or User not found for this context.');
+        }
+
+        $form = $this->createForm(VariableType::class, $variable);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $entityManager->flush();
+
+            $this->addFlash('success', 'Variable updated successfully for user ' . $user->getEmail());
+
+            return $this->redirectToRoute('admin_user_detail', ['id' => $user->getId()], Response::HTTP_SEE_OTHER);
+        }
+
+        return $this->render('admin/user/variable_edit.html.twig', [
+            'user' => $user,
+            'variable' => $variable,
+            'form' => $form,
+        ]);
+    }
+
+    #[Route('/users/{userId}/variable/{id}', name: 'admin_user_variable_delete', methods: ['POST'])]
+    public function deleteUserVariable(
+        Request $request,
+        Variable $variable,
+        EntityManagerInterface $entityManager,
+        UserRepository $userRepository,
+        int $userId
+    ): Response {
+        $user = $userRepository->find($userId);
+        if (!$user || $variable->getUser() !== $user) {
+            throw $this->createNotFoundException('Variable or User not found for this context.');
+        }
+
+        if ($this->isCsrfTokenValid('delete'.$variable->getId(), $request->request->get('_token'))) {
+            $entityManager->remove($variable);
+            $entityManager->flush();
+            $this->addFlash('success', 'Variable deleted successfully for user ' . $user->getEmail());
+        } else {
+             $this->addFlash('error', 'Invalid CSRF token.');
+        }
+
+        return $this->redirectToRoute('admin_user_detail', ['id' => $user->getId()], Response::HTTP_SEE_OTHER);
     }
 
     #[Route(path: '/models-stats', name: 'admin_models_stats')]

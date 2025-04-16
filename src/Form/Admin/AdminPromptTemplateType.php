@@ -75,14 +75,16 @@ class AdminPromptTemplateType extends AbstractType
                 'choice_label' => 'email',
                 'label' => 'Owner',
                 'placeholder' => 'Select an owner',
-                'attr' => ['class' => 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50'],
+                'disabled' => true, // Disable this field
+                'attr' => ['class' => 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 bg-gray-100'], // Add bg-gray-100 for visual cue
             ])
             ->add('organization', EntityType::class, [
                 'class' => Organization::class,
                 'choice_label' => 'domain',
                 'label' => 'Organization',
                 'placeholder' => 'Select an organization',
-                'attr' => ['class' => 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50'],
+                'disabled' => true, // Disable this field
+                'attr' => ['class' => 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 bg-gray-100'], // Add bg-gray-100 for visual cue
             ]);
     }
 
