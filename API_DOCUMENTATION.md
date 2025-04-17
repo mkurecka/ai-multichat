@@ -9,6 +9,9 @@ This document outlines the API endpoints available for the AI Multichat frontend
 **Obtaining a JWT:**
 Currently, the **only implemented method** to obtain a JWT for API usage is via the **Google OAuth 2.0 flow**. There is no standard username/password login endpoint (like `/api/login_check`) configured for the API.
 
+**JWT Token Refresh:**
+When a JWT token is about to expire, you can refresh it using the token refresh endpoint (see Authentication Endpoints section below).
+
 **Google OAuth 2.0 API Flow (Primary Method):**
 Users must authenticate via Google specifically for the API to obtain a JWT.
 
@@ -47,6 +50,60 @@ Users must authenticate via Google specifically for the API to obtain a JWT.
 
 ---
 
+## Authentication Endpoints
+
+These endpoints handle authentication and token management.
+
+### 1. Google OAuth 2.0 Callback
+
+*   **Endpoint:** `POST /api/auth/google/callback`
+*   **Description:** Exchanges a Google authorization code for a JWT token.
+*   **Request:**
+    *   **Content-Type:** `application/json`
+    *   **Body:**
+        ```json
+        {
+          "code": "GOOGLE_AUTHORIZATION_CODE",
+          "redirectUri": "YOUR_FRONTEND_REDIRECT_URI" // Required: Must match the redirect_uri used in the OAuth flow
+        }
+        ```
+*   **Response:** `200 OK`
+    *   **Content-Type:** `application/json`
+    *   **Body:**
+        ```json
+        {
+          "token": "GENERATED_JWT_TOKEN"
+        }
+        ```
+*   **Error Responses:**
+    *   `400 Bad Request`: Missing `code` or `redirectUri` in the request body.
+    *   `401 Unauthorized`: Invalid `code`, `redirectUri` mismatch, user not found in the database, or other Google authentication error.
+    *   `500 Internal Server Error`: Backend issue during code exchange or JWT generation.
+
+### 2. Refresh JWT Token
+
+*   **Endpoint:** `POST /api/token/refresh`
+*   **Description:** Refreshes an existing JWT token, typically used when the original token is about to expire.
+*   **Request:**
+    *   **Headers:**
+        ```
+        Authorization: Bearer <your_existing_jwt_token>
+        ```
+    *   **Body:** None required
+*   **Response:** `200 OK`
+    *   **Content-Type:** `application/json`
+    *   **Body:**
+        ```json
+        {
+          "token": "NEW_JWT_TOKEN"
+        }
+        ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: Missing or invalid Authorization header, invalid token (bad signature, malformed).
+    *   `500 Internal Server Error`: Backend issue during token creation.
+
+---
+
 ## Chat Endpoints (`src/Controller/ChatController.php`)
 
 These endpoints handle chat interactions, model management, and history retrieval.
@@ -62,7 +119,8 @@ These endpoints handle chat interactions, model management, and history retrieva
         ```json
         [
           {
-            "id": "string (e.g., 'openai/gpt-4')", // Unique identifier for the model
+            "id": "integer", // Database ID of the model
+            "modelId": "string (e.g., 'openai/gpt-4')", // Unique identifier for the model in the provider's system
             "name": "string", // User-friendly name
             "description": "string",
             "provider": "string", // Source provider (e.g., 'OpenAI', 'Anthropic')
@@ -448,10 +506,120 @@ These endpoints allow for programmatic management (CRUD) of Prompt Templates.
 
 ---
 
+## Variable API Endpoints (`src/Controller/ApiVariableController.php`)
+
+These endpoints allow for management of user and organization variables that can be used in prompt templates.
+
+**Base Path:** `/api/variables`
+
+**Authentication:** Requires authenticated user (`ROLE_USER`).
+
+### 1. List My Variables
+
+*   **Endpoint:** `GET /me`
+*   **Description:** Retrieves all variables accessible to the current user (their private variables and variables belonging to their organization).
+*   **Request:** None.
+*   **Response:** `200 OK`
+    *   **Content-Type:** `application/json`
+    *   **Body:** Array of Variable objects.
+        ```json
+        [
+          {
+            "id": "integer",
+            "name": "string",
+            "value": "string",
+            "scope": "private | organization",
+            "user": { /* user details if private variable */ },
+            "organization": { /* organization details if org variable */ }
+          },
+          // ... more variables
+        ]
+        ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: User is not authenticated.
+
+### 2. Create Variable
+
+*   **Endpoint:** `POST /me`
+*   **Description:** Creates a new variable for the current user.
+*   **Request:**
+    *   **Content-Type:** `application/json`
+    *   **Body:**
+        ```json
+        {
+          "name": "string (required)",
+          "value": "string (required)",
+          "scope": "private | organization" // Defaults to private, organization requires appropriate permissions
+        }
+        ```
+*   **Response:** `201 Created`
+    *   **Content-Type:** `application/json`
+    *   **Body:** The newly created Variable object.
+*   **Error Responses:**
+    *   `400 Bad Request`: Invalid JSON, validation errors (e.g., missing required fields).
+    *   `403 Forbidden`: User attempts to set `organization` scope without appropriate permissions.
+
+### 3. Update Variable
+
+*   **Endpoint:** `PUT /me/{id}` or `PATCH /me/{id}`
+*   **Description:** Updates an existing variable.
+*   **Request:**
+    *   **Content-Type:** `application/json`
+    *   **Body:**
+        ```json
+        {
+          "name": "string", // Optional for PATCH
+          "value": "string", // Optional for PATCH
+          "scope": "private | organization" // Optional for PATCH
+        }
+        ```
+*   **Response:** `200 OK`
+    *   **Content-Type:** `application/json`
+    *   **Body:** The updated Variable object.
+*   **Error Responses:**
+    *   `400 Bad Request`: Invalid JSON, validation errors.
+    *   `403 Forbidden`: User does not have permission to edit this variable.
+    *   `404 Not Found`: Variable with the given `id` not found or not accessible by the user.
+
+### 4. Delete Variable
+
+*   **Endpoint:** `DELETE /me/{id}`
+*   **Description:** Deletes a specific variable by its ID.
+*   **Request:** URL parameter `id` (integer).
+*   **Response:** `204 No Content` (Successful deletion)
+*   **Error Responses:**
+    *   `403 Forbidden`: User does not have permission to delete this variable.
+    *   `404 Not Found`: Variable with the given `id` not found or not accessible by the user.
+
+---
+
+## Context Management
+
+The AI Multichat application includes automatic context management features that work behind the scenes when using the chat endpoints. These features are not directly exposed as API endpoints but are important to understand when working with the API.
+
+### Context Compression
+
+When a chat thread grows beyond a certain threshold (typically 20 messages), the system automatically compresses older messages into a summary. This summary is then used as context for future messages, allowing the AI to maintain continuity while reducing token usage.
+
+**Key Components:**
+
+*   **Thread Summaries:** When a thread reaches the compression threshold, older messages are summarized using an AI model (typically a fast model like Claude 3 Haiku).
+*   **Context Service:** The `ContextService` manages the retrieval of relevant context for each chat message, including thread summaries and recent messages.
+*   **Maximum Recent Messages:** By default, the system includes the 5 most recent message pairs (user + assistant) in addition to any summary.
+
+**How It Affects API Usage:**
+
+*   When sending a message to a thread with a summary via `POST /chat`, the summary is automatically included in the context sent to the AI model.
+*   This helps maintain conversation continuity while keeping token usage manageable.
+*   The summary is transparent to API users - you don't need to handle it explicitly.
+
+---
+
 **Important Considerations:**
 
-*   **Serialization Groups:** The exact fields returned in JSON responses depend on how Symfony Serializer groups are configured on the `PromptTemplate` and related entities. These might need refinement (`template:read`, `template:write`, `template:read:messages`, etc.).
-*   **PATCHing Collections:** Updating the `messages` collection via PATCH requires careful implementation on the backend and clear documentation on how the frontend should structure the request (e.g., does it replace the whole collection, or merge?). The current controller implementation might replace the collection.
+*   **Serialization Groups:** The exact fields returned in JSON responses depend on how Symfony Serializer groups are configured on the entities. These might need refinement (`template:read`, `template:write`, `template:read:messages`, `variable:read`, `variable:write`, etc.).
+*   **PATCHing Collections:** Updating collections via PATCH requires careful implementation on the backend and clear documentation on how the frontend should structure the request (e.g., does it replace the whole collection, or merge?). The current controller implementation might replace the collection.
 *   **Error Handling:** Specific error messages might vary.
+*   **JWT Token Lifetime:** JWT tokens have a limited lifetime (typically 7 days). Use the token refresh endpoint to obtain a new token before expiration.
 
 ---
