@@ -21,6 +21,6 @@ class AccessDeniedHandler implements AccessDeniedHandlerInterface
         // Store the requested URL in the session to redirect back after login
         $request->getSession()->set('_security.main.target_path', $request->getUri());
 
-        return new RedirectResponse($this->urlGenerator->generate('app_login'));
+        return new RedirectResponse($this->urlGenerator->generate('app_home'));
     }
-} 
+}

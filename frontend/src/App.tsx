@@ -44,14 +44,14 @@ interface ModelOptionType {
   model: Model;
 }
 
-// --- Protected Route Component --- 
+// --- Protected Route Component ---
 // Use React.PropsWithChildren for standard child prop typing
 const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
   const token = getAuthToken();
   const location = useLocation();
 
   if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
   // TODO: Add token expiration check here
   return children;
@@ -68,7 +68,7 @@ function App() {
   const [chatHistory, setChatHistory] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   // Keep models state here if needed globally or by multiple pages via props/context
-  const [models, setModels] = useState<Model[]>([]); 
+  const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
   const isFetchingInitialData = useRef(false);
@@ -107,7 +107,7 @@ function App() {
     // Clear chat state on logout
     setChatHistory([]);
     setActiveThreadId(null);
-    setModels([]); 
+    setModels([]);
     setPromptTemplates([]); // Clear templates on logout
   }, [processToken]);
 
@@ -122,7 +122,7 @@ function App() {
       console.log("GoogleCallbackHandler: Conditions met, proceeding with auth..."); // Log Proceeding
       setAuthLoading(true);
       setError(null);
-      
+
       console.log("GoogleCallbackHandler: Calling backend handleGoogleCallback API..."); // Log API Call
       handleGoogleCallback(code, calculatedRedirectUri)
         .then(receivedToken => {
@@ -133,7 +133,7 @@ function App() {
             setError("Login failed: No token received after Google callback.");
             // Optionally navigate back to login on token failure
             // console.log("GoogleCallbackHandler: Navigating to /login due to no token.");
-            // navigate('/login', { replace: true }); 
+            // navigate('/login', { replace: true });
           } else {
             // Navigate to home page on success
             console.log("GoogleCallbackHandler: Token received, navigating to /"); // Log Success Navigation
@@ -141,15 +141,15 @@ function App() {
           }
           // Clean the URL *after* potential navigation - maybe remove this if router handles it
           // console.log("GoogleCallbackHandler: Attempting to clean URL...");
-          // window.history.replaceState({}, document.title, window.location.pathname); 
+          // window.history.replaceState({}, document.title, window.location.pathname);
         })
         .catch(err => {
           console.error("Google callback handler failed:", err); // Log Error
           setError(err instanceof Error ? err.message : 'Google login failed.');
           processToken(null);
-          // Navigate back to login on error
-          console.log("GoogleCallbackHandler: Error caught, navigating to /login."); // Log Error Navigation
-          navigate('/login', { replace: true }); 
+          // Navigate back to homepage on error
+          console.log("GoogleCallbackHandler: Error caught, navigating to homepage."); // Log Error Navigation
+          navigate('/', { replace: true });
           // Clean the URL *after* potential navigation
           // window.history.replaceState({}, document.title, window.location.pathname);
         })
@@ -179,7 +179,7 @@ function App() {
     );
   };
 
-  // --- Add Back Handlers for Sidebar --- 
+  // --- Add Back Handlers for Sidebar ---
   const handleSelectThread = useCallback((threadId: string) => {
     console.log("App: Selecting thread:", threadId);
     if (threadId === activeThreadId) return;
@@ -189,7 +189,7 @@ function App() {
 
   const handleNewChat = useCallback(() => {
     console.log("App: Starting new chat...");
-    setActiveThreadId(null); 
+    setActiveThreadId(null);
     // ChatPage will clear its state based on null activeThreadId
   }, []);
 
@@ -197,7 +197,7 @@ function App() {
    const fetchInitialData = useCallback(async () => {
      const currentToken = getAuthToken();
      if (!currentToken || isFetchingInitialData.current) return;
-     
+
      console.log("App: Fetching initial models, history, and templates...");
      isFetchingInitialData.current = true;
      setLoading(true);
@@ -224,7 +224,7 @@ function App() {
        isFetchingInitialData.current = false;
      }
    }, [handleLogout]);
- 
+
    useEffect(() => {
      if (authToken && !authLoading) {
        fetchInitialData();
@@ -245,12 +245,12 @@ function App() {
     <Routes>
       <Route path="/login" element={<LoginPage googleClientId={GOOGLE_CLIENT_ID} redirectUri={calculatedRedirectUri} />} />
       <Route path={OAUTH_CALLBACK_PATH} element={<GoogleCallbackHandler />} />
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           <ProtectedRoute>
-            <Layout 
-              userEmail={userInfo?.email || null} 
+            <Layout
+              userEmail={userInfo?.email || null}
               onLogout={handleLogout}
               chatHistory={chatHistory}
               activeThreadId={activeThreadId}
@@ -263,13 +263,13 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<ChatPage 
+        <Route index element={<ChatPage
           models={models}
           activeThreadId={activeThreadId}
           setActiveThreadId={setActiveThreadId}
           setChatHistory={setChatHistory}
         />} />
-        <Route path="templates" element={<PromptTemplatePage 
+        <Route path="templates" element={<PromptTemplatePage
           models={models}
           templates={promptTemplates}
           setTemplates={setPromptTemplates}

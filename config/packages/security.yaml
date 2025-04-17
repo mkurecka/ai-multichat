@@ -37,8 +37,10 @@ security:
             logout:
                 path: app_logout
                 target: connect_google
-            access_denied_url: /login
+            access_denied_url: /
             access_denied_handler: App\Security\AccessDeniedHandler
+            # Add entry point to redirect to homepage if authentication fails
+            entry_point: App\Security\AuthenticationEntryPoint
             switch_user: true # Enable user impersonation
 
     access_control:

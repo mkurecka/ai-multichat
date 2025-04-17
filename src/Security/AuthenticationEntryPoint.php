@@ -32,7 +32,9 @@ class AuthenticationEntryPoint implements AuthenticationEntryPointInterface
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // For regular requests, redirect to the login page
-        return new RedirectResponse($this->urlGenerator->generate('app_login'));
+        // For regular requests, redirect to the homepage instead of showing a 401 error
+        // The homepage will handle redirecting authenticated users to the app
+        // and showing the landing page for unauthenticated users
+        return new RedirectResponse($this->urlGenerator->generate('app_home'));
     }
 }

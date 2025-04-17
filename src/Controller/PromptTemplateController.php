@@ -24,7 +24,7 @@ class PromptTemplateController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
         if (!$user) {
-            return $this->redirectToRoute('app_login');
+            return $this->redirectToRoute('app_home');
         }
 
         // Fetch templates owned by the current user

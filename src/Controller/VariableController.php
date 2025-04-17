@@ -24,7 +24,7 @@ class VariableController extends AbstractController
         $user = $this->getUser();
         if (!$user) {
             // Should not happen due to IsGranted, but good practice
-            return $this->redirectToRoute('app_login'); // Or your login route
+            return $this->redirectToRoute('app_home'); // Redirect to homepage
         }
 
         // Fetch variables belonging to the current user
