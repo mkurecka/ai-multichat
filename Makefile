@@ -13,6 +13,9 @@ help:
 	@echo "  make tailwind-watch  - Watch Tailwind CSS assets for changes"
 	@echo "  make cache-clear     - Clear the application cache"
 	@echo "  make test            - Run PHPUnit tests"
+	@echo "  make prepare-test-db - Prepare test database for testing"
+	@echo "  make clear-test-cache - Clear the test environment cache"
+	@echo "  make test-with-setup - Clear test cache and run tests"
 	@echo "  make load-fixtures   - Load test data (WARNING: deletes existing data)"
 	@echo "  make promote-user    - Promote user to a role (Usage: make promote-user EMAIL=user@example.com ROLE=ROLE_ORGANIZATION_ADMIN)"
 
@@ -52,6 +55,15 @@ cache-clear:
 test:
 	docker compose exec php bin/phpunit
 
+prepare-test-db:
+	docker compose exec php bin/prepare-test-db.sh
+
+clear-test-cache:
+	docker compose exec php bin/clear-test-cache.sh
+
+test-with-setup: clear-test-cache
+	docker compose exec php bin/phpunit
+
 # Data Fixtures
 load-fixtures:
 	@echo "Dropping database schema..."
@@ -72,4 +84,4 @@ endif
 	docker compose exec php bin/console app:promote-user $(EMAIL) --role=$(ROLE)
 
 # Phony targets to avoid conflicts with filenames
-.PHONY: help up down php composer-install migrate make-migration tailwind-build tailwind-watch cache-clear test load-fixtures promote-user
+.PHONY: help up down php composer-install migrate make-migration tailwind-build tailwind-watch cache-clear test prepare-test-db clear-test-cache test-with-setup load-fixtures promote-user
