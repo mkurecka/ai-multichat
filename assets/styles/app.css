@@ -1502,6 +1502,83 @@ body {
     flex: 1 1 100%;
     max-width: 100%;
   }
+
+  /* Mobile sidebar adjustments */
+  .w-64 {
+    width: 80%; /* Make sidebar wider on mobile when shown */
+  }
+
+  /* Smaller padding for mobile */
+  .p-4 {
+    padding: 0.75rem;
+  }
+
+  /* Adjust message content for mobile */
+  .message-content {
+    font-size: 0.95rem;
+  }
+
+  /* Adjust message headers for mobile */
+  .message-header {
+    font-size: 0.9rem;
+  }
+
+  /* Make dropdowns full width on mobile */
+  .dropdown {
+    width: 100%;
+    left: 0;
+    right: 0;
+  }
+
+  /* Mobile-specific layout adjustments */
+  .mobile-full-height {
+    height: 100vh;
+    max-height: 100vh;
+  }
+
+  /* Mobile chat history sidebar */
+  .mobile-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+    background-color: white;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .mobile-sidebar.active {
+    transform: translateX(0);
+  }
+
+  /* Mobile header */
+  .mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+
+  /* Mobile bottom bar */
+  .mobile-bottom-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    background-color: white;
+  }
+
+  /* Fullscreen mobile dropdowns */
+  .mobile-fullscreen-dropdown {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    background-color: white;
+    overflow-y: auto;
+  }
 }
 
 /* Header styles */

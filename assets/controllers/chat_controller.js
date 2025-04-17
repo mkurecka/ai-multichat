@@ -31,7 +31,10 @@ export default class extends Controller {
         "authRequiredMessage",
         "mainAppContainer",
         "headerNav",
-        "userEmail"
+        "userEmail",
+        "mobileMenu",
+        "chatHistorySidebar",
+        "sidebarOverlay"
     ];
 
     static values = {
@@ -872,6 +875,36 @@ export default class extends Controller {
     }
 
     // --- UI Helpers ---
+
+    // Toggle chat history sidebar for mobile layout
+    toggleChatHistory() {
+        if (this.hasChatHistorySidebarTarget && this.hasSidebarOverlayTarget) {
+            const sidebar = this.chatHistorySidebarTarget;
+            const overlay = this.sidebarOverlayTarget;
+
+            // Check if sidebar is currently visible
+            const isVisible = !sidebar.classList.contains('hidden');
+
+            if (isVisible) {
+                // Hide sidebar
+                sidebar.classList.add('hidden');
+                sidebar.classList.add('translate-x-full');
+                overlay.classList.add('hidden');
+            } else {
+                // Show sidebar
+                sidebar.classList.remove('hidden');
+                sidebar.classList.remove('translate-x-full');
+                overlay.classList.remove('hidden');
+            }
+        }
+    }
+
+    // Toggle mobile menu in header
+    toggleMobileMenu() {
+        if (this.hasMobileMenuTarget) {
+            this.mobileMenuTarget.classList.toggle('hidden');
+        }
+    }
 
     // clearChatWindow - Removed, delegated to MessageService
 

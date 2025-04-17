@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}APP!{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token('default') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text></svg>">
+    {# Include the processed CSS file via AssetMapper #}
+    <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
+    {% block stylesheets %}{% endblock %}
+
+    {# Add device detection for layout switching #}
+    <div data-controller="device"
+         data-device-mobile-url-value="{{ mobile_url|default(path('app_mobile')) }}"
+         data-device-desktop-url-value="{{ desktop_url|default(path('app_main')) }}"
+         data-device-current-layout-value="{{ current_layout|default('mobile') }}"></div>
+</head>
+<body>
+{% block body %}
+    {# Main chat controller wraps everything #}
+    <div data-controller="chat"
+         data-chat-is-authenticated-value="{{ app.user ? 'true' : 'false' }}"
+         data-chat-user-email-value="{{ app.user ? app.user.email : '' }}"
+         data-chat-is-loading-value="true"
+         data-chat-models-value="[]"
+         data-chat-chat-history-value="[]"
+         data-chat-current-messages-value="[]"
+         data-chat-current-thread-id-value=""
+         data-chat-selected-model-ids-value="[]"
+         data-chat-chat-history-outlet="[data-controller='chat-history']"
+         class="flex flex-col h-screen">
+
+        {# Loading/Auth Indicators #}
+        <div data-chat-target="authLoadingIndicator" class="p-4 text-center">Verifying Authentication...</div>
+        <div data-chat-target="authRequiredMessage" class="p-4 text-center text-red-600" hidden>
+            <p>Authentication required. Please log in.</p>
+            <div class="mt-4 flex justify-center space-x-4 flex-wrap">
+                <button type="button" data-action="chat#checkAuth" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 m-1">Retry Authentication</button>
+                <button type="button" data-action="chat#debugToken" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 m-1">Debug Session</button>
+                <button type="button" data-action="chat#forceShowApp" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 m-1">Force Show App</button>
+                <a href="/login" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 inline-flex items-center m-1">Go to Login</a>
+            </div>
+        </div>
+        <div data-chat-target="loadingIndicator" class="fixed bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg z-50 flex items-center space-x-3 border border-blue-300" style="visibility: hidden;">
+             <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+             <span class="text-sm font-medium text-blue-600">Loading data...</span>
+             <button type="button" onclick="this.parentElement.style.visibility = 'hidden';" class="ml-2 text-gray-400 hover:text-gray-600">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                 </svg>
+             </button>
+        </div>
+
+        {# Mobile Header with Navigation #}
+        <header data-chat-target="headerNav" class="bg-white shadow-sm" hidden>
+            <div class="px-4 py-2">
+                <div class="flex justify-between items-center">
+                    <!-- Logo and App Name -->
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
+                            <!-- App Logo -->
+                            <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center text-white font-bold mr-2 app-logo">
+                                AI
+                            </div>
+                            <!-- App Name -->
+                            <a href="{{ path('app_home') }}" class="text-xl font-semibold text-gray-900">MultiChat</a>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <!-- History Button -->
+                        <button type="button"
+                                data-action="chat#toggleChatHistory"
+                                class="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+
+                        <!-- Menu Button -->
+                        <button type="button"
+                                data-action="chat#toggleMobileMenu"
+                                class="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Navigation Menu (hidden by default) -->
+            <div data-chat-target="mobileMenu" class="hidden px-2 pt-2 pb-3 space-y-1 border-t border-gray-200">
+                <a href="{{ path('app_variable_index') }}" class="{{ app.request.get('_route') starts with 'app_variable_' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800' }} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
+                    My Variables
+                </a>
+                <a href="{{ path('app_prompt_template_index') }}" class="{{ app.request.get('_route') starts with 'app_prompt_template_' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800' }} block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
+                    My Prompt Templates
+                </a>
+
+                <button type="button"
+                        data-action="chat#logout"
+                        class="w-full text-left border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
+                    Logout
+                </button>
+                <div class="pt-2 border-t border-gray-200">
+                    <span class="block pl-3 pr-4 py-2 text-sm text-gray-500" data-chat-target="userEmail"></span>
+                </div>
+            </div>
+        </header>
+
+        {# Main App Container #}
+        <div data-chat-target="mainAppContainer" class="flex flex-1 flex-col overflow-hidden" hidden>
+            {# Chat History Sidebar (hidden by default on mobile) #}
+            <div data-controller="chat-history"
+                 data-chat-history-chat-outlet="[data-controller='chat']"
+                 data-chat-history-chat-history-value="{{ []|json_encode }}"
+                 data-chat-history-current-thread-id-value=""
+                 data-chat-target="chatHistorySidebar"
+                 class="fixed inset-0 bg-white z-40 transform translate-x-full transition-transform duration-300 ease-in-out hidden">
+                <div class="flex flex-col h-full">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h2 class="font-semibold text-lg">Chat History</h2>
+                        <button type="button" data-action="chat#toggleChatHistory" class="p-2 rounded-full hover:bg-gray-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-4 border-b">
+                        <button type="button" data-action="chat-history#startNewChat" data-chat-history-target="newChatButton" class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
+                            New Chat
+                        </button>
+                    </div>
+                    <div data-chat-history-target="listContainer" class="flex-1 overflow-y-auto p-2 space-y-1">
+                        {# Session items will be rendered here by chat-history controller #}
+                        <p class="text-xs text-gray-500 p-2">Loading history...</p>
+                    </div>
+                </div>
+            </div>
+
+            {# Overlay for mobile sidebar #}
+            <div data-chat-target="sidebarOverlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-30 hidden" data-action="click->chat#toggleChatHistory"></div>
+
+            {# Main Content Area #}
+            <div class="flex-1 flex flex-col bg-gray-100 overflow-hidden">
+                {# Content from child templates will go here #}
+                {% block app_content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block javascripts %}
+    {{ importmap('app') }}
+{% endblock %}
+</body>
+</html>

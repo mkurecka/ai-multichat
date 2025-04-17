@@ -1,0 +1,178 @@
+{% extends 'base_app_mobile.html.twig' %}
+
+{% block app_content %}
+    {# This block contains the mobile-optimized chat window area #}
+
+    <script>
+        console.log('Symfony authentication status:', {{ app.user ? 'true' : 'false' }});
+    </script>
+
+    {# Chat Window Area #}
+    <div class="flex-1 flex flex-col overflow-hidden min-h-0">
+
+        {# Template Selector - Simplified for mobile #}
+        <div data-controller="template-selector"
+             data-template-selector-chat-outlet="[data-controller='chat']"
+             data-template-selector-templates-value="{{ []|json_encode }}"
+             data-template-selector-selected-template-id-value="0"
+             data-template-selector-search-term-value=""
+             data-template-selector-is-open-value="false"
+             data-chat-target="templateSelectorContainer"
+             class="bg-white border-b p-2 shadow-md z-20 flex-shrink-0 relative">
+            <div class="flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-medium text-gray-700">Templates</h3>
+                    <span data-template-selector-target="selectedCount" class="text-xs text-gray-500">0 selected</span>
+                </div>
+                <div class="relative">
+                    <div class="flex items-center border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all duration-150">
+                        <input type="text"
+                               data-template-selector-target="searchInput"
+                               data-action="input->template-selector#search keydown->template-selector#handleSearchKeydown focus->template-selector#openDropdown"
+                               placeholder="Search templates..."
+                               class="w-full px-2 py-1 text-sm border-none focus:outline-none focus:ring-0">
+                        <button type="button"
+                                data-action="click->template-selector#toggleDropdown"
+                                class="p-1 text-gray-500 hover:text-gray-700 focus:outline-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {# Dropdown - Full screen on mobile #}
+            <div data-template-selector-target="dropdown" hidden class="fixed inset-0 z-50 bg-white overflow-y-auto">
+                <div class="flex justify-between items-center p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                    <h3 class="font-medium text-gray-700">Select Template</h3>
+                    <button type="button"
+                            data-action="click->template-selector#closeDropdown"
+                            class="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div data-template-selector-target="templateList" class="p-3">
+                    {# Template items rendered here by template-selector controller #}
+                </div>
+                <div data-template-selector-target="noTemplatesMessage" hidden class="text-sm text-gray-500 py-3 text-center font-medium">No templates found</div>
+                <div class="p-2 border-t border-gray-200 sticky bottom-0 bg-white">
+                    <button type="button"
+                            data-action="click->template-selector#closeDropdown"
+                            class="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
+                        Done
+                    </button>
+                </div>
+            </div>
+
+            {# Selected Template Chip #}
+            <div data-template-selector-target="selectedTemplateContainer" class="mt-2">
+                {# Selected template chip rendered here by template-selector controller #}
+            </div>
+        </div>
+
+        {# Model Selector - Simplified for mobile #}
+        <div data-controller="model-selector"
+             data-model-selector-chat-outlet="[data-controller='chat']"
+             data-model-selector-models-value="{{ []|json_encode }}"
+             data-model-selector-selected-ids-value="{{ []|json_encode }}"
+             data-model-selector-max-models-value="16"
+             data-chat-target="modelSelectorContainer"
+             data-chat-model-selector-outlet=".model-selector"
+             class="bg-white border-b p-2 shadow-md z-10 flex-shrink-0">
+
+            <div class="flex items-center justify-between mb-2">
+                 <h2 class="text-sm font-medium text-gray-700">Available Models</h2>
+                 <span data-model-selector-target="selectedCount" class="text-xs text-gray-500">0/16 selected</span>
+            </div>
+            <div class="relative">
+                <div class="flex flex-col space-y-2">
+                    <div class="relative flex-grow">
+                        <input type="text"
+                               data-model-selector-target="searchInput"
+                               data-action="input->model-selector#search focus->model-selector#openDropdown"
+                               placeholder="Search models..."
+                               class="w-full px-3 py-1 pl-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                        {# Search Icon #}
+                        <svg class="absolute left-2 top-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <button type="button"
+                            data-action="click->model-selector#openDropdown"
+                            class="px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        Models
+                    </button>
+                </div>
+            </div>
+            {# Dropdown - Full screen on mobile #}
+            <div data-model-selector-target="dropdown" hidden class="fixed inset-0 z-50 bg-white overflow-y-auto">
+                <div class="flex justify-between items-center p-2 border-b border-gray-200 sticky top-0 bg-white z-10">
+                    <h3 class="font-medium text-gray-700">Select Models</h3>
+                    <button type="button"
+                            data-action="click->model-selector#closeDropdown"
+                            class="p-1 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div data-model-selector-target="modelList" class="p-3">
+                    {# Model items rendered here by model-selector controller #}
+                </div>
+                <div data-model-selector-target="noResultsMessage" hidden class="text-sm text-gray-500 py-3 text-center font-medium">No models found</div>
+                <div class="p-2 border-t border-gray-200 sticky bottom-0 bg-white">
+                    <button type="button"
+                            data-action="click->model-selector#closeDropdown"
+                            class="w-full py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150">
+                        Done
+                    </button>
+                </div>
+            </div>
+            {# Selected Chips #}
+            <div data-model-selector-target="selectedChipContainer" class="mt-2 flex flex-wrap gap-2">
+                 {# Selected chips rendered here by model-selector controller #}
+            </div>
+             <div data-model-selector-target="maxReachedMessage" hidden class="text-xs text-red-500 mt-1">Maximum models selected</div>
+        </div>
+
+        {# Messages Area #}
+        <div data-chat-target="chatWindowMessages" class="flex-1 overflow-y-auto p-2 space-y-4 bg-gray-50">
+            {# Messages will be appended here by chat controller's appendMessageToDOM #}
+            {# Initial placeholder message #}
+            <div class="text-center text-gray-400 p-8">
+                <p class="mb-2 text-lg">Select models and start chatting</p>
+                <p class="text-sm">Your conversation will appear here.</p>
+            </div>
+        </div>
+
+        {# Chat Input Area #}
+        <div data-controller="chat-input"
+             data-chat-input-chat-outlet="[data-controller='chat']"
+             data-chat-input-disabled-value="true"
+             data-chat-input-is-loading-value="false"
+             data-chat-target="chatInputContainer"
+             class="p-2 border-t bg-white flex-shrink-0 sticky bottom-0">
+            <form data-action="submit->chat-input#submit" class="flex items-end gap-2">
+                <div class="flex-1">
+                    <textarea data-chat-input-target="textarea"
+                              data-action="input->chat-input#onInput keydown->chat-input#keydown"
+                              placeholder="Select at least one model to start chatting"
+                              disabled
+                              class="w-full p-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 text-gray-500 transition-colors duration-150"
+                              rows="1"></textarea>
+                </div>
+                <button type="submit"
+                        data-chat-input-target="submitButton"
+                        disabled
+                        class="p-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed transition-colors duration-150">
+                    {# Send Icon #}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                </button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

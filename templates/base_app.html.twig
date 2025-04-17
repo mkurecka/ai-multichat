@@ -9,6 +9,12 @@
     {# Include the processed CSS file via AssetMapper #}
     <link rel="stylesheet" href="{{ asset('styles/app.css') }}">
     {% block stylesheets %}{% endblock %}
+
+    {# Add device detection for layout switching #}
+    <div data-controller="device"
+         data-device-mobile-url-value="{{ mobile_url|default(path('app_mobile')) }}"
+         data-device-desktop-url-value="{{ desktop_url|default(path('app_main')) }}"
+         data-device-current-layout-value="{{ current_layout|default('desktop') }}"></div>
 </head>
 <body>
 {% block body %}
