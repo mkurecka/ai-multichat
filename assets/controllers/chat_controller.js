@@ -562,76 +562,179 @@ export default class extends Controller {
         modelPlaceholders.forEach(placeholder => this.messageService.appendMessageToDOM(placeholder));
         this.currentMessagesValue = [...this.currentMessagesValue, ...modelPlaceholders];
 
-        // Determine if streaming should be used (based on model capability and settings)
+        // Determine which models support streaming
         const modelsData = this.modelsValue || [];
-        const selectedSupportsStreaming = modelsData
-            .filter(m => this.selectedModelIdsValue.includes(m.id))
-            .some(m => m.supportsStreaming);
-        // Simple streaming logic: only if one model selected and it supports streaming
-        const useStreaming = this.selectedModelIdsValue.length === 1 && selectedSupportsStreaming;
+        const selectedModels = modelsData.filter(m => this.selectedModelIdsValue.includes(m.id));
+        const streamingModels = selectedModels.filter(m => m.supportsStreaming);
+
+        // We'll use streaming for any model that supports it
+        const hasStreamingModels = streamingModels.length > 0;
 
         try {
-            // Handle streaming and non-streaming responses differently
-            if (useStreaming) {
-                // Streaming is handled by the backend sending Server-Sent Events
-                console.log('Setting up streaming response');
+            // Handle streaming and non-streaming models separately
+            if (hasStreamingModels) {
+                console.log('Setting up streaming responses for supported models');
 
-                // Use StreamingService
-                const streamingModelId = this.selectedModelIdsValue[0];
-                const streamParams = {
-                    userInput: prompt,
-                    models: [streamingModelId],
-                    promptId: promptId,
-                    threadId: this.currentThreadIdValue || undefined,
-                    templateId: this.selectedTemplateIdValue || undefined,
-                };
+                // Track thread ID from first response
+                let threadIdFromResponse = null;
 
-                this.streamingService.sendStreamingRequest(
-                    streamParams,
-                    // onChunk callback
-                    (streamContent) => {
-                        this.messageService.updateStreamingContent(promptId, streamingModelId, streamContent);
-                    },
-                    // onThreadId callback
-                    (threadId) => {
-                        if (!this.currentThreadIdValue) {
-                            this.currentThreadIdValue = threadId;
-                            console.log('New thread created from streaming response:', this.currentThreadIdValue);
-                            // Update state for existing messages
-                            this.currentMessagesValue = this.currentMessagesValue.map(msg => ({ ...msg, threadId: msg.threadId || this.currentThreadIdValue }));
+                // Create an array to track active streaming requests
+                const streamingRequests = [];
+
+                // Process streaming models first
+                for (const model of streamingModels) {
+                    console.log(`Setting up streaming for model: ${model.name} (${model.id})`);
+
+                    const streamParams = {
+                        userInput: prompt,
+                        models: [model.id],
+                        promptId: promptId,
+                        threadId: this.currentThreadIdValue || threadIdFromResponse || undefined,
+                        templateId: this.selectedTemplateIdValue || undefined,
+                    };
+
+                    const streamingRequest = this.streamingService.sendStreamingRequest(
+                        streamParams,
+                        // onChunk callback
+                        (streamContent) => {
+                            this.messageService.updateStreamingContent(promptId, model.id, streamContent);
+                        },
+                        // onThreadId callback
+                        (threadId) => {
+                            if (!this.currentThreadIdValue) {
+                                // Save thread ID from first response
+                                threadIdFromResponse = threadId;
+                                this.currentThreadIdValue = threadId;
+                                console.log('New thread created from streaming response:', this.currentThreadIdValue);
+                                // Update state for existing messages
+                                this.currentMessagesValue = this.currentMessagesValue.map(msg => ({ ...msg, threadId: msg.threadId || this.currentThreadIdValue }));
+                            }
+                        },
+                        // onComplete callback
+                        (finalContent) => {
+                            console.log(`Streaming complete for model ${model.name}`);
+                            this.messageService.updatePlaceholderMessage(promptId, model.id, finalContent);
+
+                            // Update final state for the streamed message
+                            const messageIndex = this.currentMessagesValue.findIndex(msg =>
+                                msg.promptId === promptId && msg.modelId === model.id && msg.role === 'assistant');
+                            if (messageIndex !== -1) {
+                                const updatedMessages = [...this.currentMessagesValue];
+                                updatedMessages[messageIndex] = {
+                                    ...updatedMessages[messageIndex],
+                                    content: finalContent,
+                                    isPlaceholder: false
+                                };
+                                this.currentMessagesValue = updatedMessages;
+                            }
+
+                            // Remove this request from active requests
+                            const index = streamingRequests.findIndex(req => req.modelId === model.id);
+                            if (index !== -1) {
+                                streamingRequests.splice(index, 1);
+                            }
+
+                            // If all streaming requests are done, mark as complete
+                            if (streamingRequests.length === 0) {
+                                this.isLoadingValue = false;
+                                this.dispatch('sendEnd');
+                            }
+                        },
+                        // onError callback
+                        (error, streamContent) => {
+                            console.error(`Streaming error for model ${model.name}:`, error);
+
+                            if (streamContent) {
+                                this.messageService.updatePlaceholderMessage(promptId, model.id, streamContent);
+                            } else {
+                                // Only remove this model's placeholder, not all
+                                this.messageService.removePlaceholderForModel(promptId, model.id);
+
+                                // Update the state
+                                const messageIndex = this.currentMessagesValue.findIndex(msg =>
+                                    msg.promptId === promptId && msg.modelId === model.id && msg.role === 'assistant');
+                                if (messageIndex !== -1) {
+                                    const updatedMessages = [...this.currentMessagesValue];
+                                    updatedMessages.splice(messageIndex, 1);
+                                    this.currentMessagesValue = updatedMessages;
+                                }
+                            }
+
+                            // Remove this request from active requests
+                            const index = streamingRequests.findIndex(req => req.modelId === model.id);
+                            if (index !== -1) {
+                                streamingRequests.splice(index, 1);
+                            }
+
+                            // If all streaming requests are done, mark as complete
+                            if (streamingRequests.length === 0) {
+                                this.isLoadingValue = false;
+                                this.dispatch('sendEnd');
+                            }
+
+                            this.notificationService.showNotification(`Error with ${model.name}: ${error.message}`, 'error');
                         }
-                    },
-                    // onComplete callback
-                    (finalContent) => {
-                        console.log('Streaming complete via StreamingService');
-                        this.messageService.updatePlaceholderMessage(promptId, streamingModelId, finalContent);
-                        // Update final state for the streamed message
-                         const messageIndex = this.currentMessagesValue.findIndex(msg => msg.promptId === promptId && msg.modelId === streamingModelId && msg.role === 'assistant');
-                         if (messageIndex !== -1) {
-                             const updatedMessages = [...this.currentMessagesValue];
-                             updatedMessages[messageIndex] = {
-                                 ...updatedMessages[messageIndex],
-                                 content: finalContent,
-                                 isPlaceholder: false
-                             };
-                             this.currentMessagesValue = updatedMessages;
-                         }
-                    },
-                    // onError callback
-                    (error, streamContent) => {
-                        console.error('Error with streaming request via StreamingService:', error);
-                        if (streamContent) {
-                            this.messageService.updatePlaceholderMessage(promptId, streamingModelId, streamContent);
-                        } else {
-                            this.messageService.removePlaceholders(promptId);
+                    );
+
+                    // Add to active requests
+                    streamingRequests.push({
+                        modelId: model.id,
+                        controller: streamingRequest,
+                    });
+                }
+
+                // Process non-streaming models if there are any
+                const nonStreamingModels = selectedModels.filter(m => !m.supportsStreaming);
+                if (nonStreamingModels.length > 0) {
+                    const nonStreamingModelIds = nonStreamingModels.map(m => m.id);
+                    console.log(`Processing non-streaming models: ${nonStreamingModelIds.join(', ')}`);
+
+                    try {
+                        // Wait for thread ID from streaming response if needed
+                        setTimeout(async () => {
+                            const response = await this.apiService.sendChatMessage({
+                                userInput: prompt,
+                                models: nonStreamingModelIds,
+                                threadId: this.currentThreadIdValue || undefined,
+                                promptId,
+                                templateId: this.selectedTemplateIdValue || undefined,
+                                stream: false
+                            });
+
+                            console.log('Non-streaming API Response Data:', response);
+
+                            // Process non-streaming responses
+                            if (response && response.responses) {
+                                Object.entries(response.responses).forEach(([modelId, responseData]) => {
+                                    // Update placeholder with final content
+                                    this.messageService.updatePlaceholderMessage(
+                                        promptId,
+                                        modelId,
+                                        responseData.content,
+                                        responseData.usage
+                                    );
+                                });
+                            }
+
+                            // If no streaming requests are active, mark as complete
+                            if (streamingRequests.length === 0) {
+                                this.isLoadingValue = false;
+                                this.dispatch('sendEnd');
+                            }
+                        }, threadIdFromResponse ? 0 : 500); // Small delay if waiting for thread ID
+                    } catch (apiError) {
+                        console.error('Error with non-streaming models:', apiError);
+                        this.notificationService.showNotification(`Error with non-streaming models: ${apiError.message}`, 'error');
+
+                        // If no streaming requests are active, mark as complete
+                        if (streamingRequests.length === 0) {
+                            this.isLoadingValue = false;
+                            this.dispatch('sendEnd');
                         }
-                        // Show error notification
-                        this.notificationService.showNotification(`Streaming error: ${error.message}`, 'error');
                     }
-                );
-
+                }
             } else {
-                 // For non-streaming, use ApiService
+                 // For non-streaming, use ApiService (when no models support streaming)
                 let response = null; // Initialize response
                 try {
                     response = await this.apiService.sendChatMessage({

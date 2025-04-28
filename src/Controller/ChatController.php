@@ -201,6 +201,7 @@ class ChatController extends AbstractController
         // --- Streaming Response ---
         if ($allowsStream) {
             // Call with potentially null Template object and raw userInput
+            // For streaming, we only process one model at a time, as each request will be for a single model
             $modelResponses = $openRouter->streamResponse($selectedTemplate, $userInput, [$modelIdString], $thread); // Pass $selectedTemplate (can be null)
 
             if (!isset($modelResponses[$modelIdString])) {

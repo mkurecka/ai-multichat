@@ -321,6 +321,35 @@ export default class MessageService {
     }
 
     /**
+     * Remove a specific placeholder message for a model
+     * @param {string} promptId - Prompt ID
+     * @param {string} modelId - Model ID
+     */
+    removePlaceholderForModel(promptId, modelId) {
+        // Find the message group for this prompt
+        const messageGroupElement = this.chatWindow.querySelector(`.message-group[data-prompt-id="${promptId}"]`);
+        if (messageGroupElement) {
+            // Find the assistant responses container
+            const assistantResponsesContainer = messageGroupElement.querySelector('.assistant-responses-container');
+            if (assistantResponsesContainer) {
+                // Find and remove the specific placeholder element for this model
+                const placeholder = assistantResponsesContainer.querySelector(`[data-model-id="${modelId}"][data-placeholder="true"]`);
+                if (placeholder) {
+                    placeholder.remove();
+                }
+
+                // If there are no assistant responses left, remove the entire message group
+                if (assistantResponsesContainer.children.length === 0) {
+                    messageGroupElement.remove();
+                }
+            }
+        } else {
+            // Fallback to the old method if message group not found
+            this.chatWindow.querySelectorAll(`[data-prompt-id="${promptId}"][data-model-id="${modelId}"][data-role="assistant"][data-placeholder="true"]`).forEach(el => el.remove());
+        }
+    }
+
+    /**
      * Clear the chat window
      */
     clearChatWindow() {

@@ -4,7 +4,7 @@
 export default class StreamingService {
     /**
      * Send a streaming request and process the response
-     * 
+     *
      * @param {Object} params - Request parameters
      * @param {Function} onChunk - Callback for each chunk of content
      * @param {Function} onThreadId - Callback when thread ID is received
